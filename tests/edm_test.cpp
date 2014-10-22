@@ -100,7 +100,13 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
   }  
 }
 
-
+BOOST_AUTO_TEST_CASE( grid_1d_read ) {
+  Grid<1>("sample_1d.grid");
+  BOOST_REQUIRE_EQUAL(g.min_[0] == 0)
+  BOOST_REQUIRE_EQUAL(g.max_[0] == 2.5 + g.dx_[0])
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0] == 101)
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0] == 101)
+}
 
 
 BOOST_AUTO_TEST_SUITE_END()

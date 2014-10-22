@@ -8,3 +8,4 @@ target_link_libraries (edm_test
                       ${Boost_SYSTEM_LIBRARY}
                       ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
 		      ${Boost_LIBRARIES})
+file (COPY *.grid DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

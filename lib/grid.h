@@ -39,6 +39,11 @@ class Grid {
     }
   }
 
+  Grid(std::string& input_grid) {
+    read(input_grid);
+  }
+
+
   /** This will actually allocate the arrays and perform any sublcass initialization
    *
    **/
@@ -49,7 +54,7 @@ class Grid {
       grid_size_ *= grid_number_[i];
     grid_ = (double *) malloc(sizeof(double) * DIM * grid_size_);
     if(b_derivatives_)
-      grid_deriv_ = (double *) malloc(sizeof(double) * DIM * grid_size_ * 3);
+      grid_deriv_ = (double *) malloc(sizeof(double) * DIM * DIM * grid_size_);
   }
   
   /**
@@ -144,8 +149,8 @@ class Grid {
       }
       output << setw(8) << grid_[i] << " ";
       if(b_derivatives_) {
-	for(j = 0; j < 3; j++) {
-	  output << setw(8) << grid_deriv_[i*3 + j] << " ";
+	for(j = 0; j < DIM; j++) {
+	  output << setw(8) << grid_deriv_[i*DIM + j] << " ";
 	}
       }
       output << endl;
@@ -164,9 +169,14 @@ class Grid {
     // read plumed-style header
     std::string word;
     input >> word >> word;
-    if(word.compare("FORCE") != 0)
-      fprintf(stderr, "Mangled grid file\n");
+    if(word.compare("FORCE") != 0) {
+      fprintf(stderr, "Mangled grid file\n");    
+      //error
+    } else {
+      input >> b_derivatives_;
+    }
     
+    std::cout << b_derivatives_;
   }
   
   double dx_[DIM];//grid spacing
