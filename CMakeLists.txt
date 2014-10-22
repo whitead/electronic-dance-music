@@ -13,7 +13,7 @@ add_definitions (${CXX_STD_VERSION})
 
 
 #set-up directories
-include_directories ("${PROJECT_SOURCE_DIR}/src")
+include_directories ("${PROJECT_SOURCE_DIR}/lib")
 
 
 #compile src
