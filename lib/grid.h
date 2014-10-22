@@ -156,7 +156,17 @@ class Grid {
   }
 
   void read(std::string& filename) {
-    //read grid from a file
+    using namespace std;
+    ifstream input;
+    size_t i, j;
+    input.open(filename);
+
+    // read plumed-style header
+    std::string word;
+    input >> word >> word;
+    if(word.compare("FORCE") != 0)
+      fprintf(stderr, "Mangled grid file\n");
+    
   }
   
   double dx_[DIM];//grid spacing
@@ -168,7 +178,6 @@ class Grid {
   int b_derivatives_;//if derivatives are going to be used
   double* grid_;//the grid values
   double* grid_deriv_;//derivatives  
-  
   
 };
 
