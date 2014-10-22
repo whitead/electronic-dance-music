@@ -26,3 +26,11 @@
 *.exe
 *.out
 *.app
+
+#Emacs
+*~
+.#*
+#*
+
+#Cmake
+build/*

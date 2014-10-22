@@ -1,0 +1,1 @@
+add_library (edm_lib grid gaussian_grid edm_bias)
