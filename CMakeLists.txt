@@ -6,6 +6,7 @@ set (WordModel_VERSION_MAJOR 0)
 set (WordModel_VERSION_MINOR 1)
 set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
 
+
 #compilation flags
 #set (CXX_STD_VERSION "-std=c++11 -g")
 set (CXX_STD_VERSION "-std=c++11 -O0 -g")

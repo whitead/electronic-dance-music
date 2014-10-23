@@ -9,7 +9,11 @@
 #include <ctime>
 #include <cmath>
 
-#define EPSILON 1e-5
+
+#define EPSILON 1e-10
+#define QUOTE(name) #name
+#define STR(macro) QUOTE(macro)
+#define GRID_SRC std::string(STR(TEST_GRID_SRC))
 
 using namespace boost;
 
@@ -32,7 +36,7 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity )
   double max[] = {10};
   double bin_spacing[] = {1};
   int periodic[] = {0};
-  Grid<1> g (min, max, bin_spacing, periodic, 0);
+  DimmedGrid<1> g (min, max, bin_spacing, periodic, 0);
   g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
@@ -57,7 +61,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
   double max[] = {125, 63, 78};
   double bin_spacing[] = {1.27, 1.36, 0.643};
   int periodic[] = {0, 1, 1};
-  Grid<3> g (min, max, bin_spacing, periodic, 0);
+  DimmedGrid<3> g (min, max, bin_spacing, periodic, 0);
   g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
@@ -101,12 +105,61 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
 }
 
 BOOST_AUTO_TEST_CASE( grid_1d_read ) {
-  Grid<1>("sample_1d.grid");
-  BOOST_REQUIRE_EQUAL(g.min_[0] == 0)
-  BOOST_REQUIRE_EQUAL(g.max_[0] == 2.5 + g.dx_[0])
-  BOOST_REQUIRE_EQUAL(g.grid_number_[0] == 101)
-  BOOST_REQUIRE_EQUAL(g.grid_number_[0] == 101)
+  DimmedGrid<1> g(GRID_SRC + "/1.grid");
+  BOOST_REQUIRE_EQUAL(g.min_[0], 0);
+  BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
 
+BOOST_AUTO_TEST_CASE( grid_3d_read ) {
+  DimmedGrid<3> g(GRID_SRC + "/3.grid");
+  BOOST_REQUIRE_EQUAL(g.min_[2], 0);
+  BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
+  double temp[] = {0.76, 0, 1.01};
+  BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
+}
+
+
+BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
+
+  size_t i, j;
+  std::string input;
+  std::string output;
+  for(i = 1; i <= 3; i++) {
+    std::stringstream filename;
+    filename << i << ".grid";
+    input = GRID_SRC + "/" + filename.str();
+    output = filename.str() + ".test";
+    Grid* g;
+    switch(i) {
+    case 1:
+      g = new DimmedGrid<1>(input);
+      break;
+    case 2:
+      g = new DimmedGrid<2>(input);
+      break;
+    case 3:
+      g = new DimmedGrid<3>(input);
+      break;
+    }
+    g->write(output);
+    //grab the grid for comparison
+    double *ref_grid = g->grid_;
+    g->grid_ = NULL;
+    size_t ref_length = g->grid_size_;
+    //re-read
+    g->read(output);
+    //now compare
+    BOOST_REQUIRE_EQUAL(g->grid_size_, ref_length);
+
+    for(j = 0; j < ref_length; j++)
+      BOOST_REQUIRE(pow(ref_grid[i] - g->grid_[i], 2) < EPSILON);
+
+    free(ref_grid);    
+  }
+  
+}
 
 BOOST_AUTO_TEST_SUITE_END()

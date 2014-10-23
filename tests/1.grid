@@ -1,6 +1,6 @@
 #! FORCE 1
 #! NVAR 1
-#! TYPE 1
+#! TYPE 32
 #! BIN 100
 #! MIN 0.000000
 #! MAX 2.500000
