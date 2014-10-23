@@ -14,7 +14,13 @@
 inline
 int int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
-}                                                                                                                   
+}     
+                     
+inline
+double round(double number)
+{
+  return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
+}
 
 
 /**
@@ -40,7 +46,12 @@ int int_floor(double number) {
 // Giovanni
 
 template<unsigned int DIM> 
-double interp(double* dx, double* where, double* tabf, double* tabder, int* stride, double* der){
+double interp(const double* dx, 
+	      const double* where, 
+	      const double* tabf, 
+	      const double* tabder, 
+	      const int* stride, 
+	      double* der){
 // DIM:   dimensionality
 // dx:     delta between grid points
 // where:  location relative to the floor grid point (always between 0 and dx)
@@ -128,28 +139,20 @@ class Grid {
 
 
  public:  
- Grid(int b_derivatives, int b_interpolate, double* grid, double* grid_deriv) : b_derivatives_(b_derivatives), 
-    b_interpolate_(b_interpolate), grid_(grid), grid_deriv_(grid_deriv) {
-    //empty
-  }
-  virtual double get_value(double* x) = 0;
+  virtual double get_value(const double* x) const = 0;
   /**
    * Get value and put derivatives into "der"
-   */
-  virtual double get_value_deriv(double* x, double* der) = 0;
-  virtual void write(const std::string& filename) = 0;
+   **/
+  virtual double get_value_deriv(const double* x, double* der) const = 0;
+  /**
+   * Write the grid to the given file
+   **/
+  virtual void write(const std::string& filename) const = 0;
   virtual void read(const std::string& filename) = 0;
-  virtual void initialize() = 0;
+  virtual void set_interpolation(int b_interpolate) = 0;
+  virtual double* get_grid() = 0;
+  virtual size_t get_grid_size() const = 0;
 
-  void set_interpolation(int b_interpolate) {
-    b_interpolate_ = b_interpolate;
-  }
-
-  size_t grid_size_;//total size of grid
-  int b_derivatives_;//if derivatives are going to be used
-  int b_interpolate_;//if interpolation should be used on the grid
-  double* grid_;//the grid values
-  double* grid_deriv_;//derivatives  
 };
 
 template<unsigned int DIM>
@@ -158,9 +161,14 @@ class DimmedGrid : public Grid {
    *
    **/
  public:
- DimmedGrid(double* min, double* max, double* bin_spacing, int* b_periodic, int b_derivatives, int b_interpolate) : Grid(b_derivatives, b_interpolate, NULL, NULL) {
+ DimmedGrid(const double* min, 
+	    const double* max, 
+	    const double* bin_spacing, 
+	    const int* b_periodic, 
+	    int b_derivatives, 
+	    int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
 
-    unsigned int i;
+    size_t i;
 
     for(i = 0; i < DIM; i++) {
       min_[i] = min[i];
@@ -175,16 +183,17 @@ class DimmedGrid : public Grid {
       if(!b_periodic_[i])
 	max_[i] += dx_[i];
     }
+    initialize();
   }
 
- DimmedGrid(const std::string& input_grid): Grid(0, 0, NULL, NULL) {
+ DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(0), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
 
   /** 
    * Clone constructor
    **/
- DimmedGrid(DimmedGrid<DIM>& other) : Grid(other.b_derivatives_, other.b_interpolate_, NULL, NULL) {
+ DimmedGrid(const DimmedGrid<DIM>& other) : b_derivatives_(other.b_derivatives_), b_interpolate_(other.b_interpolate_), grid_(NULL), grid_deriv_(NULL) {
     size_t i,j;
     for(i = 0; i < DIM; i++) {
       dx_[i] = other.dx_[i];
@@ -204,40 +213,35 @@ class DimmedGrid : public Grid {
     }
   } 
 
-
-  /** This will actually allocate the arrays and perform any sublcass initialization
-   *
-   **/
-  void initialize() {
-    unsigned int i;
-    grid_size_ = 1;
-    for(i = 0; i < DIM; i++)
-      grid_size_ *= grid_number_[i];
-    grid_ = (double *) malloc(sizeof(double) * DIM * grid_size_);
-    if(b_derivatives_)
-      grid_deriv_ = (double *) malloc(sizeof(double) * DIM * DIM * grid_size_);
+  ~DimmedGrid() {
+    if(grid_ != NULL)
+      free(grid_);
+    if(grid_deriv_ != NULL)
+      free(grid_deriv_);
+    
   }
   
   /**
    * Go from a point to an array of indices
    **/ 
-  size_t* get_index(double* x, size_t result[DIM]) {
-    unsigned int i;
+  void get_index(const double* x, size_t result[DIM]) const {
+    size_t i;
+    double xi;
     for(i = 0; i < DIM; i++) {
+      xi = x[i];
       if(b_periodic_[i])
-	x[i] -= (max_[i] - min_[i]) * int_floor((x[i] - min_[i]) / (max_[i] - min_[i]));
-      result[i] = (int) floor((x[i] - min_[i]) / dx_[i]);
+	xi -= (max_[i] - min_[i]) * int_floor((xi - min_[i]) / (max_[i] - min_[i]));
+      result[i] = (int) floor((xi - min_[i]) / dx_[i]);
     }
-    return result;
   }
 
   /**
    * Go from an array of indices to a single index
    **/
-  size_t multi2one(size_t index[DIM]) {
+  size_t multi2one(const size_t index[DIM]) const {
     size_t result = index[DIM-1];
 
-    unsigned int i;    
+    size_t i;    
     for(i = DIM - 1; i > 0; i--) {
       result = result * grid_number_[i-1] + index[i-1];
     }
@@ -249,8 +253,8 @@ class DimmedGrid : public Grid {
   /** 
    * Go from single index to array
    **/
-  void one2multi(size_t index, size_t result[DIM]) {
-    unsigned int i;
+  void one2multi(size_t index, size_t result[DIM]) const {
+    size_t i;
 
     for(i = 0; i < DIM-1; i++) {
       result[i] = index % grid_number_[i];
@@ -262,16 +266,9 @@ class DimmedGrid : public Grid {
   /**
    * Get the value of the grid at x
    **/ 
-  double get_value(double* x) {
+  double get_value(const double* x) const{
 
-    size_t i;
-    for(i = 0; i < DIM; i++) {
-      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
-	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
-	//error
-	return 0;
-      }
-    }
+    check_point(x);
       
     if(b_interpolate_) {
       double temp[DIM];
@@ -286,7 +283,7 @@ class DimmedGrid : public Grid {
   /**
    * Get value and derivatives
    **/ 
-  double get_value_deriv(double* x, double* der) {
+  double get_value_deriv(const double* x, double* der) const {
     
     if(grid_deriv_ == NULL) {
       std::cerr << "This grid has no derivatives" << std::endl;
@@ -300,14 +297,7 @@ class DimmedGrid : public Grid {
     size_t i;
     
     //checks
-    for(i = 0; i < DIM; i++) {
-      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
-	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
-	//error
-	return 0;
-      }
-    }
-
+    check_point(x);
 
     get_index(x, index);
     index1 = multi2one(index);
@@ -316,14 +306,19 @@ class DimmedGrid : public Grid {
       
       double where[DIM]; //local position (local meaning relative to neighbors
       int stride[DIM]; //the indexing stride, which also accounts for periodicity
+      double wrapped_x;
 
       stride[0] = 1; //dim 0 is fastest
       for(i = 1; i < DIM; i++)
 	stride[i] = stride[i - 1] * grid_number_[i - 1];
 
       for(i = 0; i < DIM; i++) {
+	//wrap x, if needed
+	wrapped_x = x[i];
+	if(b_periodic_[i])
+	  wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
 	//get position relative to neighbors
-	where[i] = x[i] - min_[i] - index[i] * dx_[i];
+	where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	//treat possible stride wrap
 	if(b_periodic_[i] && index[i] == grid_number_[i] - 1)
 	  stride[i] *= (1 - grid_number_[i]);
@@ -341,7 +336,7 @@ class DimmedGrid : public Grid {
     return value;
   }
    
-  void write(const std::string& filename) {
+  void write(const std::string& filename) const {
     using namespace std;
     ofstream output;
     size_t i, j;
@@ -515,12 +510,61 @@ class DimmedGrid : public Grid {
     //all done!
     input.close();
   }
-  
+
+  void set_interpolation(int b_interpolate) {
+    b_interpolate_ = b_interpolate;
+  }
+ 
+  double* get_grid() {
+    return grid_;
+  }
+
+  size_t get_grid_size() const{
+    return grid_size_;
+  }
+
+
+  size_t grid_size_;//total size of grid
+  int b_derivatives_;//if derivatives are going to be used
+  int b_interpolate_;//if interpolation should be used on the grid
+  double* grid_;//the grid values
+  double* grid_deriv_;//derivatives    
   double dx_[DIM];//grid spacing
   double min_[DIM];//grid minimum
   double max_[DIM];//maximum
   int grid_number_[DIM];//number of points on grid
   int b_periodic_[DIM];//if a dimension is periodic
+
+ private:
+  /**
+   * Check if a point is in bounds
+   **/
+  int check_point(const double x[DIM]) const {
+    size_t i;
+    for(i = 0; i < DIM; i++) {
+      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
+	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
+	//error
+	return 0;
+      }
+    }
+    return 1;
+  }
+  
+
+  /** This will actually allocate the arrays and perform any sublcass initialization
+   *
+   **/
+  void initialize() {
+    size_t i;
+    grid_size_ = 1;
+    for(i = 0; i < DIM; i++)
+      grid_size_ *= grid_number_[i];
+    grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
+    if(b_derivatives_)
+      grid_deriv_ = (double *) calloc(DIM * DIM * grid_size_, sizeof(double));
+  }
+
   
 };
 

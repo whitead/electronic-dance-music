@@ -1,4 +1,5 @@
 #include "grid.h"
+#include "gaussian_grid.h"
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM
 #include <boost/test/unit_test.hpp>
@@ -29,7 +30,6 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity )
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 0, 0);
-  g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
   BOOST_REQUIRE_EQUAL(g.grid_size_, 11);
@@ -61,7 +61,6 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
   double bin_spacing[] = {1.27, 1.36, 0.643};
   int periodic[] = {0, 1, 1};
   DimmedGrid<3> g (min, max, bin_spacing, periodic, 0, 0);
-  g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
   BOOST_REQUIRE_EQUAL(g.grid_number_[1], 50);
@@ -145,18 +144,18 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
     }
     g->write(output);
     //grab the grid for comparison
-    double *ref_grid = g->grid_;
-    g->grid_ = NULL;
-    size_t ref_length = g->grid_size_;
+    size_t ref_length = g->get_grid_size();
+    double ref_grid[ref_length];
+    for(i = 0; i < ref_length; i++)
+      ref_grid[i] = g->get_grid()[i];
     //re-read
     g->read(output);
     //now compare
-    BOOST_REQUIRE_EQUAL(g->grid_size_, ref_length);
+    BOOST_REQUIRE_EQUAL(g->get_grid_size(), ref_length);
 
     for(j = 0; j < ref_length; j++)
-      BOOST_REQUIRE(pow(ref_grid[i] - g->grid_[i], 2) < EPSILON);
+      BOOST_REQUIRE(pow(ref_grid[j] - g->get_grid()[j], 2) < EPSILON);
 
-    free(ref_grid);    
   }
   
 }
@@ -168,7 +167,6 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
-  g.initialize();
 
   
   for(int i = 0; i < 11; i++) {
@@ -206,7 +204,6 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
   double bin_spacing[] = {M_PI / 100};
   int periodic[] = {1};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
-  g.initialize();
 
   for(int i = 0; i < g.grid_number_[0]; i++) {
     g.grid_[i] = sin(g.min_[0] + i * g.dx_[0]);
@@ -236,7 +233,6 @@ BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
   double bin_spacing[] = {M_PI / 100, M_PI / 100, 1};
   int periodic[] = {1, 1, 0};
   DimmedGrid<3> g (min, max, bin_spacing, periodic, 1, 0);
-  g.initialize();
   
   size_t index = 0;
   double x,y,z;
@@ -269,6 +265,64 @@ BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
   BOOST_REQUIRE(pow(der[1] - true_der[1], 2) < 0.1);
   BOOST_REQUIRE(pow(der[2] - true_der[2], 2) < 0.1);
 
+}
+
+BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
+  double min[] = {-10};
+  double max[] = {10};
+  double sigma[] = {1};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
+
+  //add 1 gaussian
+  double x[] = {0};
+  g.add_gaussian(x, 1);
+
+  //now check a few points
+  BOOST_REQUIRE(pow(g.get_value(x) - 1, 2) < EPSILON);
+  
+  int i;
+  for( i = -6; i < 7; i++) {
+    x[0] = i;
+    BOOST_REQUIRE(pow(g.get_value(x) - exp(-x[0]*x[0]/2.), 2) < 0.01);
+  }
+ 
+}
+
+BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double offsets = 1. / N;
+
+  //generate a random number but use sequential grid point offsets
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    g.add_gaussian(x, 1.5);
+  }
+
+  //now we integrate the grid
+  double area = 0;
+  double dx = 0.1;
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    area += g.get_value(x) * dx;
+  }
+
+  //Make sure the integrated area is correct
+  //unnormalized, so a little height scaling is necessary
+  BOOST_REQUIRE(pow(area - N * 1.5 * sigma[0] * sqrt(2 * M_PI), 2) < 0.1);
+ 
 }
 
 struct FooTest {
