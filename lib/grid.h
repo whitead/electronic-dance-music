@@ -16,21 +16,138 @@ int int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
 }                                                                                                                   
 
+
+/**
+ * This method was adapted from PLUMED 1.3 (Copyright (c) 2008-2011 The PLUMED team.) and is distributed under GPL * v3.
+ *
+ * The notes below provide a good overview. I've added comments myself to the method throughout
+ **/
+//-------------------------------------------------------------------------------------------
+// Interpolation with a (sort of) cubic spline.
+// The function is built as a sum over the nearest neighbours (i.e. 2 in 1d, 4 in 2d, 8 in 3d,...).
+// Each neighbour contributes with a polynomial function which is a product of single-dimensional polynomials,
+// written as functions of the distance to the neighbour in units of grid spacing
+// Each polynomial is proportional to:
+// (1-3x^2+2x^3)  + Q (x-2x^2+x^3)
+// * its value and derivative in +1 are zero
+// * its value in 0 is 1
+// * its derivative in 0 is Q
+// so, Q is chosen as the desired derivative at the grid point divided by the value at the grid point
+// and the final function is multiplied times the value at the grid point.
+//
+// It works perfectly, except when the tabulated function is zero (there is a special case).
+// Maybe one day I will learn the proper way to do splines...
+// Giovanni
+
+template<unsigned int DIM> 
+double interp(double* dx, double* where, double* tabf, double* tabder, int* stride, double* der){
+// DIM:   dimensionality
+// dx:     delta between grid points
+// where:  location relative to the floor grid point (always between 0 and dx)
+// tabf:   table with function, already pointed at the floor grid point
+// tabder: table with POSITIVE gradients (the fastest running index is the dimension index), already pointed at the floor grid point
+// stride: strides to the next point on the tabf array.
+//         note that, in case of PBC, this stride should corrispond to a backward jump of (N-1) points,
+//         where N is the number of points in the domain. 
+//         also note that the corrisponding strides for tabder can be obtained multipling times DIM
+// der:    in output, the minus gradient.
+
+  int idim, jdim;
+  int npoints,ipoint;
+  double X;
+  double X2;
+  double X3; 
+  int x0[DIM]; //0 or 1, indicates neighbors relative position on local grid to interpolating point
+  double fd[DIM]; // the unscaled interpolated derivative contribution from a neighbor
+  double C[DIM]; // The value of the polynomials
+  double D[DIM]; // The derivative of the polynomials
+  int  tmp,shift;
+  double f; //the final value of the interpolated function
+  double ff; // the unscaled interpolated contribution from a neighbor
+  double qq; // the neighbor derivative divided by its value
+
+  //Get the number of neighbors for a given dimension
+  npoints = 1; 
+  for(idim = 0;idim < DIM; idim++) 
+    npoints *= 2; // npoints=2**DIM
+  
+  // reset
+  f = 0;
+  for(idim = 0;idim < DIM; idim++) 
+    der[idim] = 0;
+  
+  // looping over neighbour points:
+  for(ipoint = 0; ipoint < npoints; ipoint++){
+    
+    // find the local grid offset of neighbour point (x0) [0 or 1] and its corresponding change in collapsed index in order to use the given potential and forces
+    tmp = ipoint;
+    shift = 0;
+    for(idim = 0;idim < DIM; idim++){
+      x0[idim] = tmp % 2; tmp /= 2; //this defines the single current neighbor we're considering 
+      shift += stride[idim] * x0[idim]; //the shift in the collapsed index for the current neighbor
+    }
+
+    // reset contribution
+    ff = 1.0;
+
+    //the neighbor has n-dimensions, so we make the polynomial n-dimensional
+    for(idim = 0;idim < DIM; idim++){
+      X = fabs(where[idim] / dx[idim] - x0[idim]); //switch from local spatial coordinates to local rescaled 
+      X2 = X * X;
+      X3 = X2 * X;
+      if(fabs(tabf[shift]) < 0.0000001) 
+	qq = 0.0; //special case of 0/0
+      else 
+	qq = -tabder[shift * DIM + idim] / tabf[shift];
+      
+      //The sign change is in case we want a backwards or fowrards derivative
+      //dx comes back in via chain rule
+      C[idim] = (1 - 3 * X2 + 2 * X3) - (x0[idim] ? -1 : 1) * qq * (X - 2 * X2 + X3) * dx[idim];
+      D[idim] = ( -6 * X + 6 * X2) - (x0[idim] ? -1 : 1) * qq * (1 - 4 * X + 3 * X2) * dx[idim]; // d / dX
+      D[idim]  *= (x0[idim] ? -1 : 1)/dx[idim]; // chain rule (to where)
+      ff  *= C[idim]; // we are multiplying the polynomials (same as below)
+    }
+
+    for(idim = 0; idim < DIM; idim++) {
+      fd[idim] = D[idim];
+      for(jdim = 0; jdim < DIM; jdim++) 
+	if(jdim != idim) 
+	  fd[idim]  *= C[jdim];
+    }
+
+    //add the contribution from this neighbor
+    f += tabf[shift]*ff;
+    for(idim = 0; idim < DIM; idim++) 
+      der[idim] += tabf[shift] * fd[idim];
+  }
+  return f;
+};
+
+
 class Grid {
 
 
  public:  
- Grid(int b_derivatives, double* grid, double* grid_deriv) : b_derivatives_(b_derivatives), 
-    grid_(grid), grid_deriv_(grid_deriv) {
+ Grid(int b_derivatives, int b_interpolate, double* grid, double* grid_deriv) : b_derivatives_(b_derivatives), 
+    b_interpolate_(b_interpolate), grid_(grid), grid_deriv_(grid_deriv) {
     //empty
   }
   virtual double get_value(double* x) = 0;
+  /**
+   * Get value and put derivatives into "der"
+   */
+  virtual double get_value_deriv(double* x, double* der) = 0;
   virtual void write(const std::string& filename) = 0;
   virtual void read(const std::string& filename) = 0;
   virtual void initialize() = 0;
 
+  void set_interpolation(int b_interpolate) {
+    b_interpolate_ = b_interpolate;
+  }
+
   size_t grid_size_;//total size of grid
   int b_derivatives_;//if derivatives are going to be used
+  int b_interpolate_;//if interpolation should be used on the grid
   double* grid_;//the grid values
   double* grid_deriv_;//derivatives  
 };
@@ -41,7 +158,7 @@ class DimmedGrid : public Grid {
    *
    **/
  public:
- DimmedGrid(double* min, double* max, double* bin_spacing, int* b_periodic, int b_derivatives) : Grid(b_derivatives, NULL, NULL) {
+ DimmedGrid(double* min, double* max, double* bin_spacing, int* b_periodic, int b_derivatives, int b_interpolate) : Grid(b_derivatives, b_interpolate, NULL, NULL) {
 
     unsigned int i;
 
@@ -60,14 +177,14 @@ class DimmedGrid : public Grid {
     }
   }
 
- DimmedGrid(const std::string& input_grid): Grid(0, NULL, NULL) {
+ DimmedGrid(const std::string& input_grid): Grid(0, 0, NULL, NULL) {
     read(input_grid);
   }
 
   /** 
    * Clone constructor
    **/
- DimmedGrid(DimmedGrid<DIM>& other) : Grid(other.b_derivatives_, NULL, NULL) {
+ DimmedGrid(DimmedGrid<DIM>& other) : Grid(other.b_derivatives_, other.b_interpolate_, NULL, NULL) {
     size_t i,j;
     for(i = 0; i < DIM; i++) {
       dx_[i] = other.dx_[i];
@@ -146,9 +263,82 @@ class DimmedGrid : public Grid {
    * Get the value of the grid at x
    **/ 
   double get_value(double* x) {
+
+    size_t i;
+    for(i = 0; i < DIM; i++) {
+      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
+	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
+	//error
+	return 0;
+      }
+    }
+      
+    if(b_interpolate_) {
+      double temp[DIM];
+      return get_value_deriv(x, temp);
+    }
+
     size_t index[DIM];
     get_index(x, index);
     return grid_[multi2one(index)];
+  }
+
+  /**
+   * Get value and derivatives
+   **/ 
+  double get_value_deriv(double* x, double* der) {
+    
+    if(grid_deriv_ == NULL) {
+      std::cerr << "This grid has no derivatives" << std::endl;
+      //error
+      return get_value(x);
+    }
+
+    double value;
+    size_t index[DIM];
+    size_t index1;
+    size_t i;
+    
+    //checks
+    for(i = 0; i < DIM; i++) {
+      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
+	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
+	//error
+	return 0;
+      }
+    }
+
+
+    get_index(x, index);
+    index1 = multi2one(index);
+
+    if(b_interpolate_) {
+      
+      double where[DIM]; //local position (local meaning relative to neighbors
+      int stride[DIM]; //the indexing stride, which also accounts for periodicity
+
+      stride[0] = 1; //dim 0 is fastest
+      for(i = 1; i < DIM; i++)
+	stride[i] = stride[i - 1] * grid_number_[i - 1];
+
+      for(i = 0; i < DIM; i++) {
+	//get position relative to neighbors
+	where[i] = x[i] - min_[i] - index[i] * dx_[i];
+	//treat possible stride wrap
+	if(b_periodic_[i] && index[i] == grid_number_[i] - 1)
+	  stride[i] *= (1 - grid_number_[i]);
+      }
+      
+      value = interp<DIM>(dx_, where, &grid_[index1], &grid_deriv_[index1 * DIM], stride, der);
+      
+    } else {
+      for(i = 0; i < DIM; i++) {
+	der[i] = grid_deriv_[index1 * DIM + i];
+      }
+      value = grid_[index1];
+    }
+
+    return value;
   }
    
   void write(const std::string& filename) {

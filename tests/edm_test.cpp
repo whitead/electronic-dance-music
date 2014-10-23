@@ -17,14 +17,6 @@
 
 using namespace boost;
 
-struct FooTest {
-  FooTest(){
-    //
-  }  
-};
-
-BOOST_FIXTURE_TEST_SUITE( foo_test, FooTest )
-
 BOOST_AUTO_TEST_CASE( grid_1d_sanity )
 {
   /* Visual:
@@ -36,7 +28,7 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity )
   double max[] = {10};
   double bin_spacing[] = {1};
   int periodic[] = {0};
-  DimmedGrid<1> g (min, max, bin_spacing, periodic, 0);
+  DimmedGrid<1> g (min, max, bin_spacing, periodic, 0, 0);
   g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
@@ -52,7 +44,14 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity )
 
   double x[] = {3.5};
   BOOST_REQUIRE(pow(g.get_value(x) - 3, 2) < 0.000001);
-    
+
+  //try to break it
+  x[0] = 0;
+  g.get_value(x);
+
+  x[0] = 10;
+  g.get_value(x);
+
 }
 
 BOOST_AUTO_TEST_CASE( grid_3d_sanity )
@@ -61,7 +60,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
   double max[] = {125, 63, 78};
   double bin_spacing[] = {1.27, 1.36, 0.643};
   int periodic[] = {0, 1, 1};
-  DimmedGrid<3> g (min, max, bin_spacing, periodic, 0);
+  DimmedGrid<3> g (min, max, bin_spacing, periodic, 0, 0);
   g.initialize();
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
@@ -161,5 +160,124 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
   }
   
 }
+
+BOOST_AUTO_TEST_CASE( interpolation_1d ) {
+  
+  double min[] = {0};
+  double max[] = {10};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
+  g.initialize();
+
+  
+  for(int i = 0; i < 11; i++) {
+    g.grid_[i] = log(i);
+    g.grid_deriv_[i] = 1. / i;
+  }
+
+  double array[] = {5.3};
+  double der[1];
+  double fhat = g.get_value_deriv(array,der);
+
+  //make sure it's at least in the ballpark
+  BOOST_REQUIRE(fhat > log(5) && fhat < log(6));
+  BOOST_REQUIRE(der[0] < 1. / 5 && der[0] > 1. / 6.);
+
+  //Make sure it's reasonably accurate
+  BOOST_REQUIRE(pow(fhat - log(5.3), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0]- 1. / 5.3, 2) < 0.1);
+
+  //try edge cases
+  array[0] = 5.0;
+  g.get_value(array);
+  array[0] = 5.5;
+  g.get_value(array);
+  array[0] = 0.0;
+  g.get_value(array);
+  array[0] = 10.0;
+  g.get_value(array);
+
+}
+
+BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
+  double min[] = {-M_PI};
+  double max[] = {M_PI};
+  double bin_spacing[] = {M_PI / 100};
+  int periodic[] = {1};
+  DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
+  g.initialize();
+
+  for(int i = 0; i < g.grid_number_[0]; i++) {
+    g.grid_[i] = sin(g.min_[0] + i * g.dx_[0]);
+    g.grid_deriv_[i] = cos(g.min_[0] + i * g.dx_[0]);
+  }
+
+  double array[] = {M_PI / 4};
+  double der[1];
+  double fhat = g.get_value_deriv(array,der);
+
+  //Make sure it's reasonably accurate
+  BOOST_REQUIRE(pow(fhat- sin(array[0]), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
+
+  //test periodic
+  array[0] = 5 * M_PI / 4;
+  fhat = g.get_value_deriv(array,der);
+
+  BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
+
+}
+
+BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
+  double min[] = {-M_PI, -M_PI, 0};
+  double max[] = {M_PI, M_PI, 10};
+  double bin_spacing[] = {M_PI / 100, M_PI / 100, 1};
+  int periodic[] = {1, 1, 0};
+  DimmedGrid<3> g (min, max, bin_spacing, periodic, 1, 0);
+  g.initialize();
+  
+  size_t index = 0;
+  double x,y,z;
+  
+  for(int i = 0; i < g.grid_number_[2]; i++) {
+    for(int j = 0; j < g.grid_number_[1]; j++) {
+      for(int k = 0; k < g.grid_number_[0]; k++) {
+	x = g.min_[0] + k * g.dx_[0];
+	y = g.min_[1] + j * g.dx_[1];
+	z = g.min_[2] + i * g.dx_[2];
+	g.grid_[index] = cos(x) * sin(y) * z;
+	g.grid_deriv_[index * 3 + 0] = -sin(x) * sin(y) * z;
+	g.grid_deriv_[index * 3 + 1] = cos(x) * cos(y) * z;
+	g.grid_deriv_[index * 3 + 2] = cos(x) * sin(y);
+	index++;
+      }
+    }
+  }
+
+  double array[] = {-10.75 * M_PI / 2, 8.43 * M_PI / 2, 3.5};
+  double der[3];
+  double fhat = g.get_value_deriv(array,der);
+  double f = cos(array[0]) * sin(array[1]) * array[2];
+  double true_der[] = {-sin(array[0]) * sin(array[1]) * array[2],
+		       cos(array[0]) * cos(array[1]) * array[2],
+		       cos(array[0]) * sin(array[1])};
+  
+  BOOST_REQUIRE(pow(f- fhat, 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - true_der[0], 2) < 0.1);
+  BOOST_REQUIRE(pow(der[1] - true_der[1], 2) < 0.1);
+  BOOST_REQUIRE(pow(der[2] - true_der[2], 2) < 0.1);
+
+}
+
+struct FooTest {
+  FooTest(){
+    //
+  }  
+};
+
+BOOST_FIXTURE_TEST_SUITE( foo_test, FooTest )
+
 
 BOOST_AUTO_TEST_SUITE_END()
