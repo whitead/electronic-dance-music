@@ -22,7 +22,6 @@ double round(double number)
   return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
 }
 
-
 /**
  * This method was adapted from PLUMED 1.3 (Copyright (c) 2008-2011 The PLUMED team.) and is distributed under GPL * v3.
  *
@@ -567,5 +566,37 @@ class DimmedGrid : public Grid {
 
   
 };
+
+Grid* make_grid(unsigned int dim, 
+		const double* min, 
+		const double* max, 
+		const double* bin_spacing, 
+		const int* b_periodic, 
+		int b_derivatives, 
+		int b_interpolate) {
+  switch(dim) {
+  case 1:
+    return new DimmedGrid<1>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
+  case 2:
+    return new DimmedGrid<2>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
+  case 3:
+    return new DimmedGrid<3>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
+  }
+
+  return NULL;
+}
+
+Grid* read_grid(unsigned int dim, const std::string& filename) {
+  switch(dim) {
+  case 1:
+    return new DimmedGrid<1>(filename);
+  case 2:
+    return new DimmedGrid<2>(filename);
+  case 3:
+    return new DimmedGrid<3>(filename);
+  }
+  return NULL;
+}
+
 
 #endif //GRID_H_
