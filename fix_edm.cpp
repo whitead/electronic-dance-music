@@ -1,7 +1,8 @@
 /**
  * Example syntax:
- *   fix ID group-ID EDM input_file
+ *   fix [ID] [group-ID] edm [temperature] [input_file] [add hill stride, integer] [write bias stride, integer] [bias file] [seed]
  *
+ * make sure write bias is large because that takes a long time
  **/
 
 #include "math.h"
@@ -12,9 +13,13 @@
 #include "force.h"
 #include "respa.h"
 #include "domain.h"
+#include "random_mars.h"
 #include "error.h"
 #include "group.h"
+#include "memory.h"
 #include "fix_edm.h"
+
+#include "edm_bias.h"
 
 using namespace LAMMPS_NS;
 
@@ -28,7 +33,7 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
   int i,j,k,i_c,nn,mm;
   int me;
 
-  if (narg != 5) error->all(FLERR,"Illegal fix EDM command");
+  if (narg != 9) error->all(FLERR,"Illegal fix EDM command");
 
   MPI_Comm_rank(world,&me);
   MPI_Comm_size(world,&size);
@@ -36,7 +41,23 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
   if (!atom->tag_enable)
     error->all(FLERR,"fix EDM requires atom tags");
 
+  temperature = atof(arg[3]);
+  stride = atoi(arg[5]);
+  write_stride = atoi(arg[6]);
+  strcpy(bias_file, arg[7]);
+  seed = atoi(arg[8]);
+  if(stride < 0)
+    error->all(FLERR,"Illegal stride given to EDM command");
+  if(write_stride < 0)
+    error->all(FLERR,"Illegal write bias stride given to EDM command");
+
+
   //here is where we would load up the EDM bias
+  bias = new EDMBias(arg[4]);
+
+  bias->set_mask(atom->mask);
+  random_numbers = NULL;
+  random = new RanMars(lmp,seed + me);
 
   return;
 }
@@ -45,7 +66,12 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
 
 FixEDM::~FixEDM()
 {
-
+  if(bias != NULL)
+    delete bias;
+  if(bias != NULL)
+    delete random;
+  
+  memory->destroy(random_numbers);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -69,6 +95,9 @@ void FixEDM::init()
 
   if (strcmp(update->integrate_style,"respa") == 0)
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
+  bias->setup(temperature, force->boltz * temperature);
+  bias->subdivide(domain->sublo, domain->subhi, domain->periodicity);
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -95,7 +124,30 @@ void FixEDM::min_setup(int vflag)
 
 void FixEDM::post_force(int vflag)
 {
-  //update biases
+
+  //just in case; important since subgrids have little awareness of overall periodicity
+  domain->pbc();
+
+  //update force
+  bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
+  //treat add hills
+  if(update->ntimestep % stride == 0) {
+
+    //bias requires payment in the form of an array of random numbers
+    if(random_numbers == NULL) {
+      memory->create(random_numbers, atom->nmax, "fix/edm:random_numbers");
+    }
+    int i;
+    for(i = 0; i < atom->nlocal+atom->nghost; i++) {
+      random_numbers[i] = random->uniform();
+    }
+
+    bias->add_hills(atom->nlocal+atom->nghost, atom->x, random_numbers, groupbit);
+  }
+
+  if(update->ntimestep % write_stride == 0) {
+    bias->write_bias(bias_file);
+  }
 }
 
 /* ---------------------------------------------------------------------- */

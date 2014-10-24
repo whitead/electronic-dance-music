@@ -1,0 +1,9 @@
+dimension 2
+tempering 0
+hill_prefactor 1.0
+hill_density 1
+bias_spacing 1.0 1.0
+bias_sigma 2 1
+target_filename 2.grid.test
+box_low 0 0 
+box_high 5 5

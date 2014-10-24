@@ -1,4 +1,5 @@
 #include "grid.h"
+#include "edm_bias.h"
 #include "gaussian_grid.h"
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM
@@ -325,13 +326,22 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
  
 }
 
-struct FooTest {
-  FooTest(){
+
+BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
+  EDMBias bias = EDMBias(GRID_SRC + "/bfile_test_1.txt");
+  BOOST_REQUIRE_EQUAL(bias.dim_, 2);
+  BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
+  BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
+  BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
+}
+
+struct EDMBiasTest {
+  EDMBiasTest(){
     //
   }  
 };
 
-BOOST_FIXTURE_TEST_SUITE( foo_test, FooTest )
+BOOST_FIXTURE_TEST_SUITE( edmbias_test, EDMBiasTest )
 
 
 BOOST_AUTO_TEST_SUITE_END()

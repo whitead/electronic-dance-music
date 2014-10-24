@@ -8,6 +8,8 @@ FixStyle(edm,FixEDM)
 #define LMP_FIX_EDM_H
 
 #include "fix.h"
+#include "edm_bias.h"
+#include "random_mars.h"
 
 namespace LAMMPS_NS {
 
@@ -26,6 +28,15 @@ class FixEDM : public Fix {
   void min_post_force(int);
 
  private:
+   class EDMBias* bias;
+   char bias_file[256];
+   double temperature;
+   int stride;
+   int write_stride;
+   double* random_numbers;
+   class RanMars *random;
+   unsigned int seed;
+   int nlevels_respa;
 };
 
 };

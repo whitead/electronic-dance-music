@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <iomanip>
+#include "mpi.h"
 
 #define GRID_TYPE 32
  
@@ -147,10 +148,15 @@ class Grid {
    * Write the grid to the given file
    **/
   virtual void write(const std::string& filename) const = 0;
+  virtual void multi_write(const std::string& filename, const double* box_low, const double* box_high) const = 0;
   virtual void read(const std::string& filename) = 0;
   virtual void set_interpolation(int b_interpolate) = 0;
   virtual double* get_grid() = 0;
+  virtual const double* get_dx() const = 0;
+  virtual const double* get_max() const = 0;
+  virtual const double* get_min() const = 0;
   virtual size_t get_grid_size() const = 0;
+  virtual void one2multi(size_t index, size_t* result) const = 0;
 
 };
 
@@ -267,9 +273,17 @@ class DimmedGrid : public Grid {
    **/ 
   double get_value(const double* x) const{
 
-    check_point(x);
+    if(!check_point(x)) {
+      std::cerr << "Bad grid value (";
+      size_t i;
+      for(i = 0; i < DIM; i++)
+	std::cerr << x[i] << ", ";
+      std::cerr << ")" << std::endl;
+      return 0;
+    }
+
       
-    if(b_interpolate_) {
+    if(b_interpolate_ && b_derivatives_) {
       double temp[DIM];
       return get_value_deriv(x, temp);
     }
@@ -284,19 +298,20 @@ class DimmedGrid : public Grid {
    **/ 
   double get_value_deriv(const double* x, double* der) const {
     
-    if(grid_deriv_ == NULL) {
-      std::cerr << "This grid has no derivatives" << std::endl;
-      //error
-      return get_value(x);
-    }
-
     double value;
     size_t index[DIM];
     size_t index1;
     size_t i;
     
     //checks
-    check_point(x);
+    if(!check_point(x)) {
+      std::cerr << "Bad grid value (";
+      size_t i;
+      for(i = 0; i < DIM; i++)
+	std::cerr << x[i] << ", ";
+      std::cerr << ")" << std::endl;
+      return 0;
+    }
 
     get_index(x, index);
     index1 = multi2one(index);
@@ -339,7 +354,7 @@ class DimmedGrid : public Grid {
     using namespace std;
     ofstream output;
     size_t i, j;
-    output.open(filename);
+    output.open(filename.c_str());
 
     // print plumed-style header
     output << "#! FORCE " << b_derivatives_ << endl;
@@ -377,12 +392,12 @@ class DimmedGrid : public Grid {
     for(i = 0; i < grid_size_; i++) {
       one2multi(i, temp);
       for(j = 0; j < DIM; j++) {
-	output << setw(8) << left << setfill('0') << (min_[j] + dx_[j] * temp[j]) << " ";
+	output << setprecision(8) << std::fixed << (min_[j] + dx_[j] * temp[j]) << " ";
       }
-      output << setw(8) << left << setfill('0') << grid_[i] << " ";
+      output << setprecision(8) << std::fixed << grid_[i] << " ";
       if(b_derivatives_) {
 	for(j = 0; j < DIM; j++) {
-	  output << setw(8) << left << setfill('0')<<  grid_deriv_[i*DIM + j] << " ";
+	  output << setprecision(8) << std::fixed <<  -grid_deriv_[i*DIM + j] << " ";
 	}
       }
       output << endl;
@@ -392,15 +407,147 @@ class DimmedGrid : public Grid {
 
     output.close();    
   }
+
+  void multi_write(const std::string& filename, const double box_min[DIM], const double box_max[DIM]) const {
+
+    using namespace std;
+        
+    size_t i, j;
+
+    for(i = 0; i < DIM; i++) {
+      if(b_periodic_[i]) {
+	cerr << "Multi-write does not work for periodic gridded systems!!!!" << endl;
+	return;
+      }
+    }
+
+
+    int myrank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    size_t index[DIM];
+    double x[DIM];
+    unsigned int counts[DIM];
+    unsigned int reduced_counts[DIM];
+    ofstream output;     
+    
+    //first, count the number of points that we will have in this box
+    for(i = 0; i < DIM; i++)
+      counts[i] = 0;
+    
+    for(i = 0; i < grid_size_; i++) {
+      one2multi(i,index);
+      for(j = 0; j < DIM; j++) {
+	x[j] = min_[j] + dx_[j] * index[j];
+	if(x[j] >= box_min[j] && x[j] <= box_max[j])
+	  counts[j]++;
+      }
+    }
+    
+    MPI_Allreduce(counts, reduced_counts, DIM, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+    
+    //write header
+    if(myrank == 0) {
+      
+      output.open(filename.c_str());
+      
+      // print plumed-style header
+      output << "#! FORCE " << b_derivatives_ << endl;
+      output << "#! NVAR " << DIM << endl;
+      
+      output << "#! TYPE ";
+      for(i = 0; i < DIM; i++)
+	output << GRID_TYPE << " ";
+      output << endl;
+      
+      output << "#! BIN ";
+      for(i = 0; i < DIM; i++)
+	output << reduced_counts[i] - 1<< " ";
+      output << endl;
+      
+      output << "#! MIN ";
+      for(i = 0; i < DIM; i++)
+	output << box_min[i] << " ";
+      output << endl;
+      
+      output << "#! MAX ";
+      for(i = 0; i < DIM; i++)
+	output << box_max[i] << " ";
+      output << endl;
+      
+      output << "#! PBC ";
+      for(i = 0; i < DIM; i++)
+	output << b_periodic_[i] << " ";
+      output << endl;
+
+      output.close();
+      
+    }
+    
+    size_t total = 1;
+    for(i = 0; i < DIM; i++)
+      total *= reduced_counts[i];
+    
+    //print out grid
+    double der[DIM];
+    int b_amwriting = 0;
+    size_t super_index[DIM];
+    size_t temp;
+    double value;
+    for(i = 0; i < total; i++) {
+
+      //one2multi
+      temp = i;
+      for(j = 0; j < DIM-1; j++) {
+	super_index[j] = temp % reduced_counts[j];
+	super_index[j] = (temp - super_index[j]) / reduced_counts[j];
+	x[j] = super_index[j] * dx_[j] +  box_min[j];
+      }
+      super_index[j] = temp; 
+      x[j] = super_index[j] * dx_[j] +  box_min[j];
+
+      //Is it my turn to write?
+      if(check_point(x)) {
+	if(!b_amwriting) {
+	  //	  cout << "I am " << myrank << " and I'm going to write now" << endl;
+	  b_amwriting = 1;
+	  output.open(filename.c_str(), std::fstream::out | std::fstream::app);
+	}
+      } else {
+	if(b_amwriting) {
+	  //	  cout << "I am " << myrank << "and I will stop writing" << endl;
+	  b_amwriting = 0;
+	  output.close();
+	}
+      }
+
+      //now write!
+      for(j = 0; j < DIM; j++) {
+	output << setprecision(8) << std::fixed << x[j] << " ";
+      }
+      value = get_value_deriv(x, der);
+      output << setprecision(8) << std::fixed << value << " ";
+      if(b_derivatives_) {
+	for(j = 0; j < DIM; j++) {
+	  output << setprecision(8) << std::fixed <<  -der[j] << " ";
+	}
+      }
+      output << endl;
+      if(super_index[0] == reduced_counts[0] - 1)
+	output << endl;
+    }
+    if(b_amwriting)
+      output.close();
+  }
   
   void read(const std::string& filename) {
     using namespace std;
     ifstream input;
     size_t i, j;
-    input.open(filename);
+    input.open(filename.c_str());
 
     if(!input.is_open()) {      
-      cerr << "Cannot open input file " << filename << endl;
+      cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
       //error
     }
 
@@ -518,9 +665,36 @@ class DimmedGrid : public Grid {
     return grid_;
   }
 
+  const double* get_dx() const{
+    return const_cast<double*>(dx_);
+  }
+
+  const double* get_min() const{
+    return const_cast<double*>(min_);
+  }
+
+  const double* get_max() const{
+    return const_cast<double*>(max_);
+  }
+
+
   size_t get_grid_size() const{
     return grid_size_;
   }
+
+  /**
+   * Check if a point is in bounds
+   **/
+  int check_point(const double x[DIM]) const {
+    size_t i;
+    for(i = 0; i < DIM; i++) {
+      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
+	return 0;
+      }
+    }
+    return 1;
+  }
+
 
 
   size_t grid_size_;//total size of grid
@@ -534,22 +708,7 @@ class DimmedGrid : public Grid {
   int grid_number_[DIM];//number of points on grid
   int b_periodic_[DIM];//if a dimension is periodic
 
- private:
-  /**
-   * Check if a point is in bounds
-   **/
-  int check_point(const double x[DIM]) const {
-    size_t i;
-    for(i = 0; i < DIM; i++) {
-      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
-	std::cerr << "Bad grid value " << x[i] << " in dimension " << i << std::endl;
-	//error
-	return 0;
-      }
-    }
-    return 1;
-  }
-  
+ private:  
 
   /** This will actually allocate the arrays and perform any sublcass initialization
    *
@@ -573,30 +732,9 @@ Grid* make_grid(unsigned int dim,
 		const double* bin_spacing, 
 		const int* b_periodic, 
 		int b_derivatives, 
-		int b_interpolate) {
-  switch(dim) {
-  case 1:
-    return new DimmedGrid<1>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
-  case 2:
-    return new DimmedGrid<2>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
-  case 3:
-    return new DimmedGrid<3>(min, max, bin_spacing, b_periodic, b_derivatives, b_interpolate);
-  }
+		int b_interpolate);
 
-  return NULL;
-}
-
-Grid* read_grid(unsigned int dim, const std::string& filename) {
-  switch(dim) {
-  case 1:
-    return new DimmedGrid<1>(filename);
-  case 2:
-    return new DimmedGrid<2>(filename);
-  case 3:
-    return new DimmedGrid<3>(filename);
-  }
-  return NULL;
-}
+Grid* read_grid(unsigned int dim, const std::string& filename);
 
 
 #endif //GRID_H_
