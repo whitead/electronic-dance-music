@@ -131,12 +131,14 @@ void EDMBias::subdivide(const double sublo[3],
 void EDMBias::write_bias(const std::string& output) const {
   #ifndef SERIAL_TEST
   bias_->multi_write(output);
+#ifdef EDM_MPI_DEBUG
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   std::ostringstream oss;
   oss << output << "_" << rank;
   bias_->write(oss.str());
-  #else
+#endif //EDM_DEBUG
+#else //SERIAL TEST
   bias_->write(output);
   #endif
 }
