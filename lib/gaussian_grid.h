@@ -210,13 +210,13 @@ class DimmedGaussGrid : public GaussGrid{
 	xx[j] = grid_.min_[j] + grid_.dx_[j] * xx_index[j];
 	
 	//is this point within the boundary?
-	if(xx[j] < boundary_min_[j] || xx[j] > boundary_max_[j]) {
+	if(!b_periodic_boundary_[j] && (xx[j] < boundary_min_[j] || xx[j] > boundary_max_[j])) {
 	  b_flag = 1;
 	  break;
 	}
       }
 
-      //was this point out of grid or boundary?
+      //was this point out of grid?
       if(b_flag)
 	continue;
 

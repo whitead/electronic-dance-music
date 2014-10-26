@@ -262,7 +262,6 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
 
   double test_point[] = {0,1}; //should not remap
   g.remap(test_point);
-  std::cout << test_point[0] << ", " << test_point[1] <<")" << std::endl;
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
 
@@ -293,6 +292,73 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
 
 
 }
+
+BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {-2};
+  double max[] = {7};
+  double bin_spacing[] = {0.1};
+  int periodic[] = {0};
+  double sigma[] = {0.1};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  min[0] = 0;
+  max[0] = 10;
+  periodic[0] = 1;
+  g.set_boundary(min, max, periodic);
+
+  double test_point[] = {0}; //should not remap
+  g.remap(test_point);
+  std::cout << test_point[0] << ", " << test_point[1] <<")" << std::endl;
+  BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
+
+  test_point[0] = -1;//shoul not remap
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - -1, 2) < 0.1);
+
+  test_point[0] = 9;//should remap
+  g.remap(test_point);
+  std::cout << test_point[0] << std::endl;
+  BOOST_REQUIRE(pow(test_point[0] - -1, 2) < 0.1);
+
+  test_point[0] = 6;//should not remap
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 6, 2) < 0.1);
+
+
+}
+
+
+BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {-2};
+  double max[] = {7};
+  double bin_spacing[] = {0.1};
+  int periodic[] = {0};
+  double sigma[] = {0.1};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  min[0] = 0;
+  max[0] = 10;
+  periodic[0] = 1;
+  g.set_boundary(min, max, periodic);
+
+  double point[] = {0.01};
+  g.add_gaussian(point,1);
+  double der[1];
+  point[0] = 0;
+  g.get_value_deriv(point, der);
+  BOOST_REQUIRE(fabs(der[0]) > 0.1);
+
+
+}
+
+
+
 
 BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
   double min[] = {-M_PI, -M_PI, 0};
@@ -558,7 +624,8 @@ struct EDMBiasTest {
     double low[] = {0};
     double high[] = {10};
     int p[] = {1};
-    bias.subdivide(low, high, p);    
+    double skin[] = {0};
+    bias.subdivide(low, high, p, skin);    
     
   }     
   
