@@ -78,16 +78,7 @@ class DimmedGaussGrid : public GaussGrid{
 
     //Attempt to wrap around the specified boundaries (possibly separate from grid bounds)
     if(!in_bounds(xx)) {
-      int changed = 0;
-      for(i = 0; i < DIM; i++){
-	if(b_periodic_boundary_[i]) {
-	  xx[i] -= int_floor((xx[i] - boundary_min_[i]) / (boundary_max_[i] - boundary_min_[i])) * 
-	    (boundary_max_[i] - boundary_min_[i]);	
-	  changed = 1;
-	}
-      }
-      if(!changed || !in_bounds(xx))
-	return 0;
+      remap(xx);
     }
     
     return grid_.get_value(xx);
@@ -104,19 +95,7 @@ class DimmedGaussGrid : public GaussGrid{
 
     //Attempt to wrap around the specified boundaries (separate from grid bounds)
     if(!in_bounds(xx)) {
-      int changed = 0;
-      for(i = 0; i < DIM; i++){
-	if(b_periodic_boundary_[i]) {
-	  xx[i] -= int_floor((xx[i] - boundary_min_[i]) / (boundary_max_[i] - boundary_min_[i])) * 
-	    (boundary_max_[i] - boundary_min_[i]);	
-	  changed = 1;
-	}
-      }
-      if(!changed || !in_bounds(xx)) {
-	for(i = 0; i < DIM; i++)
-	  der[i] = 0;
-	return 0;
-      }
+      remap(xx);
     }
 
     return grid_.get_value_deriv(xx, der);
@@ -176,31 +155,9 @@ class DimmedGaussGrid : public GaussGrid{
     double x[DIM];
     for(i = 0; i < DIM; i++)
       x[i] = x0[i];
-    
-    //this is a special wrapping. We want to find the nearest image, not the minimal image
-    // eg, our grid runs from 0 to 5 and the box runs from 0 to 10.
-    // If we want to get the contribution from a particle at 9.5, we need to wrap it to -0.5
-    if(!grid_.in_grid(x)) {
-      for(i = 0; i < DIM; i++){
-	if(b_periodic_boundary_[i]) {
-	  
-	  //find which boundary we can best wrap to, temporarily making use of dp[]
 
-	  //this is the image choice
-	  dp[0] = round((grid_.min_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
-	    (boundary_max_[i] - boundary_min_[i]);	
-	  dp[1] = round((grid_.max_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
-	    (boundary_max_[i] - boundary_min_[i]);	
-	  
-	  //which bound is closest
-	  if(fabsl(grid_.min_[i] - x[i] - dp[0]) < fabsl(grid_.max_[i] - x[i] - dp[1]))
-	    x[i] += dp[0]; //wrap to it
-	  else
-	    x[i] += dp[1];
-	}
-      }
-    } 
 
+    remap(x); //attempt to remap to be close or in grid
 
     //now we are at the closest possible image, find an index            
     //normally, would be grid_.get_index(x, x_index);
@@ -350,6 +307,45 @@ class DimmedGaussGrid : public GaussGrid{
     }
 
     return 1;
+  }
+
+  void remap(double x[DIM]) const {
+    
+    double dp[2];
+    size_t i;
+
+    //this is a special wrapping. We want to find the nearest image, not the minimal image
+    // eg, our grid runs from 0 to 5 and the box runs from 0 to 10.
+    // If we want to get the contribution from a particle at 9.5, we need to wrap it to -0.5
+    for(i = 0; i < DIM; i++){
+
+      if(x[i] < grid_.min_[i] || x[i] > grid_.max_[i]) {
+
+	if(grid_.b_periodic_[i]) { //are we periodic, if so than wrap
+
+	  x[i] -= (grid_.max_[i] - grid_.min_[i]) * 
+	    int_floor((x[i] - grid_.min_[i]) / 
+		      (grid_.max_[i] - grid_.min_[i]));
+
+	} else if(b_periodic_boundary_[i]) { 
+	  //if we aren't periodic and out of grid, try wrapping using the system boundaries
+
+	//find which boundary we can best wrap to, temporarily making use of dp[]	
+	//this is the image choice
+	dp[0] = round((grid_.min_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	  (boundary_max_[i] - boundary_min_[i]);	
+	dp[1] = round((grid_.max_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	  (boundary_max_[i] - boundary_min_[i]);	
+	
+	//which bound is closest
+	if(fabsl(grid_.min_[i] - x[i] - dp[0]) < fabsl(grid_.max_[i] - x[i] - dp[1]))
+	  x[i] += dp[0]; //wrap to it
+	else
+	  x[i] += dp[1];
+	}
+      }
+    }
+
   }
 
 

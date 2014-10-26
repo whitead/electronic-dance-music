@@ -18,6 +18,7 @@
 #include "group.h"
 #include "memory.h"
 #include "fix_edm.h"
+#include "neighbor.h"
 
 #include "edm_bias.h"
 
@@ -94,7 +95,9 @@ void FixEDM::init()
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
 
   bias->setup(temperature, force->boltz);
-  bias->subdivide(domain->sublo, domain->subhi, domain->periodicity);
+  double skin[3];
+  skin[0] = skin[1] = skin[2] = neighbor->skin;
+  bias->subdivide(domain->sublo, domain->subhi, domain->periodicity, skin);
   bias->set_mask(atom->mask);
 
 }
@@ -124,7 +127,7 @@ void FixEDM::min_setup(int vflag)
 void FixEDM::post_force(int vflag)
 {
 
-  domain->pbc(); //make sure particles are wrapped
+  //  domain->pbc(); //make sure particles are with thier processors
 
   //update force
   bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  

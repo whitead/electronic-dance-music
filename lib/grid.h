@@ -286,7 +286,7 @@ class DimmedGrid : public Grid {
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
-	std::cerr << x[i] << ", ";
+	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
       return 0;
     }
@@ -317,7 +317,7 @@ class DimmedGrid : public Grid {
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
-	std::cerr << x[i] << ", ";
+	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
       return 0;
     }
@@ -429,13 +429,11 @@ class DimmedGrid : public Grid {
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-    size_t index[DIM];
     double x[DIM];
-    unsigned int counts[DIM];
     unsigned int reduced_counts[DIM];
     ofstream output;     
     double der[DIM];
-    int b_amwriting = 0, flag;
+    int b_amwriting = 0;
     size_t super_index[DIM];
     size_t temp;
     double value;
@@ -496,7 +494,7 @@ class DimmedGrid : public Grid {
       temp = i;
       for(j = 0; j < DIM-1; j++) {
 	super_index[j] = temp % reduced_counts[j];
-	super_index[j] = (temp - super_index[j]) / reduced_counts[j];
+	temp = (temp - super_index[j]) / reduced_counts[j];
 	x[j] = super_index[j] * dx_[j] +  box_min[j];
       }
       super_index[j] = temp; 
@@ -508,12 +506,12 @@ class DimmedGrid : public Grid {
 	MPI_Allreduce(&myrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 		
 	if(!b_amwriting && otherrank == myrank) {
-	  //	  cout << "I am " << myrank << " and I'm going to write now" << endl;
+	  cout << "[" << i << "] I am " << myrank << " and I'm going to write now" << endl;
 	  b_amwriting = 1;
 	  output.open(filename.c_str(), std::fstream::out | std::fstream::app);
 	} else if(b_amwriting && otherrank != myrank) {
 
-	  //	  cout << "I am " << myrank << "and I will stop writing, due to outrank" << endl;
+	  cout << "[" << i << "] I am " << myrank << "and I will stop writing, due to outrank" << endl;
 	  b_amwriting = 0;
 	  output.close();
 
@@ -525,10 +523,11 @@ class DimmedGrid : public Grid {
 	MPI_Allreduce(&otherrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
 	if(b_amwriting) {
-	  //	  cout << "I am " << myrank << "and I will stop writing, due to out of grid" << endl;
+	  cout << "[" << i << "] I am " <<  myrank << "and I will stop, due to out of grid" << endl;
 	  b_amwriting = 0;
 	  output.close();
 	}
+	
       }
       
       MPI_Barrier(MPI_COMM_WORLD);

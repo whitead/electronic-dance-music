@@ -24,7 +24,7 @@ class EDMBias {
   /** Create a grid that only occupies enough space for this processes local box
    *
    */
-  void subdivide(const double sublo[3], const double subhi[3], const int b_periodic[3]);
+  void subdivide(const double sublo[3], const double subhi[3], const int b_periodic[3], const double skin[3]);
 
   void setup(double temperature, double boltzmann_constant);
     
@@ -82,7 +82,7 @@ class EDMBias {
   //buffers for sending and receiving with neighbors
   double send_buffer_[BIAS_BUFFER_SIZE];
   double receive_buffer_[BIAS_BUFFER_SIZE];
-  unsigned int buffer_i;
+  unsigned int buffer_i_;
 
 };
 

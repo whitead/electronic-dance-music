@@ -245,7 +245,52 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
 
 }
 
-BOOST_AUTO_TEST_CASE( wrap_interp_segfault_regression) {
+BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {0, 0};
+  double max[] = {10, 5};
+  double bin_spacing[] = {1, 1};
+  int periodic[] = {1, 0, 0};
+  double sigma[] = {0.1, 0.1};
+  DimmedGaussGrid<2> g (min, max, bin_spacing, periodic, 1, sigma);
+  max[1] = 10;
+  periodic[1] = 1;
+  g.set_boundary(min, max, periodic);
+
+  double test_point[] = {0,1}; //should not remap
+  g.remap(test_point);
+  std::cout << test_point[0] << ", " << test_point[1] <<")" << std::endl;
+  BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[0] = -1;//on grid, at 9
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[1] = 6;//closest point is 6
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 6, 2) < 0.1);
+
+  test_point[1] = 11;//actually in grid at 1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[1] = 9; //closest point is -1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
+
+  test_point[1] = -1; //closest point is -1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
+
 
 }
 

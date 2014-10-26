@@ -12,7 +12,6 @@
 #ifdef EDM_MPI_DEBUG
 #include "unistd.h"
 #endif
- 
 
 //Some stuff for reading in files quickly 
 namespace std {
@@ -41,7 +40,7 @@ EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 						      mask_(NULL),
 						      mpi_neighbor_count_(0),
 						      mpi_neighbors_(NULL),
-						      buffer_i(0){
+						      buffer_i_(0){
   
   //read input file
   read_input(input_filename);  
@@ -59,7 +58,10 @@ EDMBias::~EDMBias() {
 }
 
 
-void EDMBias::subdivide(const double sublo[3], const double subhi[3], const int b_periodic[3]) {
+void EDMBias::subdivide(const double sublo[3], 
+			const double subhi[3], 
+			const int b_periodic[3],
+			const double skin[3]) {
 
   //has subdivide already been called?
   if(bias_ != NULL)
@@ -73,15 +75,19 @@ void EDMBias::subdivide(const double sublo[3], const double subhi[3], const int 
   int bounds_flag = 1;
 
   for(i = 0; i < dim_; i++) {
+
+    min[i] = sublo[i];      
+    max[i] = subhi[i];      
+
     //check if we encapsulate the entire bounds in any dimension
     if(fabs(sublo[i] - min_[i]) < 0.000001 && fabs(subhi[i] - max_[i]) < 0.000001) {
       grid_period[i] = b_periodic[i];
       bounds_flag = 0;      
+    } else {
+      min[i] -= skin[i];
+      max[i] += skin[i];
     }
       
-    min[i] = sublo[i];      
-    max[i] = subhi[i];      
-
     //check if we'll always be out of bounds
     bounds_flag &= (min[i] >= max_[i] || max[i] <= min_[i]);    
     
@@ -136,9 +142,9 @@ void EDMBias::setup(double temperature, double boltzmann_constant) {
   boltzmann_factor_ = boltzmann_constant * temperature;
 
 #ifdef EDM_MPI_DEBUG
-int rank;
-MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-if(rank == 0) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  if(rank == 1) {
     int i = 0;
     char hostname[256];
     gethostname(hostname, sizeof(hostname));
@@ -146,7 +152,8 @@ if(rank == 0) {
     fflush(stdout);
     while (0 == i)
       sleep(5);
- }
+	  }
+  
 
 #endif
 
@@ -163,6 +170,7 @@ void EDMBias::update_forces(int nlocal, const double* const* positions, double**
   if(b_outofbounds_)
     return;
 
+
   //simply perform table look-ups of the positions to get the forces
   int i,j;
   double der[3] = {0, 0, 0};
@@ -173,7 +181,7 @@ void EDMBias::update_forces(int nlocal, const double* const* positions, double**
 	forces[i][j] -= der[j];
     }
   }
-
+  
 }
 
 void EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
@@ -226,13 +234,13 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	  //pack result into buffer if necessary
 	  if(mpi_neighbor_count_ > 0) {
 	    for(j = 0; j < dim_; j++)	    
-	      send_buffer_[buffer_i * (dim_+1) + j] = positions[i][j];
-	    send_buffer_[buffer_i * (dim_+1) + j] = this_h;
+	      send_buffer_[buffer_i_ * (dim_+1) + j] = positions[i][j];
+	    send_buffer_[buffer_i_ * (dim_+1) + j] = this_h;
 
-	    buffer_i++;
+	    buffer_i_++;
 
 	    //do we need to flush?
-	    if(buffer_i * (dim_+1) >= BIAS_BUFFER_SIZE)
+	    if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
 	      bias_added += flush_buffers(0); //flush and we don't know if we're synched
 
 	  }
@@ -308,8 +316,8 @@ double EDMBias::flush_buffers(int synched) {
     if(mpi_neighbor_count_ == size) {
       for(i = 0; i < size; i++) {
 	if(rank == i) {
-	  MPI_Bcast(&buffer_i, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
-	  MPI_Bcast(send_buffer_, buffer_i * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
+	  MPI_Bcast(&buffer_i_, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
+	  MPI_Bcast(send_buffer_, buffer_i_ * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
 	} else {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
@@ -326,27 +334,28 @@ double EDMBias::flush_buffers(int synched) {
 	//start with receive
 	MPI_Irecv(&buffer_j, 1, MPI_UNSIGNED, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &rrequest);
 
-	if(mpi_neighbors_[i] >= 0 && buffer_i > 0) {
+	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0) {
 	  //want to make sure the send is complete before we get to barrier
-	  MPI_Send(&buffer_i, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
-
+	  MPI_Send(&buffer_i_, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
+	  /*
 	  std::cout << "I am " << rank 
 		    << " and I'm sending " 
-		    << buffer_i 
+		    << buffer_i_ 
 		    << " items to " 
 		    << mpi_neighbors_[i] 
 		    << std::endl;
+	  */
 
 	} else {
-	  	  std::cout << "I am " << rank << " and won't send " << std::endl;
+	  //	  	  std::cout << "I am " << rank << " and won't send " << std::endl;
 	}
 	
 	//now make sure everyone is done before we send/receive buffers so we know for sure who is getting one
 	MPI_Barrier(MPI_COMM_WORLD);
 	
 	//now send buffer if needed
-	if(mpi_neighbors_[i] >= 0 && buffer_i > 0) {
-	  MPI_Isend(send_buffer_, buffer_i * (dim_ + 1), MPI_DOUBLE, mpi_neighbors_[i], i, MPI_COMM_WORLD, &srequest); //no blocking
+	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0) {
+	  MPI_Isend(send_buffer_, buffer_i_ * (dim_ + 1), MPI_DOUBLE, mpi_neighbors_[i], i, MPI_COMM_WORLD, &srequest); //no blocking
 	}
 	
 	//if we did get a receive, we know we have an incoming buffer and we need to finish the process
@@ -361,20 +370,20 @@ double EDMBias::flush_buffers(int synched) {
 	  //clean up operation
 	  MPI_Cancel(&rrequest);	  
 	  MPI_Request_free(&rrequest);    
-	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
+	  //	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
 	}
 
 	//finally wait for send to finish, if we did send
-	if(mpi_neighbors_[i] >= 0 && buffer_i > 0)
+	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0)
 	  MPI_Wait(&srequest, MPI_STATUS_IGNORE);
 
       }
     }
 
     //reset buffer
-    buffer_i = 0;
-    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
-  }    
+    buffer_i_ = 0;
+    //    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
+  }
 
 
   
