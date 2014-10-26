@@ -506,12 +506,12 @@ class DimmedGrid : public Grid {
 	MPI_Allreduce(&myrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 		
 	if(!b_amwriting && otherrank == myrank) {
-	  cout << "[" << i << "] I am " << myrank << " and I'm going to write now" << endl;
+	  //	  cout << "[" << i << "] I am " << myrank << " and I'm going to write now" << endl;
 	  b_amwriting = 1;
 	  output.open(filename.c_str(), std::fstream::out | std::fstream::app);
 	} else if(b_amwriting && otherrank != myrank) {
 
-	  cout << "[" << i << "] I am " << myrank << "and I will stop writing, due to outrank" << endl;
+	  //	  cout << "[" << i << "] I am " << myrank << "and I will stop writing, due to outrank" << endl;
 	  b_amwriting = 0;
 	  output.close();
 
@@ -523,7 +523,7 @@ class DimmedGrid : public Grid {
 	MPI_Allreduce(&otherrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
 	if(b_amwriting) {
-	  cout << "[" << i << "] I am " <<  myrank << "and I will stop, due to out of grid" << endl;
+	  //	  cout << "[" << i << "] I am " <<  myrank << "and I will stop, due to out of grid" << endl;
 	  b_amwriting = 0;
 	  output.close();
 	}
