@@ -10,6 +10,7 @@
 #include <map>
 
 #define BIAS_CLAMP 10
+#define BIAS_BUFFER_SIZE 32
 
 class EDMBias {
   /** The EDM bias class.
@@ -17,7 +18,7 @@ class EDMBias {
    *
    */
  public:
-
+  
   EDMBias(const std::string& input_filename);
   ~EDMBias();
   /** Create a grid that only occupies enough space for this processes local box
@@ -25,7 +26,7 @@ class EDMBias {
    */
   void subdivide(const double sublo[3], const double subhi[3], const int b_periodic[3]);
 
-  void setup(double temperature, double boltzmann);
+  void setup(double temperature, double boltzmann_constant);
     
   int read_input(const std::string& input_filename);
   void update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
@@ -47,8 +48,12 @@ class EDMBias {
    */
   void update_height(double bias_added);
 
+  void infer_neighbors();
+  int check_for_flush();
+  double flush_buffers(int snyched);
 
   int b_tempering_;// boolean, do tempering
+  int b_targeting_;// boolean, do targeting  
   unsigned int dim_;//the dimension
   double global_tempering_;// global tempering threshold
   double bias_factor_;
@@ -65,13 +70,19 @@ class EDMBias {
   double* bias_sigma_;
   double* min_; //boundary minimum
   double* max_; //boundary maximum
-  const int* mask_;// a mask to use to exclude atoms
-  
-
+ 
 
   Grid* target_; //target PMF
   GaussGrid* bias_;// bias
+  const int* mask_;// a mask to use to exclude atoms
+
+  unsigned int mpi_neighbor_count_;
+  int* mpi_neighbors_;//who my neighbors are
   
+  //buffers for sending and receiving with neighbors
+  double send_buffer_[BIAS_BUFFER_SIZE];
+  double receive_buffer_[BIAS_BUFFER_SIZE];
+  size_t buffer_i;
 
 };
 

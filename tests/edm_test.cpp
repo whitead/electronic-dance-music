@@ -16,6 +16,7 @@
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 #define GRID_SRC std::string(STR(TEST_GRID_SRC))
+#define EDM_SRC std::string(STR(TEST_EDM_SRC))
 
 using namespace boost;
 
@@ -116,9 +117,24 @@ BOOST_AUTO_TEST_CASE( grid_3d_read ) {
   BOOST_REQUIRE_EQUAL(g.min_[2], 0);
   BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
-  double temp[] = {0.76, 0, 1.01};
+  double temp[] = {0.75, 0, 1.00};
   BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
+  
 }
+
+BOOST_AUTO_TEST_CASE( derivative_direction ) {
+  DimmedGrid<3> g(GRID_SRC + "/3.grid");
+  g.b_interpolate_ = 1;
+
+  double temp[] = {0.75, 0, 1.00};
+  double temp2[] = {0.76, 0, 1.00};
+  BOOST_REQUIRE(g.get_value(temp2)> g.get_value(temp));
+  temp2[0] = 0.75;
+  temp2[2] = 0.99;
+  BOOST_REQUIRE(g.get_value(temp2) < g.get_value(temp));
+  
+}
+
 
 
 BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
@@ -284,12 +300,92 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
   BOOST_REQUIRE(pow(g.get_value(x) - 1, 2) < EPSILON);
   
   int i;
+  double der[1];
+  double value;
   for( i = -6; i < 7; i++) {
     x[0] = i;
-    BOOST_REQUIRE(pow(g.get_value(x) - exp(-x[0]*x[0]/2.), 2) < 0.01);
+    value = g.get_value_deriv(x, der);
+    BOOST_REQUIRE(pow(value - exp(-x[0]*x[0]/2.), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)), 2) < 0.01);
   }
  
 }
+
+BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
+  double min[] = {2};
+  double max[] = {10};
+  double sigma[] = {1};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
+
+  //add 1 gaussian
+  double x[] = {2};
+  g.add_gaussian(x, 1);
+
+  int i;
+  double der[1];
+  double value;
+  double dx;
+  for( i = -6; i < 7; i++) {
+    x[0] = i;
+    dx = x[0] - 2;
+    dx  -= round(dx / (min[0] - max[0])) * (min[0] - max[0]);
+    value = g.get_value_deriv(x, der);
+    /*
+    std::cout << "x = " << x[0]
+	      << " dx = " << dx 
+	      << " value = " << value 
+	      << " (" << exp(-dx*dx/2.) << ")" 
+	      << std::endl;
+    */
+    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)), 2) < 0.01);
+  }
+ 
+}
+
+
+BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
+  double min[] = {2};
+  double max[] = {4};
+  double sigma[] = {1};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  double gauss_loc[] = {11};
+  double x[1];
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
+  periodic[0] = 1;
+  max[0] = 10;
+  g.set_boundary(min, max, periodic);
+
+  //add 1 gaussian
+  g.add_gaussian(gauss_loc, 1); //added at equivalent to 1
+
+  int i;
+  double der[1];
+  double value;
+  double dx;
+  for( i = 2; i < 4; i++) {
+    x[0] = i;
+    dx = x[0] - gauss_loc[0];
+    dx  -= round(dx / (min[0] - max[0])) * (min[0] - max[0]);
+    value = g.get_value_deriv(x, der);
+
+
+    std::cout << "x = " << x[0]
+	      << " dx = " << dx 
+	      << " value = " << value 
+	      << " (" << exp(-dx*dx/2.) << ")" 
+	      << std::endl;
+
+
+    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)), 2) < 0.01);
+  }
+ 
+}
+
 
 BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   double min[] = {-100};
@@ -304,11 +400,12 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   int i;
   double x[1];
   double offsets = 1. / N;
+  double g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g.add_gaussian(x, 1.5);
+    g_integral += g.add_gaussian(x, 1.5);
   }
 
   //now we integrate the grid
@@ -322,13 +419,82 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
 
   //Make sure the integrated area is correct
   //unnormalized, so a little height scaling is necessary
-  BOOST_REQUIRE(pow(area - N * 1.5 * sigma[0] * sqrt(2 * M_PI), 2) < 0.1);
- 
+  //  std::cout << area << " " << N * 1.5 * sigma[0] * sqrt(2 * M_PI) << std::endl;
+  BOOST_REQUIRE(pow(area - N * 1.5 * sigma[0] * sqrt(2 * M_PI), 2) < 1);
+
+  //now make sure that add_gaussian returned the correct answers as well
+   BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
+}
+
+BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double offsets = 1. / N;
+  double g_integral = 0;
+
+  //generate a random number but use sequential grid point offsets
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    g_integral += g.add_gaussian(x, 1.5);
+  }
+
+  //now we calculate finite differences on the grid
+  double vlast, vlastlast, v, approx_der;  
+
+  double der[1];
+  double der_last;
+  double dx = 0.1;
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    v = g.get_value_deriv(x,der);
+    if(i > 1) {
+      approx_der = (v - vlastlast) / (2*dx);
+      BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.01);
+    }
+    vlastlast = vlast;
+    vlast = v;
+
+    der_last = der[0];
+  }
+
+}
+
+
+BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
+  double min[] = {0};
+  double max[] = {10};
+  double bin_spacing[] = {0.009765625};
+  double sigma[] = {0.1};
+  int periodic[] = {1};
+  GaussGrid* g  = make_gauss_grid(1, min, max, bin_spacing, periodic, 1, sigma);
+  periodic[0] = 1;
+  g->set_boundary(min, max, periodic);
+
+  //add gaussian that was failing
+  double x[] = {-3.91944};
+  double h = 1.0;
+  double bias_added = g->add_gaussian(x, h);
+
+  //unnormalized, so a little height scaling is necessary
+  std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
+  BOOST_REQUIRE(pow(bias_added - h * sqrt(2 * M_PI) * sigma[0], 2) < 0.1);
+
+  delete g;
 }
 
 
 BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
-  EDMBias bias = EDMBias(GRID_SRC + "/bfile_test_1.txt");
+  EDMBias bias = EDMBias(EDM_SRC + "/read_test.edm");
   BOOST_REQUIRE_EQUAL(bias.dim_, 2);
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
@@ -336,12 +502,52 @@ BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
 }
 
 struct EDMBiasTest {
-  EDMBiasTest(){
-    //
-  }  
+  EDMBiasTest() : bias(EDM_SRC + "/sanity.edm") {
+        
+    bias.setup(1, 1);
+    double low[] = {0};
+    double high[] = {10};
+    int p[] = {1};
+    bias.subdivide(low, high, p);    
+    
+  }     
+  
+  EDMBias bias;
 };
 
 BOOST_FIXTURE_TEST_SUITE( edmbias_test, EDMBiasTest )
+
+BOOST_AUTO_TEST_CASE( edm_sanity ) {
+  double** positions = (double**) malloc(sizeof(double*));
+  positions[0] = (double*) malloc(sizeof(double));
+  double runiform[] = {1};
+  double integral = sqrt(2 * M_PI) * bias.bias_sigma_[0];
+  
+  positions[0][0] = 5.0;
+  bias.add_hills(1, positions, runiform);
+
+  bias.write_bias("BIAS");
+  
+  BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_, 2) < EPSILON);
+  BOOST_REQUIRE(pow(bias.cum_bias_ - integral * bias.hill_prefactor_, 2) < 0.001);
+  
+  //now  check that the forces point away from the hills
+  double der[0];
+  positions[0][0] = 4.99; //to the left
+  bias.bias_->get_value_deriv(positions[0], der);
+  //the negative of the bias (the force) should point to the left
+  BOOST_REQUIRE(-der[0] < 0);
+
+  positions[0][0] = 5.01; // to the right of the bias
+  bias.bias_->get_value_deriv(positions[0], der);
+  //the negative of the bias (the force) should point to the right
+  BOOST_REQUIRE(-der[0] > 0);
+
+  
+
+  free(positions[0]);
+  free(positions);
+}
 
 
 BOOST_AUTO_TEST_SUITE_END()

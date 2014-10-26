@@ -19,6 +19,7 @@ GaussGrid* make_gauss_grid(unsigned int dim,
   return NULL;
 }
 
+
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma) {
   switch(dim) {
   case 1:

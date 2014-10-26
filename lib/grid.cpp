@@ -19,6 +19,19 @@ Grid* make_grid(unsigned int dim,
   return NULL;
 }
 
+Grid* read_grid(unsigned int dim, const std::string& filename, int b_interpolate) {
+  switch(dim) {
+  case 1:
+    return new DimmedGrid<1>(filename, b_interpolate);
+  case 2:
+    return new DimmedGrid<2>(filename, b_interpolate);
+  case 3:
+    return new DimmedGrid<3>(filename, b_interpolate);
+  }
+  return NULL;
+}
+
+
 Grid* read_grid(unsigned int dim, const std::string& filename) {
   switch(dim) {
   case 1:

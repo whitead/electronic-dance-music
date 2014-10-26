@@ -1,0 +1,7 @@
+tempering		0
+hill_prefactor 		0.25
+dimension 		1
+box_low			0
+box_high		10
+bias_spacing		0.009765625
+bias_sigma		0.1

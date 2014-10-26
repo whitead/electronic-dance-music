@@ -10,8 +10,8 @@ set (LAMMPS_SRC "/home/whitead/Documents/lammps/src")
 
 #compilation flags
 #set (CXX_STD_VERSION "-std=c++11 -g")
-#set (CXX_STD_VERSION "-std=c++11 -O0 -g")
-add_definitions (${CXX_STD_VERSION})
+set (CXX_DEBUG "-O0 -g -Wall")
+add_definitions (${CXX_DEBUG})
 
 find_package(MPI REQUIRED) 
 include_directories(SYSTEM ${MPI_INCLUDE_PATH})

@@ -61,7 +61,7 @@ double interp(const double* dx,
 //         note that, in case of PBC, this stride should corrispond to a backward jump of (N-1) points,
 //         where N is the number of points in the domain. 
 //         also note that the corrisponding strides for tabder can be obtained multipling times DIM
-// der:    in output, the minus gradient.
+// der:    in output, the POSITIVE gradient.
 
   int idim, jdim;
   int npoints,ipoint;
@@ -140,6 +140,7 @@ class Grid {
 
  public:  
   virtual double get_value(const double* x) const = 0;
+  virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
    **/
@@ -148,7 +149,10 @@ class Grid {
    * Write the grid to the given file
    **/
   virtual void write(const std::string& filename) const = 0;
-  virtual void multi_write(const std::string& filename, const double* box_low, const double* box_high) const = 0;
+  virtual void multi_write(const std::string& filename, 
+			   const double* box_low, 
+			   const double* box_high, 
+			   const int* b_periodic) const = 0;
   virtual void read(const std::string& filename) = 0;
   virtual void set_interpolation(int b_interpolate) = 0;
   virtual double* get_grid() = 0;
@@ -191,9 +195,14 @@ class DimmedGrid : public Grid {
     initialize();
   }
 
- DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(0), grid_(NULL), grid_deriv_(NULL) {
+ DimmedGrid(const std::string& input_grid, int b_interpolate): b_derivatives_(0), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
+
+ DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL) {
+    read(input_grid);
+  }
+
 
   /** 
    * Clone constructor
@@ -236,7 +245,7 @@ class DimmedGrid : public Grid {
       xi = x[i];
       if(b_periodic_[i])
 	xi -= (max_[i] - min_[i]) * int_floor((xi - min_[i]) / (max_[i] - min_[i]));
-      result[i] = (int) floor((xi - min_[i]) / dx_[i]);
+      result[i] = (size_t) floor((xi - min_[i]) / dx_[i]);
     }
   }
 
@@ -273,7 +282,7 @@ class DimmedGrid : public Grid {
    **/ 
   double get_value(const double* x) const{
 
-    if(!check_point(x)) {
+    if(!in_grid(x)) {
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
@@ -304,7 +313,7 @@ class DimmedGrid : public Grid {
     size_t i;
     
     //checks
-    if(!check_point(x)) {
+    if(!in_grid(x)) {
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
@@ -387,7 +396,6 @@ class DimmedGrid : public Grid {
 
 
     //print out grid
-    double point;
     size_t temp[DIM];
     for(i = 0; i < grid_size_; i++) {
       one2multi(i, temp);
@@ -408,28 +416,29 @@ class DimmedGrid : public Grid {
     output.close();    
   }
 
-  void multi_write(const std::string& filename, const double box_min[DIM], const double box_max[DIM]) const {
+  void multi_write(const std::string& filename, const double box_min[DIM], 
+		   const double box_max[DIM], 
+		   const int b_periodic[DIM]) const {
 
     using namespace std;
         
     size_t i, j;
+    int myrank, otherrank, size;
 
-    for(i = 0; i < DIM; i++) {
-      if(b_periodic_[i]) {
-	cerr << "Multi-write does not work for periodic gridded systems!!!!" << endl;
-	return;
-      }
-    }
-
-
-    int myrank;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD,&size);
 
     size_t index[DIM];
     double x[DIM];
     unsigned int counts[DIM];
     unsigned int reduced_counts[DIM];
     ofstream output;     
+    double der[DIM];
+    int b_amwriting = 0;
+    size_t super_index[DIM];
+    size_t temp;
+    double value;
+
     
     //first, count the number of points that we will have in this box
     for(i = 0; i < DIM; i++)
@@ -439,7 +448,8 @@ class DimmedGrid : public Grid {
       one2multi(i,index);
       for(j = 0; j < DIM; j++) {
 	x[j] = min_[j] + dx_[j] * index[j];
-	if(x[j] >= box_min[j] && x[j] <= box_max[j])
+	if(x[j] >= box_min[j] && x[j] < box_max[j]//check if it's in box
+	   && x[j] < max_[j] - dx_[j])//remove the extra point up top from the counts
 	  counts[j]++;
       }
     }
@@ -461,8 +471,8 @@ class DimmedGrid : public Grid {
       output << endl;
       
       output << "#! BIN ";
-      for(i = 0; i < DIM; i++)
-	output << reduced_counts[i] - 1<< " ";
+      for(i = 0; i < DIM; i++) 
+	output << (b_periodic[i] ? reduced_counts[i] : reduced_counts[i] - 1 ) << " ";
       output << endl;
       
       output << "#! MIN ";
@@ -477,7 +487,7 @@ class DimmedGrid : public Grid {
       
       output << "#! PBC ";
       for(i = 0; i < DIM; i++)
-	output << b_periodic_[i] << " ";
+	output << b_periodic[i] << " ";
       output << endl;
 
       output.close();
@@ -489,11 +499,6 @@ class DimmedGrid : public Grid {
       total *= reduced_counts[i];
     
     //print out grid
-    double der[DIM];
-    int b_amwriting = 0;
-    size_t super_index[DIM];
-    size_t temp;
-    double value;
     for(i = 0; i < total; i++) {
 
       //one2multi
@@ -506,35 +511,52 @@ class DimmedGrid : public Grid {
       super_index[j] = temp; 
       x[j] = super_index[j] * dx_[j] +  box_min[j];
 
-      //Is it my turn to write?
-      if(check_point(x)) {
-	if(!b_amwriting) {
-	  //	  cout << "I am " << myrank << " and I'm going to write now" << endl;
+      if(in_grid(x)) {
+
+	//sort out who is going to write, since there is overlap possible		
+	MPI_Allreduce(&myrank, &otherrank, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+		
+	if(!b_amwriting && otherrank == myrank) {
+	  cout << "I am " << myrank << " and I'm going to write now" << endl;
 	  b_amwriting = 1;
 	  output.open(filename.c_str(), std::fstream::out | std::fstream::app);
+	} else if(b_amwriting && otherrank != myrank) {
+
+	  cout << "I am " << myrank << "and I will stop writing, due to outrank" << endl;
+	  b_amwriting = 0;
+	  output.close();
+
 	}
       } else {
+	
+	//to synchronize
+	MPI_Allreduce(&size, &otherrank, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+
 	if(b_amwriting) {
-	  //	  cout << "I am " << myrank << "and I will stop writing" << endl;
+	  cout << "I am " << myrank << "and I will stop writing, due to out of grid" << endl;
 	  b_amwriting = 0;
 	  output.close();
 	}
       }
+      
+      MPI_Barrier(MPI_COMM_WORLD);
 
       //now write!
-      for(j = 0; j < DIM; j++) {
-	output << setprecision(8) << std::fixed << x[j] << " ";
-      }
-      value = get_value_deriv(x, der);
-      output << setprecision(8) << std::fixed << value << " ";
-      if(b_derivatives_) {
+      if(b_amwriting) {
 	for(j = 0; j < DIM; j++) {
-	  output << setprecision(8) << std::fixed <<  -der[j] << " ";
+	  output << setprecision(8) << std::fixed << x[j] << " ";
 	}
-      }
-      output << endl;
-      if(super_index[0] == reduced_counts[0] - 1)
+	value = get_value_deriv(x, der);
+	output << setprecision(8) << std::fixed << value << " ";
+	if(b_derivatives_) {
+	  for(j = 0; j < DIM; j++) {
+	    output << setprecision(8) << std::fixed <<  -der[j] << " ";
+	  }
+	}
 	output << endl;
+	if(super_index[0] == reduced_counts[0] - 1)
+	  output << endl;
+      }
     }
     if(b_amwriting)
       output.close();
@@ -640,15 +662,15 @@ class DimmedGrid : public Grid {
     initialize();
     
     //now we read grid!    
-    size_t temp[DIM];
     for(i = 0; i < grid_size_; i++) {
       //skip dimensions
       for(j = 0; j < DIM; j++)
 	input >> word;
-      input >> grid_[i];
+      input >> grid_[i];      
       if(b_derivatives_) {
 	for(j = 0; j < DIM; j++) {
 	  input >> grid_deriv_[i * DIM + j];
+	  grid_deriv_[i * DIM + j] *= -1;
 	}
       }
     }    
@@ -685,7 +707,7 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  int check_point(const double x[DIM]) const {
+  int in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
       if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
@@ -694,8 +716,6 @@ class DimmedGrid : public Grid {
     }
     return 1;
   }
-
-
 
   size_t grid_size_;//total size of grid
   int b_derivatives_;//if derivatives are going to be used
@@ -721,6 +741,7 @@ class DimmedGrid : public Grid {
     grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
     if(b_derivatives_)
       grid_deriv_ = (double *) calloc(DIM * DIM * grid_size_, sizeof(double));
+
   }
 
   
@@ -733,6 +754,8 @@ Grid* make_grid(unsigned int dim,
 		const int* b_periodic, 
 		int b_derivatives, 
 		int b_interpolate);
+
+Grid* read_grid(unsigned int dim, const std::string& filename, int b_interpolate);
 
 Grid* read_grid(unsigned int dim, const std::string& filename);
 

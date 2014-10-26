@@ -28,10 +28,8 @@ using namespace LAMMPS_NS;
 FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
-  double *mss,*chg;
-  int *int_p,size;
-  int i,j,k,i_c,nn,mm;
-  int me;
+
+  int me, size;
 
   if (narg != 9) error->all(FLERR,"Illegal fix EDM command");
 
@@ -55,7 +53,6 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
   //here is where we would load up the EDM bias
   bias = new EDMBias(arg[4]);
 
-  bias->set_mask(atom->mask);
   random_numbers = NULL;
   random = new RanMars(lmp,seed + me);
 
@@ -95,8 +92,10 @@ void FixEDM::init()
 
   if (strcmp(update->integrate_style,"respa") == 0)
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
-  bias->setup(temperature, force->boltz * temperature);
+
+  bias->setup(temperature, force->boltz);
   bias->subdivide(domain->sublo, domain->subhi, domain->periodicity);
+  bias->set_mask(atom->mask);
 
 }
 
@@ -125,9 +124,6 @@ void FixEDM::min_setup(int vflag)
 void FixEDM::post_force(int vflag)
 {
 
-  //just in case; important since subgrids have little awareness of overall periodicity
-  domain->pbc();
-
   //update force
   bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
   //treat add hills
@@ -138,16 +134,17 @@ void FixEDM::post_force(int vflag)
       memory->create(random_numbers, atom->nmax, "fix/edm:random_numbers");
     }
     int i;
-    for(i = 0; i < atom->nlocal+atom->nghost; i++) {
+    for(i = 0; i < atom->nlocal; i++) {
       random_numbers[i] = random->uniform();
     }
 
-    bias->add_hills(atom->nlocal+atom->nghost, atom->x, random_numbers, groupbit);
+    bias->add_hills(atom->nlocal, atom->x, random_numbers, groupbit);
   }
 
   if(update->ntimestep % write_stride == 0) {
     bias->write_bias(bias_file);
   }
+
 }
 
 /* ---------------------------------------------------------------------- */

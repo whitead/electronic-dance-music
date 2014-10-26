@@ -6,7 +6,7 @@
 #include <iostream>
 #include <cmath>
 
-#define GAUSS_SUPPORT 6. // sigma^2 considered for gaussian
+#define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
 
 /**
  * This class uses a compositional ("has-a") relationship with Grid. This is the 
@@ -17,10 +17,12 @@ class GaussGrid : public Grid {
    * Retruns the integrated amount of bias added to the system
    **/
  public:
+  virtual ~GaussGrid() {};
   virtual double add_gaussian(const double* x, double height) = 0;
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
   virtual int in_bounds(const double* x) const = 0;
+  virtual void multi_write(const std::string& filename) const = 0;
 };
 
 template<int DIM>
@@ -43,7 +45,7 @@ class DimmedGaussGrid : public GaussGrid{
       sigma_[i] = sigma[i];
       boundary_min_[i] = min[i];
       boundary_max_[i] = max[i];
-      b_periodic_boundary_[i] = 0;
+      b_periodic_boundary_[i] = b_periodic[i];
     }
     
     update_minigrid();
@@ -61,6 +63,10 @@ class DimmedGaussGrid : public GaussGrid{
     update_minigrid();
   }
 
+  ~DimmedGaussGrid() {
+    //nothing
+  }
+
   double get_value(const double* x) const {
 
     size_t i;
@@ -70,19 +76,20 @@ class DimmedGaussGrid : public GaussGrid{
     for(i = 0; i < DIM; i++)
       xx[i] = x[i];
 
-    //Attempt to wrap around the specified boundaries (separate from grid bounds)
-    if(!in_bounds(x)) {
+    //Attempt to wrap around the specified boundaries (possibly separate from grid bounds)
+    if(!in_bounds(xx)) {
       int changed = 0;
       for(i = 0; i < DIM; i++){
 	if(b_periodic_boundary_[i]) {
-	  xx[i] -= int_floor(xx[i] / (boundary_max_[i] - boundary_min_[i])) * (boundary_max_[i] - boundary_min_[i]);	
+	  xx[i] -= int_floor((xx[i] - boundary_min_[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	    (boundary_max_[i] - boundary_min_[i]);	
 	  changed = 1;
 	}
       }
       if(!changed || !in_bounds(xx))
 	return 0;
     }
-
+    
     return grid_.get_value(xx);
   }
 
@@ -100,7 +107,8 @@ class DimmedGaussGrid : public GaussGrid{
       int changed = 0;
       for(i = 0; i < DIM; i++){
 	if(b_periodic_boundary_[i]) {
-	  xx[i] -= int_floor(xx[i] / (boundary_max_[i] - boundary_min_[i])) * (boundary_max_[i] - boundary_min_[i]);	
+	  xx[i] -= int_floor((xx[i] - boundary_min_[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	    (boundary_max_[i] - boundary_min_[i]);	
 	  changed = 1;
 	}
       }
@@ -122,9 +130,20 @@ class DimmedGaussGrid : public GaussGrid{
     grid_.write(filename);
   }
 
-  void multi_write(const std::string& filename, const double* box_low, const double* box_high) const {
-    grid_.multi_write(filename, box_low, box_high);
+  /**
+   * Uses its known boundaries to handle assembling all grids
+   **/
+  void multi_write(const std::string& filename) const {
+    grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_);
   }
+
+  virtual void multi_write(const std::string& filename, 
+			   const double* box_low, 
+			   const double* box_high, 
+			   const int* b_periodic) const {
+    grid_.multi_write(filename, box_low, box_high, b_periodic);
+  }
+
   
   void set_interpolation(int b_interpolate) {
     grid_.b_interpolate_ = b_interpolate;
@@ -140,8 +159,7 @@ class DimmedGaussGrid : public GaussGrid{
     double xx[DIM]; //points away from hill center but affected by addition
     size_t xx_index[DIM];//The grid index that corresponds to xx
     size_t xx_index1;//The collapsed grid index that corresponds to xx
-    size_t x_index[DIM];//The grid index that corresponds to the hill center
-    size_t x_index1;//The collapsed grid index that corresponds to the hill center
+    int x_index[DIM];//The grid index that corresponds to the hill center, possibly negative for points outside grid
     int b_flag; //a flag
     double dp[DIM]; //essentially distance vector, changes in course of calculation
     double dp2; //essentially magnitude of distance vector, changes in course of calculation
@@ -149,31 +167,47 @@ class DimmedGaussGrid : public GaussGrid{
     double bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
     double vol_element = 1;
 
-    //switch to non-const so we can wrap
-    double x[DIM];
-    for(i = 0; i < DIM; i++)
-      x[i] = x0[i];
-    
-    //Attempt to wrap around the specified boundaries (separate from grid bounds)
-    if(!in_bounds(x)) {
-      for(i = 0; i < DIM; i++){
-	if(b_periodic_boundary_[i]) {
-	  x[i] -= int_floor(x[i] / (boundary_max_[i] - boundary_min_[i])) * (boundary_max_[i] - boundary_min_[i]);	
-	}
-      }
-    }
-
-    if(!grid_.check_point(x))
-      return 0;
-
-
     //get volume element for bias integration
     for(i = 0; i < DIM; i++) {
       vol_element *= grid_.dx_[i]; 
     }
 
-    grid_.get_index(x, x_index);
-    x_index1 = grid_.multi2one(x_index);
+    //switch to non-const so we can wrap
+    double x[DIM];
+    for(i = 0; i < DIM; i++)
+      x[i] = x0[i];
+    
+    //this is a special wrapping. We want to find the nearest image, not the minimal image
+    // eg, our grid runs from 0 to 5 and the box runs from 0 to 10.
+    // If we want to get the contribution from a particle at 9.5, we need to wrap it to -0.5
+    if(!grid_.in_grid(x)) {
+      for(i = 0; i < DIM; i++){
+	if(b_periodic_boundary_[i]) {
+	  
+	  //find which boundary we can best wrap to, temporarily making use of dp[]
+
+	  //this is the image choice
+	  dp[0] = round((grid_.min_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	    (boundary_max_[i] - boundary_min_[i]);	
+	  dp[1] = round((grid_.max_[i] - x[i]) / (boundary_max_[i] - boundary_min_[i])) * 
+	    (boundary_max_[i] - boundary_min_[i]);	
+	  
+	  //which bound is closest
+	  if(fabsl(grid_.min_[i] - x[i] - dp[0]) < fabsl(grid_.max_[i] - x[i] - dp[1]))
+	    x[i] += dp[0]; //wrap to it
+	  else
+	    x[i] += dp[1];
+	}
+      }
+    } 
+
+
+    //now we are at the closest possible image, find an index            
+    //normally, would be grid_.get_index(x, x_index);
+    //but we need to consider negative indices    
+    for(i = 0; i < DIM; i++) {
+      x_index[i] = int_floor((x[i] - grid_.min_[i]) / grid_.dx_[i]);
+    }
 
     //loop over only the support of the gaussian
     for(i = 0; i < minisize_total_; i++) {
@@ -194,16 +228,27 @@ class DimmedGaussGrid : public GaussGrid{
       //convert offset into grid index and point
       for(j = 0; j < DIM; j++) {
 	//turn offset into index
-	xx_index[j] = (index[j] + x_index[j]);
-	//check if out of grid or wrap
-	if(xx_index[j] >= grid_.grid_number_[j]) {
+	index[j] += x_index[j];
+
+	//check if out of grid or needs to be wrap
+	if(index[j] >= grid_.grid_number_[j]) {
 	  if(grid_.b_periodic_[j]) {
-	    xx_index[j] %= grid_.grid_number_[j];
+	    index[j] %= grid_.grid_number_[j];
 	  } else {
 	    b_flag = 1; //we don't need to consider this point
 	    break;
 	  }
 	}
+	if(index[j] < 0) {
+	  if(grid_.b_periodic_[j]) {
+	    index[j] += grid_.grid_number_[j];
+	  } else {
+	    b_flag = 1; //we don't need to consider this point
+	    break;
+	  }
+	}
+	//we know now it's > 0 and in grid
+	xx_index[j] = static_cast<size_t>(index[j]);
 
 	xx[j] = grid_.min_[j] + grid_.dx_[j] * xx_index[j];
 	
@@ -235,15 +280,15 @@ class DimmedGaussGrid : public GaussGrid{
       
       if(dp2 < GAUSS_SUPPORT) {
 	expo = height * exp(-dp2);
-      }
       
-      //actually add hill now!
-      xx_index1 = grid_.multi2one(xx_index);
-      grid_.grid_[xx_index1] += expo;
-      bias_added += expo * vol_element;
-      //and derivative
-      for(j = 0; j < DIM; j++) {
-	grid_.grid_deriv_[(xx_index1) * DIM + j] = dp[j] / sigma_[j] * expo;
+	//actually add hill now!
+	xx_index1 = grid_.multi2one(xx_index);
+	grid_.grid_[xx_index1] += expo;      
+	bias_added += expo * vol_element;
+	//and POSITIVE derivative!! (different than plumed)
+	for(j = 0; j < DIM; j++) {
+	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= dp[j] / sigma_[j] * expo;
+	}
       }
     }
     return bias_added;
@@ -269,6 +314,7 @@ class DimmedGaussGrid : public GaussGrid{
     for(i = 0; i < DIM; i++) {
       vol *= boundary_max_[i] - boundary_min_[i];
     }
+    return vol;
   }
  
   void one2multi(size_t index, size_t result[DIM]) const {
@@ -307,137 +353,6 @@ class DimmedGaussGrid : public GaussGrid{
   }
 
 
-  /* This is a total clusterfuck. some other day
-  communicate_soft_boundary(unsigned int* cpu_dim) {
-
-    int neighbors = 1; //number of neighbors, depends only on dimension
-    int direction[DIM];//direction we're communicating with 
-    int my_cpu_index[DIM];
-    int temp;
-    size_t i,j,k,l;
-
-    int myrank;
-    MPI_Request send_request, rec_request;
-    int outgoing, incoming;
-
-    //get my CPU location
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-
-    std::cout << "I am rank (" << myrank;
-    for(i = 0; i < DIM-1; i++) {
-      my_cpu_index[i] = myrank % cpu_dim[i];
-      myrank = (myrank - my_cpu_index[i]) / cpu_dim[i];
-      std::cout << my_cpu_index[i] << ",";
-    }
-    my_cpu_rank[i] = myrank;
-
-    std::cout << ")" << std:endl;
-
-    //get size for buffer
-    size_t buffer_size = 1;
-    for(i = 0; i < DIM; i++)
-      buffer_size *= soft_boundary_points_[i];
-
-    size_t buffer_size *= (DIM + 1);//each point we need derivative and  value
-    double*  send_buffer = (double*) malloc(sizeof(double) * buffer_size);
-    double*  rec_buffer = (double*) malloc(sizeof(double) * buffer_size);
-
-    for(i = 0; i < DIM; i++)
-      neighbors *= 2;
-
-
-    //for each neighboring grid
-    for(i = 0; i < neighbors; i++) {
-
-      //crate grid index shifts
-      temp = i;
-      for(j = 0; j < DIM; j++) {
-	if(temp % 2 == 0)
-	  direction = 1;
-	else 
-	  direction[i] = -1;
-
-	temp /= 2;
-      }
-
-      //now create buffer containing the grid points
-
-      for(j = 0; j < DIM; j++) {
-	//for each boundary dimension
-	for(k = 0; k < soft_boundary_points_[j]; k++) {
-	  //for the points in that dimension
-
-	  //if we're heading left, we go from the boundary to the right
-	  //if we're heading right, we go from the boundary to the left
-	  if(direction[j] == -1)
-	    temp = k;
-	  else
-	    temp = grid_.grid_number_[i] - k;
-
-	  //the value of the function
-	  send_buffer[k * (DIM+1)] = grid_.grid_[temp];
-	  grid_.grid_[temp] = 0; //zero it out since we're about to send it
-	  //the derivative
-	  for(l = 0; l < DIM; l++) {
-	    send_buffer[k * (DIM + 1)] = grid._grid_deriv_[temp * DIM + l];
-	    grid._grid_deriv_[temp * DIM + l] = 0; //zero it out since we're about to send it
-	  }
-	}
-      }
-
-      //get the rank of the node we're communicating with
-      outgoing = my_cpu_rank[DIM - 1] + direction[DIM-1];
-      for(j = DIM-1; j > 0; i--)
-	outgoing = outgoing * cpu_dim[i- 1] + (my_cpu_rank[i - 1] + direction[i -  1]);
-
-      //send the buffer
-      int MPI_Isend(send_buffer, buffer_size, MPI_DOUBLE, outgoing, 0,
-		    MPI_COMM_WORLD, &send_request);
-
-
-      //flip direction to find incoming
-      for(j = 0; j < DIM; j++)
-	direction[j] *= -1;
-
-      //find incoming
-      incoming = my_cpu_rank[DIM - 1] + direction[DIM-1];
-      for(j = DIM-1; j > 0; i--)
-	incoming = incoming * cpu_dim[i- 1] + (my_cpu_rank[i - 1] + direction[i -  1]);
-
-      
-      int MPI_Recv(rec_buffer, buffer_size, MPI_DOUBLE, incoming, 0,
-		    MPI_COMM_WORLD, &rec_request);
-      
-      //unpack the buffer, notice direction has been already flipped
-      for(j = 0; j < DIM; j++) {
-	//for each boundary dimension
-	for(k = 0; k < soft_boundary_points_[j]; k++) {
-	  //for the points in that dimension
-
-	  //if we've recieved from our left, we go from the soft boundary to the right into normal region
-	  //if we've recieved from our right, we go from soft boundary to the left into normal region
-	  if(direction[j] == -1)
-	    temp = soft_boundary_points_[j] + k + 1;
-	  else
-	    temp = grid_.grid_number_[i] - (soft_boundary_points_[j] + 1) - k;
-
-	  //the value of the function
-	  //the first point in the buffer was at the boundary, which is the deepest the
-	  //we penetrate here. So we reverse
-	  grid_.grid_[temp] = rec_buffer[buffer_size - k * (DIM+1)]
-	  //the derivative
-	  for(l = 0; l < DIM; l++) {
-	    grid._grid_deriv_[temp * DIM + l] = rec_buffer[buffer_size - k * (DIM+1) - l]
-	  }
-	}
-      }            
-    }
-
-    free(rec_buffer);
-    free(send_buffer);
-  }
-  */
-
   size_t minisize_[DIM];// On DIM-dimensional grid, how far we must search before gaussian decays enough to ignore
   size_t minisize_total_; //On reduced grid, how far we must search before gaussian decays enough to ignore
   double sigma_[DIM];//gaussian sigma
@@ -472,6 +387,7 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 			   const int* b_periodic, 
 			   int b_interpolate,
 			   const double* sigma);
+
 
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 
