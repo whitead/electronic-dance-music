@@ -82,7 +82,7 @@ class EDMBias {
   //buffers for sending and receiving with neighbors
   double send_buffer_[BIAS_BUFFER_SIZE];
   double receive_buffer_[BIAS_BUFFER_SIZE];
-  size_t buffer_i;
+  unsigned int buffer_i;
 
 };
 

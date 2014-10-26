@@ -435,27 +435,17 @@ class DimmedGrid : public Grid {
     unsigned int reduced_counts[DIM];
     ofstream output;     
     double der[DIM];
-    int b_amwriting = 0;
+    int b_amwriting = 0, flag;
     size_t super_index[DIM];
     size_t temp;
     double value;
 
     
     //first, count the number of points that we will have in this box
-    for(i = 0; i < DIM; i++)
-      counts[i] = 0;
-    
-    for(i = 0; i < grid_size_; i++) {
-      one2multi(i,index);
-      for(j = 0; j < DIM; j++) {
-	x[j] = min_[j] + dx_[j] * index[j];
-	if(x[j] >= box_min[j] && x[j] < box_max[j]//check if it's in box
-	   && x[j] < max_[j] - dx_[j])//remove the extra point up top from the counts
-	  counts[j]++;
-      }
-    }
-    
-    MPI_Allreduce(counts, reduced_counts, DIM, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+    for(i = 0; i < DIM; i++) {      
+      reduced_counts[i] = (int) ceil((box_max[i] - box_min[i]) / dx_[i]);      
+      reduced_counts[i] = b_periodic[i] ? reduced_counts[i] : reduced_counts[i] + 1;
+    }       
     
     //write header
     if(myrank == 0) {

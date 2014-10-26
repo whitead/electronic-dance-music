@@ -124,6 +124,8 @@ void FixEDM::min_setup(int vflag)
 void FixEDM::post_force(int vflag)
 {
 
+  domain->pbc(); //make sure particles are wrapped
+
   //update force
   bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
   //treat add hills

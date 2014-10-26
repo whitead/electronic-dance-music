@@ -232,7 +232,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	    buffer_i++;
 
 	    //do we need to flush?
-	    if(buffer_i * (dim_+1) == BIAS_BUFFER_SIZE)
+	    if(buffer_i * (dim_+1) >= BIAS_BUFFER_SIZE)
 	      bias_added += flush_buffers(0); //flush and we don't know if we're synched
 
 	  }
@@ -295,7 +295,8 @@ double EDMBias::flush_buffers(int synched) {
       MPI_Allreduce(&my_flush, &do_flush, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     }
     
-    size_t i,j,buffer_j;
+    size_t i,j;
+    unsigned int buffer_j;
     int rank, size, result;
     MPI_Request srequest, rrequest;
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -328,16 +329,16 @@ double EDMBias::flush_buffers(int synched) {
 	if(mpi_neighbors_[i] >= 0 && buffer_i > 0) {
 	  //want to make sure the send is complete before we get to barrier
 	  MPI_Send(&buffer_i, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
-	  /*
+
 	  std::cout << "I am " << rank 
 		    << " and I'm sending " 
 		    << buffer_i 
 		    << " items to " 
 		    << mpi_neighbors_[i] 
 		    << std::endl;
-	  */
+
 	} else {
-	  //	  std::cout << "I am " << rank << " and won't send " << std::endl;
+	  	  std::cout << "I am " << rank << " and won't send " << std::endl;
 	}
 	
 	//now make sure everyone is done before we send/receive buffers so we know for sure who is getting one
@@ -360,7 +361,7 @@ double EDMBias::flush_buffers(int synched) {
 	  //clean up operation
 	  MPI_Cancel(&rrequest);	  
 	  MPI_Request_free(&rrequest);    
-	  //	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
+	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
 	}
 
 	//finally wait for send to finish, if we did send
@@ -372,7 +373,7 @@ double EDMBias::flush_buffers(int synched) {
 
     //reset buffer
     buffer_i = 0;
-    //    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
+    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
   }    
 
 
