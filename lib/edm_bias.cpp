@@ -69,9 +69,9 @@ void EDMBias::subdivide(const double sublo[3], const double subhi[3], const int 
   double min[3];
   double max[3];
   size_t i;
-
-
+  int size;
   int bounds_flag = 1;
+
   for(i = 0; i < dim_; i++) {
     //check if we encapsulate the entire bounds in any dimension
     if(fabs(sublo[i] - min_[i]) < 0.000001 && fabs(subhi[i] - max_[i]) < 0.000001) {
@@ -93,6 +93,13 @@ void EDMBias::subdivide(const double sublo[3], const double subhi[3], const int 
 
 #ifndef SERIAL_TEST
   infer_neighbors(b_periodic);
+
+  //make hill density a per-system measurement not per replica
+
+  MPI_Comm_size(MPI_COMM_WORLD,&size);
+  if(hill_density_ > 0) 
+    hill_density_ /= size;
+  
 #endif
 
   if(bounds_flag) {
@@ -230,7 +237,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 
 	  }
 	  
-	  //output info/*
+	  /*	  //output info/*
 	  std::cout << "|- " << bias_added / sqrt(2 * M_PI) / bias_sigma_[0] 
 		    << " (" << h << "*";
 	  if(b_targeting_)
@@ -243,6 +250,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	  std::cout << ") "
 		    << positions[i][0] 
 		    << std::endl;
+	  */
 	}
       }
     }
@@ -265,7 +273,6 @@ int EDMBias::check_for_flush() {
     int my_flush = 0;
     int do_flush;
     MPI_Allreduce(&my_flush, &do_flush, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    std::cout << "Flush? -> " << do_flush << std::endl;
     if(do_flush)
       return 1;
 
@@ -294,7 +301,7 @@ double EDMBias::flush_buffers(int synched) {
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-    std::cout << "I am " << rank << " and I'm about to begin flush" << std::endl;
+    //    std::cout << "I am " << rank << " and I'm about to begin flush" << std::endl;
     
     
     if(mpi_neighbor_count_ == size) {
@@ -321,14 +328,16 @@ double EDMBias::flush_buffers(int synched) {
 	if(mpi_neighbors_[i] >= 0 && buffer_i > 0) {
 	  //want to make sure the send is complete before we get to barrier
 	  MPI_Send(&buffer_i, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
+	  /*
 	  std::cout << "I am " << rank 
 		    << " and I'm sending " 
 		    << buffer_i 
 		    << " items to " 
 		    << mpi_neighbors_[i] 
 		    << std::endl;
+	  */
 	} else {
-	  std::cout << "I am " << rank << " and won't send " << std::endl;
+	  //	  std::cout << "I am " << rank << " and won't send " << std::endl;
 	}
 	
 	//now make sure everyone is done before we send/receive buffers so we know for sure who is getting one
@@ -342,7 +351,7 @@ double EDMBias::flush_buffers(int synched) {
 	//if we did get a receive, we know we have an incoming buffer and we need to finish the process
 	MPI_Test(&rrequest, &result, MPI_STATUS_IGNORE);
 	if(result) {
-	  std::cout << "I am " << rank << " and I'm about to get " << buffer_j << std::endl;
+	  //	  std::cout << "I am " << rank << " and I'm about to get " << buffer_j << std::endl;
 	  MPI_Recv(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); //note we block here
 	  for(j = 0; j < buffer_j; j++) {
 	    bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], receive_buffer_[j * (dim_+1) + dim_]);	
@@ -351,7 +360,7 @@ double EDMBias::flush_buffers(int synched) {
 	  //clean up operation
 	  MPI_Cancel(&rrequest);	  
 	  MPI_Request_free(&rrequest);    
-	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
+	  //	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
 	}
 
 	//finally wait for send to finish, if we did send
@@ -363,7 +372,7 @@ double EDMBias::flush_buffers(int synched) {
 
     //reset buffer
     buffer_i = 0;
-    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
+    //    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
   }    
 
 
@@ -436,6 +445,7 @@ double EDMBias::flush_buffers(int synched) {
 
    mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
 
+   #ifdef EDM_MPI_DEBUG   
    for(i = 0; i < size; i++) {
      if(rank == i) {
        std::cout << "Neighobrs of " << i << "== ";
@@ -446,6 +456,7 @@ double EDMBias::flush_buffers(int synched) {
      }
    }
    std::cout << std::endl;
+   #endif
  }
 
 void EDMBias::update_height(double bias_added) {

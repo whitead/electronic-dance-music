@@ -45,7 +45,7 @@ double round(double number)
 // Maybe one day I will learn the proper way to do splines...
 // Giovanni
 
-template<unsigned int DIM> 
+template<int DIM> 
 double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
@@ -106,7 +106,7 @@ double interp(const double* dx,
       X = fabs(where[idim] / dx[idim] - x0[idim]); //switch from local spatial coordinates to local rescaled 
       X2 = X * X;
       X3 = X2 * X;
-      if(fabs(tabf[shift]) < 0.0000001) 
+      if(fabs(tabf[shift]) < 0.0000001)  
 	qq = 0.0; //special case of 0/0
       else 
 	qq = -tabder[shift * DIM + idim] / tabf[shift];
@@ -338,8 +338,9 @@ class DimmedGrid : public Grid {
       for(i = 0; i < DIM; i++) {
 	//wrap x, if needed
 	wrapped_x = x[i];
-	if(b_periodic_[i])
-	  wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
+	//commented out, because the index should already have taken care of that 
+	//	if(b_periodic_[i])
+	//	  wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
 	//get position relative to neighbors
 	where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	//treat possible stride wrap
@@ -514,15 +515,15 @@ class DimmedGrid : public Grid {
       if(in_grid(x)) {
 
 	//sort out who is going to write, since there is overlap possible		
-	MPI_Allreduce(&myrank, &otherrank, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+	MPI_Allreduce(&myrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 		
 	if(!b_amwriting && otherrank == myrank) {
-	  cout << "I am " << myrank << " and I'm going to write now" << endl;
+	  //	  cout << "I am " << myrank << " and I'm going to write now" << endl;
 	  b_amwriting = 1;
 	  output.open(filename.c_str(), std::fstream::out | std::fstream::app);
 	} else if(b_amwriting && otherrank != myrank) {
 
-	  cout << "I am " << myrank << "and I will stop writing, due to outrank" << endl;
+	  //	  cout << "I am " << myrank << "and I will stop writing, due to outrank" << endl;
 	  b_amwriting = 0;
 	  output.close();
 
@@ -530,10 +531,11 @@ class DimmedGrid : public Grid {
       } else {
 	
 	//to synchronize
-	MPI_Allreduce(&size, &otherrank, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+	otherrank = -1;
+	MPI_Allreduce(&otherrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
 	if(b_amwriting) {
-	  cout << "I am " << myrank << "and I will stop writing, due to out of grid" << endl;
+	  //	  cout << "I am " << myrank << "and I will stop writing, due to out of grid" << endl;
 	  b_amwriting = 0;
 	  output.close();
 	}

@@ -227,6 +227,7 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
     g.grid_deriv_[i] = cos(g.min_[0] + i * g.dx_[0]);
   }
 
+
   double array[] = {M_PI / 4};
   double der[1];
   double fhat = g.get_value_deriv(array,der);
@@ -241,6 +242,10 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
 
   BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
+
+}
+
+BOOST_AUTO_TEST_CASE( wrap_interp_segfault_regression) {
 
 }
 
@@ -372,13 +377,13 @@ BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
     dx  -= round(dx / (min[0] - max[0])) * (min[0] - max[0]);
     value = g.get_value_deriv(x, der);
 
-
+    /*
     std::cout << "x = " << x[0]
 	      << " dx = " << dx 
 	      << " value = " << value 
 	      << " (" << exp(-dx*dx/2.) << ")" 
 	      << std::endl;
-
+    */
 
     BOOST_REQUIRE(pow(value - exp(-dx*dx/2.), 2) < 0.01);
     BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)), 2) < 0.01);
@@ -486,7 +491,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
   double bias_added = g->add_gaussian(x, h);
 
   //unnormalized, so a little height scaling is necessary
-  std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
+  //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
   BOOST_REQUIRE(pow(bias_added - h * sqrt(2 * M_PI) * sigma[0], 2) < 0.1);
 
   delete g;
