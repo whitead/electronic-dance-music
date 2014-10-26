@@ -92,7 +92,7 @@ void EDMBias::subdivide(const double sublo[3], const double subhi[3], const int 
   bias_->set_boundary(min_, max_, b_periodic);
 
 #ifndef SERIAL_TEST
-  infer_neighbors();
+  infer_neighbors(b_periodic);
 #endif
 
   if(bounds_flag) {
@@ -371,7 +371,7 @@ double EDMBias::flush_buffers(int synched) {
   return bias_added;
 }
 
- void EDMBias::infer_neighbors() {
+ void EDMBias::infer_neighbors(const int* b_periodic) {
 
    //now the hard part, we need to infer the domain decomposition topology
    size_t i,j;
@@ -403,15 +403,29 @@ double EDMBias::flush_buffers(int synched) {
        MPI_Bcast(bounds, dim_ * 2, MPI_DOUBLE, i, MPI_COMM_WORLD);
        //check if this could be a neighbor
        for(j = 0; j < dim_; j++) {
-	 if(bias_->get_max()[j] + 6 * bias_sigma_[j] > bounds[j*2]) {
+	 if(bias_->get_max()[j] + 6 * bias_sigma_[j] > bounds[j*2] &&
+	    bias_->get_max()[j] + 6 * bias_sigma_[j] < bounds[j*2 + 1]) {
 	   mpi_neighbors_[mpi_neighbor_count_] = i;
 	   mpi_neighbor_count_++;
 	   break;
-	 } else if(bias_->get_min()[j] - 6 * bias_sigma_[j] < bounds[j * 2 + 1]) {
+	 } else if(bias_->get_min()[j] - 6 * bias_sigma_[j] < bounds[j * 2 + 1] &&
+		   bias_->get_min()[j] - 6 * bias_sigma_[j] > bounds[j * 2]) {
 	   mpi_neighbors_[mpi_neighbor_count_] = i;
 	   mpi_neighbor_count_++;
 	   break;
 	 }
+	 //those were the easy cases, now wrapping
+	 if(b_periodic[j]) {
+	   
+	   if((fabs(bias_->get_min()[j] - min_[j]) < 6 * bias_sigma_[j] && // I am at left
+	       fabs(bounds[j * 2 + 1] - max_[j] - bias_dx_[j]) < 6 * bias_sigma_[j]) || //other is at right
+	      (fabs(bias_->get_max()[j] - max_[j] - bias_dx_[j]) < 6 * bias_sigma_[j] && //or I am at right
+	       fabs(bounds[j * 2] - min_[j]) < 6 * bias_sigma_[j])) {//other is at left
+	     mpi_neighbors_[mpi_neighbor_count_] = i;
+	     mpi_neighbor_count_++;
+	     break;	     
+	   }	   	   
+	 }	 
        }
      }
    }
