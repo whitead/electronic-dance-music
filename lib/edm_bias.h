@@ -11,6 +11,8 @@
 
 #define BIAS_CLAMP 10
 #define BIAS_BUFFER_SIZE 32
+#define NO_COMM_PARTNER -1
+
 
 class EDMBias {
   /** The EDM bias class.
@@ -49,6 +51,8 @@ class EDMBias {
   void update_height(double bias_added);
 
   void infer_neighbors(const int* b_periodic);
+  void sort_neighbors();
+
   int check_for_flush();
   double flush_buffers(int snyched);
 

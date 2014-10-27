@@ -63,6 +63,23 @@ void EDMBias::subdivide(const double sublo[3],
 			const int b_periodic[3],
 			const double skin[3]) {
 
+#ifdef EDM_MPI_DEBUG
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  if(rank == 0) {
+    int i = 0;
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    printf("PID %d on %s ready for attach\n", getpid(), hostname);
+    fflush(stdout);
+    while (0 == i)
+      sleep(5);
+  }
+  
+
+#endif
+
+
   //has subdivide already been called?
   if(bias_ != NULL)
     return;
@@ -99,6 +116,7 @@ void EDMBias::subdivide(const double sublo[3],
 
 #ifndef SERIAL_TEST
   infer_neighbors(b_periodic);
+  sort_neighbors();
 
   //make hill density a per-system measurement not per replica
 
@@ -147,22 +165,6 @@ void EDMBias::setup(double temperature, double boltzmann_constant) {
 
   temperature_ = temperature;
   boltzmann_factor_ = boltzmann_constant * temperature;
-
-#ifdef EDM_MPI_DEBUG
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  if(rank == 1) {
-    int i = 0;
-    char hostname[256];
-    gethostname(hostname, sizeof(hostname));
-    printf("PID %d on %s ready for attach\n", getpid(), hostname);
-    fflush(stdout);
-    while (0 == i)
-      sleep(5);
-	  }
-  
-
-#endif
 
 }
 
@@ -252,7 +254,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 
 	  }
 	  
-	  /*	  //output info/*
+
 	  std::cout << "|- " << bias_added / sqrt(2 * M_PI) / bias_sigma_[0] 
 		    << " (" << h << "*";
 	  if(b_targeting_)
@@ -265,7 +267,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	  std::cout << ") "
 		    << positions[i][0] 
 		    << std::endl;
-	  */
+
 	}
       }
     }
@@ -344,17 +346,17 @@ double EDMBias::flush_buffers(int synched) {
 	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0) {
 	  //want to make sure the send is complete before we get to barrier
 	  MPI_Send(&buffer_i_, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
-	  /*
+
 	  std::cout << "I am " << rank 
 		    << " and I'm sending " 
 		    << buffer_i_ 
 		    << " items to " 
 		    << mpi_neighbors_[i] 
 		    << std::endl;
-	  */
+
 
 	} else {
-	  //	  	  std::cout << "I am " << rank << " and won't send " << std::endl;
+	  std::cout << "I am " << rank << " and won't send " << std::endl;
 	}
 	
 	//now make sure everyone is done before we send/receive buffers so we know for sure who is getting one
@@ -368,7 +370,7 @@ double EDMBias::flush_buffers(int synched) {
 	//if we did get a receive, we know we have an incoming buffer and we need to finish the process
 	MPI_Test(&rrequest, &result, MPI_STATUS_IGNORE);
 	if(result) {
-	  //	  std::cout << "I am " << rank << " and I'm about to get " << buffer_j << std::endl;
+	  std::cout << "I am " << rank << " and I'm about to get " << buffer_j << std::endl;
 	  MPI_Recv(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); //note we block here
 	  for(j = 0; j < buffer_j; j++) {
 	    bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], receive_buffer_[j * (dim_+1) + dim_]);	
@@ -377,7 +379,7 @@ double EDMBias::flush_buffers(int synched) {
 	  //clean up operation
 	  MPI_Cancel(&rrequest);	  
 	  MPI_Request_free(&rrequest);    
-	  //	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
+	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
 	}
 
 	//finally wait for send to finish, if we did send
@@ -389,7 +391,7 @@ double EDMBias::flush_buffers(int synched) {
 
     //reset buffer
     buffer_i_ = 0;
-    //    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
+    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
   }
 
 
@@ -413,7 +415,7 @@ double EDMBias::flush_buffers(int synched) {
 
    mpi_neighbors_ = (int*) malloc(sizeof(int) * size);
    for(i = 0; i < size; i++) 
-     mpi_neighbors_[i] = -1;
+     mpi_neighbors_[i] = NO_COMM_PARTNER;
 
    for(i = 0; i < size; i++) {   //for each rank 
 
@@ -456,13 +458,8 @@ double EDMBias::flush_buffers(int synched) {
      }
    }
 
-   //now, we need to find the maximum neighbor number so we can synchronize our hill passing
-   unsigned int temp = mpi_neighbor_count_;
-   MPI_Allreduce(&temp, &mpi_neighbor_count_, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
-
-   mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
-
    #ifdef EDM_MPI_DEBUG   
+   //print out the unsorted neighbors
    for(i = 0; i < size; i++) {
      if(rank == i) {
        std::cout << "Neighobrs of " << i << "== ";
@@ -475,6 +472,139 @@ double EDMBias::flush_buffers(int synched) {
    std::cout << std::endl;
    #endif
  }
+
+
+/** This method will take the unordered list of neighbors and create sorted versions
+ * so that there will be no communication blocks
+ */
+void EDMBias::sort_neighbors() {
+
+  int* unsorted_neighbors; 
+  unsigned int* unsorted_counts;
+  int* sorted_neighbors; 
+  unsigned int* sorted_counts;//this is include NO_COMM_PARTNER neighbors, so is generally higher
+  int i,j,k,l;
+  int* b_paired;
+  int rank, size, flag;
+
+   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+   MPI_Comm_size(MPI_COMM_WORLD,&size);
+
+   //only execute on head node, because it's too much comm to try to parallelize it
+   if(rank == 0) {
+     
+     sorted_neighbors = (int*) malloc(sizeof(int) * size * size);
+     unsorted_neighbors = (int*) malloc(sizeof(int) * size * size);
+     sorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * size);
+     unsorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * size);
+     b_paired = (int*) malloc(sizeof(int) * size);
+     
+     for(i = 0; i < size; i++)
+       sorted_counts[i] = 0;
+
+   }
+
+   MPI_Gather(mpi_neighbors_, size, MPI_INT, unsorted_neighbors, size, MPI_INT, 0, MPI_COMM_WORLD);
+   MPI_Gather(&mpi_neighbor_count_, 1, MPI_UNSIGNED, unsorted_counts, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+   if(rank == 0) {
+     
+     for(i = 0; i < size; i++) {//for each round of communication with neighbors, at most size size
+       //clear paired flags
+       for(j = 0; j < size; j++)
+	 b_paired[j] = 0;
+
+       for(j = 0; j < size; j++) {//for each node
+	 if(!b_paired[j]) {
+
+	   //assume we won't find a neighbor
+	   sorted_neighbors[j * size + sorted_counts[j]] = NO_COMM_PARTNER;
+	   
+	   //iterate through my neighbor list
+	   for(k = 0; k < size && unsorted_neighbors[j * size + k] != NO_COMM_PARTNER; k++) {
+	     //NO_COMM_PARTNER happens to mark the end of the array
+
+	     if(!b_paired[unsorted_neighbors[j * size + k]]) { //found an unpaired neighbor!
+
+	       //make sure we haven't already paired with it once before
+	       flag = 0;
+	       for(l = 0; l < sorted_counts[j]; l++) {
+		 if(sorted_neighbors[j * size + l] == unsorted_neighbors[j * size + k]) {
+		   flag = 1;
+		 break;
+		 }
+	       }
+
+	       if(!flag) {
+
+		 l = unsorted_neighbors[j * size + k];
+
+		 sorted_neighbors[j * size + sorted_counts[j]] = l;
+		 unsorted_counts[j]--;
+
+		 sorted_neighbors[l * size + sorted_counts[l]] = j;
+		 b_paired[l] = 1;
+		 sorted_counts[l]++;
+		 unsorted_counts[l]--;
+	       }
+	     }
+	   }
+	   
+	   sorted_counts[j]++;	   
+	   b_paired[j] = 1; //we are either paired or know we're exlcuded
+
+	 }
+       }
+
+
+#ifdef EDM_MPI_DEBUG
+       for(j = 0; j < size; j++) {
+	 std::cout << j << ": [";
+	 for(k = 0; k < sorted_counts[j]; k++)
+	   std::cout << sorted_neighbors[j * size + k] << ", ";
+	 std::cout << "] <--> [";
+	 for(k = 0; k < unsorted_counts[j]; k++)
+	   std::cout << unsorted_neighbors[j * size + k] << ", ";
+	 std::cout << "]" << std::endl;
+	 
+     }
+#endif// EDM_MPI_DEBUG
+
+
+       //let's now check that we're finished by ensuring we have
+       //accounted for all the neighbors
+       flag = 0;
+       for(j = 0; j < size; j++) {
+	 if(unsorted_counts[j] != 0) {
+	   flag = 1;
+	   break;
+	 }
+       }
+       if(!flag)
+	 break;
+     }
+   }
+
+   //now we distribute the results
+   MPI_Scatter(sorted_counts, 1, MPI_UNSIGNED, &mpi_neighbor_count_,
+	       1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+   MPI_Scatter(sorted_neighbors, size, MPI_INT, mpi_neighbors_,
+	       size, MPI_INT, 0, MPI_COMM_WORLD);
+
+   //truncate results
+   mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
+
+   if(rank == 0) {     
+
+     free(unsorted_neighbors);
+     free(sorted_neighbors);
+     free(sorted_counts);
+     free(unsorted_counts);
+     free(b_paired);
+
+   } 
+}
 
 void EDMBias::update_height(double bias_added) {
   double other_bias = 0;

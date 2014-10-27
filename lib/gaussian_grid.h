@@ -176,7 +176,7 @@ class DimmedGaussGrid : public GaussGrid{
       index1 = i - minisize_total_ / 2;
       for(j = 0; j < DIM-1; j++) {
 	index[j] = index1 % minisize_[j];
-	index1 = (index1 - index[j]) / minisize_[j];
+	index1 = (index1 - index[j]) / static_cast<long int>(minisize_[j]);
       }
       index[j] = index1; 
 
