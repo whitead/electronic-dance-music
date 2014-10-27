@@ -50,7 +50,7 @@ class EDMBias {
    */
   void update_height(double bias_added);
 
-  void infer_neighbors(const int* b_periodic);
+  void infer_neighbors(const int* b_periodic, const double* skin);
   void sort_neighbors();
 
   int check_for_flush();

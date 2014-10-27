@@ -13,6 +13,10 @@
 #include "unistd.h"
 #endif
 
+#ifndef GAUSS_SUPPORT
+#define GAUSS_SUPPORT 6.25
+#endif
+
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
@@ -66,7 +70,7 @@ void EDMBias::subdivide(const double sublo[3],
 #ifdef EDM_MPI_DEBUG
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  if(rank == 0) {
+  if(-1 == 0) {
     int i = 0;
     char hostname[256];
     gethostname(hostname, sizeof(hostname));
@@ -115,14 +119,23 @@ void EDMBias::subdivide(const double sublo[3],
   bias_->set_boundary(min_, max_, b_periodic);
 
 #ifndef SERIAL_TEST
-  infer_neighbors(b_periodic);
-  sort_neighbors();
-
+  infer_neighbors(b_periodic, skin);
   //make hill density a per-system measurement not per replica
 
   MPI_Comm_size(MPI_COMM_WORLD,&size);
   if(hill_density_ > 0) 
     hill_density_ /= size;
+
+  //We have two comm cases, global and neighbors. In global, we build
+  //a broadcast tree so that the number of comms is logrithmic in the
+  //number of comms. That is with broadcast. If instead it's more
+  //efficient to use neighbor communication, then we need to sort our neighbors
+  //  if(mpi_neighbor_count_ < log(size))
+  if(1)
+    sort_neighbors();
+  else
+    mpi_neighbor_count_ = size; //just communicate with all
+
   
 #endif
 
@@ -253,8 +266,8 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	      bias_added += flush_buffers(0); //flush and we don't know if we're synched
 
 	  }
-	  
 
+	  /*	  
 	  std::cout << "|- " << bias_added / sqrt(2 * M_PI) / bias_sigma_[0] 
 		    << " (" << h << "*";
 	  if(b_targeting_)
@@ -267,7 +280,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	  std::cout << ") "
 		    << positions[i][0] 
 		    << std::endl;
-
+	  */
 	}
       }
     }
@@ -315,13 +328,10 @@ double EDMBias::flush_buffers(int synched) {
     size_t i,j;
     unsigned int buffer_j;
     int rank, size, result;
-    MPI_Request srequest, rrequest;
+    MPI_Request srequest1, srequest2;
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-    //    std::cout << "I am " << rank << " and I'm about to begin flush" << std::endl;
-    
-    
     if(mpi_neighbor_count_ == size) {
       for(i = 0; i < size; i++) {
 	if(rank == i) {
@@ -338,60 +348,44 @@ double EDMBias::flush_buffers(int synched) {
       }
     } else {
       
-      for(i = 0;i < mpi_neighbor_count_; i++) {
+      for(i = 0; i < mpi_neighbor_count_; i++) {
 
-	//start with receive
-	MPI_Irecv(&buffer_j, 1, MPI_UNSIGNED, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &rrequest);
+	if(mpi_neighbors_[i] == NO_COMM_PARTNER)
+	  continue;
 
-	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0) {
-	  //want to make sure the send is complete before we get to barrier
-	  MPI_Send(&buffer_i_, 1, MPI_UNSIGNED, mpi_neighbors_[i], i, MPI_COMM_WORLD);
+	//async send, since we don't care about the buffer
+	MPI_Isend(&buffer_i_, 1, MPI_UNSIGNED, 
+		  mpi_neighbors_[i], i, MPI_COMM_WORLD, 
+		  &srequest1);
 
-	  std::cout << "I am " << rank 
-		    << " and I'm sending " 
-		    << buffer_i_ 
-		    << " items to " 
-		    << mpi_neighbors_[i] 
-		    << std::endl;
+	MPI_Isend(send_buffer_, buffer_i_ * (dim_ + 1), 
+		  MPI_DOUBLE, mpi_neighbors_[i], 
+		  i, MPI_COMM_WORLD, &srequest2);
 
+	//do sync receive, because we need it to continue
+	MPI_Recv(&buffer_j, 1, MPI_UNSIGNED, 
+		 mpi_neighbors_[i], i, 
+		 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-	} else {
-	  std::cout << "I am " << rank << " and won't send " << std::endl;
-	}
-	
-	//now make sure everyone is done before we send/receive buffers so we know for sure who is getting one
-	MPI_Barrier(MPI_COMM_WORLD);
-	
-	//now send buffer if needed
-	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0) {
-	  MPI_Isend(send_buffer_, buffer_i_ * (dim_ + 1), MPI_DOUBLE, mpi_neighbors_[i], i, MPI_COMM_WORLD, &srequest); //no blocking
-	}
-	
-	//if we did get a receive, we know we have an incoming buffer and we need to finish the process
-	MPI_Test(&rrequest, &result, MPI_STATUS_IGNORE);
-	if(result) {
-	  std::cout << "I am " << rank << " and I'm about to get " << buffer_j << std::endl;
-	  MPI_Recv(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); //note we block here
-	  for(j = 0; j < buffer_j; j++) {
-	    bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], receive_buffer_[j * (dim_+1) + dim_]);	
-	  }
-	} else {
-	  //clean up operation
-	  MPI_Cancel(&rrequest);	  
-	  MPI_Request_free(&rrequest);    
-	  std::cout << "I am " << rank << " and no one wants to talk to me " << std::endl;
+	MPI_Recv(receive_buffer_, buffer_j * (dim_ + 1), 
+		 MPI_DOUBLE, mpi_neighbors_[i], 
+		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
+
+	for(j = 0; j < buffer_j; j++) {
+	  bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
+					    receive_buffer_[j * (dim_+1) + dim_]);	
 	}
 
-	//finally wait for send to finish, if we did send
-	if(mpi_neighbors_[i] >= 0 && buffer_i_ > 0)
-	  MPI_Wait(&srequest, MPI_STATUS_IGNORE);
+	//Technically, I don't need to do this here but 
+	//it's more convienent than having a bunch of outstanding requests
+	MPI_Wait(&srequest1, MPI_STATUS_IGNORE);
+	MPI_Wait(&srequest2,  MPI_STATUS_IGNORE);
 
       }
     }
 
     //reset buffer
     buffer_i_ = 0;
-    std::cout << "I am " << rank << " and I ended up with  " << bias_added << "new bias" << std::endl;
   }
 
 
@@ -399,12 +393,13 @@ double EDMBias::flush_buffers(int synched) {
   return bias_added;
 }
 
- void EDMBias::infer_neighbors(const int* b_periodic) {
+void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 
    //now the hard part, we need to infer the domain decomposition topology
    size_t i,j;
    int rank, size;
    double* bounds = (double*) malloc(sizeof(double) * dim_ * 2);
+   int dim_overlap; //if somethig overlaps in all dimensions
    
 
    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -429,31 +424,38 @@ double EDMBias::flush_buffers(int synched) {
 
      }  else {
        MPI_Bcast(bounds, dim_ * 2, MPI_DOUBLE, i, MPI_COMM_WORLD);
+       
        //check if this could be a neighbor
+       dim_overlap = 0;
        for(j = 0; j < dim_; j++) {
-	 if(bias_->get_max()[j] + 6 * bias_sigma_[j] > bounds[j*2] &&
-	    bias_->get_max()[j] + 6 * bias_sigma_[j] < bounds[j*2 + 1]) {
-	   mpi_neighbors_[mpi_neighbor_count_] = i;
-	   mpi_neighbor_count_++;
-	   break;
-	 } else if(bias_->get_min()[j] - 6 * bias_sigma_[j] < bounds[j * 2 + 1] &&
-		   bias_->get_min()[j] - 6 * bias_sigma_[j] > bounds[j * 2]) {
-	   mpi_neighbors_[mpi_neighbor_count_] = i;
-	   mpi_neighbor_count_++;
-	   break;
+	 //check if their min is within our bounds
+	 if(bounds[j * 2] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
+	    bounds[j * 2] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
+	   dim_overlap++;
+	   continue;
+	   //or if their max is wihtin our bounds
+	 } else if(bounds[j * 2 + 1] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
+		   bounds[j * 2 + 1] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
+	   dim_overlap++;
+	   continue;
 	 }
 	 //those were the easy cases, now wrapping
 	 if(b_periodic[j]) {
-	   
-	   if((fabs(bias_->get_min()[j] - min_[j]) < 6 * bias_sigma_[j] && // I am at left
-	       fabs(bounds[j * 2 + 1] - max_[j] - bias_dx_[j]) < 6 * bias_sigma_[j]) || //other is at right
-	      (fabs(bias_->get_max()[j] - max_[j] - bias_dx_[j]) < 6 * bias_sigma_[j] && //or I am at right
-	       fabs(bounds[j * 2] - min_[j]) < 6 * bias_sigma_[j])) {//other is at left
-	     mpi_neighbors_[mpi_neighbor_count_] = i;
-	     mpi_neighbor_count_++;
-	     break;	     
-	   }	   	   
-	 }	 
+
+	   if(fabs(bias_->get_min()[j] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && // I am at left
+	      fabs(bounds[j * 2 + 1] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) { //other is at right
+	     dim_overlap++;
+	     continue;
+	   } else if(fabs(bias_->get_max()[j] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && //or I am at right
+		     fabs(bounds[j * 2] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) {//other is at left
+	     dim_overlap++;
+	     continue;
+	   }
+	 }
+       }
+       if(dim_overlap == dim_) {
+	 mpi_neighbors_[mpi_neighbor_count_] = i;
+	 mpi_neighbor_count_++;
        }
      }
    }
@@ -462,7 +464,14 @@ double EDMBias::flush_buffers(int synched) {
    //print out the unsorted neighbors
    for(i = 0; i < size; i++) {
      if(rank == i) {
-       std::cout << "Neighobrs of " << i << "== ";
+       std::cout << "Neighobrs of " << i << " [";
+       for(j = 0; j < dim_; j++)
+	 std::cout << bias_->get_min()[j] << ", ";
+       std::cout << "-> ";
+       for(j = 0; j < dim_; j++)
+	 std::cout << bias_->get_max()[j] << ", ";
+       std::cout << "] == ";
+
        for(j = 0; j < mpi_neighbor_count_; j++){
 	 std::cout << mpi_neighbors_[j] << " ";
        }
@@ -483,7 +492,7 @@ void EDMBias::sort_neighbors() {
   unsigned int* unsorted_counts;
   int* sorted_neighbors; 
   unsigned int* sorted_counts;//this is include NO_COMM_PARTNER neighbors, so is generally higher
-  int i,j,k,l;
+  unsigned int i,j,k,l;
   int* b_paired;
   int rank, size, flag;
 
@@ -546,13 +555,14 @@ void EDMBias::sort_neighbors() {
 		 b_paired[l] = 1;
 		 sorted_counts[l]++;
 		 unsorted_counts[l]--;
+		 break;
 	       }
 	     }
 	   }
 	   
 	   sorted_counts[j]++;	   
 	   b_paired[j] = 1; //we are either paired or know we're exlcuded
-
+	   
 	 }
        }
 
