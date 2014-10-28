@@ -10,7 +10,8 @@
 #include <map>
 
 #define BIAS_CLAMP 10
-#define BIAS_BUFFER_SIZE 32
+//number of doubles
+#define BIAS_BUFFER_SIZE 64
 #define NO_COMM_PARTNER -1
 
 

@@ -130,11 +130,15 @@ void EDMBias::subdivide(const double sublo[3],
   //a broadcast tree so that the number of comms is logrithmic in the
   //number of comms. That is with broadcast. If instead it's more
   //efficient to use neighbor communication, then we need to sort our neighbors
-  //  if(mpi_neighbor_count_ < log(size))
-  if(1)
+  if(mpi_neighbor_count_ < log(size)) {
+    //  if(1)
     sort_neighbors();
-  else
+    std::cout << "Using neighbors" << std::endl;
+  } else{
     mpi_neighbor_count_ = size; //just communicate with all
+    std::cout << "Using broadcast" << std::endl;
+  }
+
 
   
 #endif

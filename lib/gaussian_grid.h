@@ -173,12 +173,15 @@ class DimmedGaussGrid : public GaussGrid{
       //This is the one2multi algorithm
 
       //We substract here so that we consider both below and above hill center
-      index1 = i - minisize_total_ / 2;
+      index1 = i;
       for(j = 0; j < DIM-1; j++) {
-	index[j] = index1 % minisize_[j];
-	index1 = (index1 - index[j]) / static_cast<long int>(minisize_[j]);
+	index[j] = index1 % (2 * minisize_[j] + 1);
+	index1 = (index1 - index[j]) / static_cast<long int>(2 * minisize_[j] + 1);
       }
-      index[j] = index1; 
+      index[j] = index1;
+
+      for(j = 0; j < DIM; j++)
+	index[j] -= minisize_[j];
 
 
       b_flag = 0;
@@ -234,7 +237,6 @@ class DimmedGaussGrid : public GaussGrid{
       }
 
       dp2 *= 0.5;
-      
       if(dp2 < GAUSS_SUPPORT) {
 	expo = height * exp(-dp2);
       
@@ -368,8 +370,8 @@ class DimmedGaussGrid : public GaussGrid{
     minisize_total_ = 1;
     for(i = 0; i < DIM; i++) {
       dist = sqrt(2 * GAUSS_SUPPORT) * sigma_[i]; //a distance that goes for gaussian center outwards
-      minisize_[i] = int_floor(dist / grid_.dx_[i]) + 1;
-      minisize_total_ *= (2 * minisize_[i] + 1); // the minisize is only in 1 direction, but we in total must look forward and back from center
+      minisize_[i] =  int_floor(dist / grid_.dx_[i]);
+      minisize_total_ *= (2 * minisize_[i] + 1);
     }
   }
   
