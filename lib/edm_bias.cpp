@@ -62,6 +62,10 @@ EDMBias::~EDMBias() {
 }
 
 
+//need to also pass the the box size and its periodicity so we can
+//infer if the given boundary extends across the entire system. That
+//determins the acutal b_periodic
+
 void EDMBias::subdivide(const double sublo[3], 
 			const double subhi[3], 
 			const int b_periodic[3],
@@ -113,8 +117,7 @@ void EDMBias::subdivide(const double sublo[3],
     bounds_flag &= (min[i] >= max_[i] || max[i] <= min_[i]);    
     
   }
-  
-  
+
   bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, 1, bias_sigma_);
   bias_->set_boundary(min_, max_, b_periodic);
 

@@ -544,7 +544,7 @@ class DimmedGrid : public Grid {
 	    output << setprecision(8) << std::fixed <<  -der[j] << " ";
 	  }
 	}
-	output << setprecision(8) << std::fixed << myrank << " ";
+
 	output << endl;
 	if(super_index[0] == reduced_counts[0] - 1)
 	  output << endl;
