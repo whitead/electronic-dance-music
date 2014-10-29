@@ -6,6 +6,8 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <iomanip>
+
 #include <map>
 #include "mpi.h"
 
@@ -20,21 +22,23 @@
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
-      is >> ps.first;
-      std::getline (is,ps.second);
-      return is;
+    is >> ps.first;
+    std::getline (is,ps.second);
+    return is;
   }
-
+  
   ostream& operator << (ostream& os, const pair<const string, string>& ps)
   {
     return os << "\"" << ps.first << "\": \"" << ps.second << "\"";
   }
-
+  
 }
 
 
 EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0), 
 						      b_targeting_(0), 
+						      mpi_rank_(0),
+						      mpi_size_(0),
 						      global_tempering_(0), 
 						      hill_density_(-1),
 						      cum_bias_(0), 
@@ -46,21 +50,26 @@ EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 						      mpi_neighbors_(NULL),
 						      buffer_i_(0){
   
+  //assign rank
+#ifndef SERIAL_TEST
+  MPI_Comm_rank(MPI_COMM_WORLD,&mpi_rank_);
+  MPI_Comm_size(MPI_COMM_WORLD,&mpi_size_);
+#endif
   //read input file
   read_input(input_filename);  
   
 }
-
-EDMBias::~EDMBias() {
+  
+  EDMBias::~EDMBias() {
   if(target_ != NULL)
     delete target_;
   if(bias_ != NULL)
     delete bias_;
-
+  
   if(mpi_neighbors_ != NULL)
     free(mpi_neighbors_);
 }
-
+  
 
 //need to also pass the the box size and its periodicity so we can
 //infer if the given boundary extends across the entire system. That
@@ -68,14 +77,14 @@ EDMBias::~EDMBias() {
 
 void EDMBias::subdivide(const double sublo[3], 
 			const double subhi[3], 
+			const double boxlo[3],
+			const double boxhi[3],
 			const int b_periodic[3],
 			const double skin[3]) {
 
 #ifdef EDM_MPI_DEBUG
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  if(-1 == 0) {
-    int i = 0;
+  if(mpi_rank_ == 2) {
+    volatile int i = 0;
     char hostname[256];
     gethostname(hostname, sizeof(hostname));
     printf("PID %d on %s ready for attach\n", getpid(), hostname);
@@ -93,11 +102,17 @@ void EDMBias::subdivide(const double sublo[3],
     return;
   
   int grid_period[] = {0, 0, 0};
+  int boundary_period[] = {0, 0, 0};
   double min[3];
   double max[3];
   size_t i;
-  int size;
   int bounds_flag = 1;
+
+  for(i = 0; i < dim_; i++) {
+    //check if the given boundary matches the system boundary, if so then use the system periodicity
+    if(fabs(boxlo[i] - min_[i]) < 0.000001 && fabs(boxhi[i] - max_[i]) < 0.000001)
+      boundary_period[i] = b_periodic[i];
+  }
 
   for(i = 0; i < dim_; i++) {
 
@@ -106,7 +121,7 @@ void EDMBias::subdivide(const double sublo[3],
 
     //check if we encapsulate the entire bounds in any dimension
     if(fabs(sublo[i] - min_[i]) < 0.000001 && fabs(subhi[i] - max_[i]) < 0.000001) {
-      grid_period[i] = b_periodic[i];
+      grid_period[i] = boundary_period[i];
       bounds_flag = 0;      
     } else {
       min[i] -= skin[i];
@@ -119,33 +134,32 @@ void EDMBias::subdivide(const double sublo[3],
   }
 
   bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, 1, bias_sigma_);
-  bias_->set_boundary(min_, max_, b_periodic);
+  bias_->set_boundary(min_, max_, boundary_period);
 
 #ifndef SERIAL_TEST
   infer_neighbors(b_periodic, skin);
   //make hill density a per-system measurement not per replica
 
-  MPI_Comm_size(MPI_COMM_WORLD,&size);
   if(hill_density_ > 0) 
-    hill_density_ /= size;
+    hill_density_ /= mpi_size_;
 
   //We have two comm cases, global and neighbors. In global, we build
   //a broadcast tree so that the number of comms is logrithmic in the
   //number of comms. That is with broadcast. If instead it's more
   //efficient to use neighbor communication, then we need to sort our neighbors
-  if(mpi_neighbor_count_ < log(size)) {
+  if(mpi_neighbor_count_ < log(mpi_size_)) {
     //  if(1)
     sort_neighbors();
     std::cout << "Using neighbors" << std::endl;
   } else{
-    mpi_neighbor_count_ = size; //just communicate with all
+    mpi_neighbor_count_ = mpi_size_; //just communicate with all
     std::cout << "Using broadcast" << std::endl;
   }
 
 
   
 #endif
-
+  
   if(bounds_flag) {
     //we do this after so that we have a grid to at least write out
     std::cout << "I am out of bounds!" << std::endl;
@@ -154,9 +168,14 @@ void EDMBias::subdivide(const double sublo[3],
   }
 
   //get volume
+  //note that get_volume won't get the system volume, due the skin 
+  //between regions. However, it is correct for getting average bias
+  //because some hills will be counted twice and this increase in volume
+  //compensates for that.
   double other_vol = 0;
   double vol = bias_->get_volume();
   total_volume_ = 0;
+
   #ifndef SERIAL_TEST
   MPI_Allreduce(&vol, &other_vol, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   #else
@@ -167,18 +186,16 @@ void EDMBias::subdivide(const double sublo[3],
 }
 
 void EDMBias::write_bias(const std::string& output) const {
-  #ifndef SERIAL_TEST
+#ifndef SERIAL_TEST
   bias_->multi_write(output);
 #ifdef EDM_MPI_DEBUG
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   std::ostringstream oss;
-  oss << output << "_" << rank;
+  oss << output << "_" << mpi_rank_;
   bias_->write(oss.str());
 #endif //EDM_DEBUG
 #else //SERIAL TEST
   bias_->write(output);
-  #endif
+#endif
 }
 
 void EDMBias::setup(double temperature, double boltzmann_constant) {
@@ -198,8 +215,8 @@ void EDMBias::update_forces(int nlocal, const double* const* positions, double**
   //are we active?
   if(b_outofbounds_)
     return;
-
-
+  
+  
   //simply perform table look-ups of the positions to get the forces
   int i,j;
   double der[3] = {0, 0, 0};
@@ -260,6 +277,9 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	  this_h = fmin(this_h, BIAS_CLAMP * boltzmann_factor_);
 	  bias_added += bias_->add_gaussian(&positions[i][0], this_h);
 	  
+	  //output hill
+	  output_hill(&positions[i][0], this_h, bias_added);
+
 	  //pack result into buffer if necessary
 	  if(mpi_neighbor_count_ > 0) {
 	    for(j = 0; j < dim_; j++)	    
@@ -267,54 +287,52 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	    send_buffer_[buffer_i_ * (dim_+1) + j] = this_h;
 
 	    buffer_i_++;
-
+	    
 	    //do we need to flush?
 	    if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
 	      bias_added += flush_buffers(0); //flush and we don't know if we're synched
-
 	  }
-
-	  /*	  
-	  std::cout << "|- " << bias_added / sqrt(2 * M_PI) / bias_sigma_[0] 
-		    << " (" << h << "*";
-	  if(b_targeting_)
-	    std::cout << "exp(" 
-		      << target_->get_value(&positions[i][0]) 
-		      << ") ->" 
-		      << exp(-target_->get_value(&positions[i][0]));
-	  else
-	    std::cout << 1;
-	  std::cout << ") "
-		    << positions[i][0] 
-		    << std::endl;
-	  */
 	}
       }
     }
   }
-
   bias_added += flush_buffers(0); //flush, but we don't know if we're synched
 
   //some processors may have had to flush more than once if there are
   //lots of hills, continue waiting for them until we all agree no more flush
   while(check_for_flush())
     bias_added += flush_buffers(1); //flush and we are synched
-
+  
   update_height(bias_added);
 }
+ 
+
+ void EDMBias::output_hill(const double* position, double height, double bias_added) {
+   
+   size_t i;
+   
+   hill_output_ << std::setprecision(8) << std::fixed;
+   for(i = 0; i < dim_; i++)  {
+     hill_output_ << position[i] << " ";
+   }
+   hill_output_ << height << " ";
+   hill_output_ << bias_added << " ";
+   hill_output_ << cum_bias_ / total_volume_ << std::endl;
+   
+ }
 
 int EDMBias::check_for_flush() {
-
+  
   if(mpi_neighbor_count_ > 0) {
-
+    
     int my_flush = 0;
     int do_flush;
     MPI_Allreduce(&my_flush, &do_flush, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     if(do_flush)
       return 1;
-
+    
   }
-
+  
   return 0;
 
 }
@@ -334,14 +352,11 @@ double EDMBias::flush_buffers(int synched) {
     
     size_t i,j;
     unsigned int buffer_j;
-    int rank, size, result;
     MPI_Request srequest1, srequest2;
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-    MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-    if(mpi_neighbor_count_ == size) {
-      for(i = 0; i < size; i++) {
-	if(rank == i) {
+    if(mpi_neighbor_count_ == mpi_size_) {
+      for(i = 0; i < mpi_size_; i++) {
+	if(mpi_rank_ == i) {
 	  MPI_Bcast(&buffer_i_, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(send_buffer_, buffer_i_ * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
 	} else {
@@ -350,6 +365,8 @@ double EDMBias::flush_buffers(int synched) {
 	  for(j = 0; j < buffer_j; j++) {
 	    bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					      receive_buffer_[j * (dim_+1) + dim_]);
+	    hill_output_ << "[" << i << "] ";
+	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
 	  }
 	}
       }
@@ -381,6 +398,8 @@ double EDMBias::flush_buffers(int synched) {
 	for(j = 0; j < buffer_j; j++) {
 	  bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					    receive_buffer_[j * (dim_+1) + dim_]);	
+	  hill_output_ << "[" << mpi_neighbors_[i] << "] ";
+	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
 	}
 
 	//Technically, I don't need to do this here but 
@@ -404,24 +423,20 @@ void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 
    //now the hard part, we need to infer the domain decomposition topology
    size_t i,j;
-   int rank, size;
    double* bounds = (double*) malloc(sizeof(double) * dim_ * 2);
    int dim_overlap; //if somethig overlaps in all dimensions
    
 
-   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-   MPI_Comm_size(MPI_COMM_WORLD,&size);
-
    if(mpi_neighbors_ != NULL)
      free(mpi_neighbors_);
 
-   mpi_neighbors_ = (int*) malloc(sizeof(int) * size);
-   for(i = 0; i < size; i++) 
+   mpi_neighbors_ = (int*) malloc(sizeof(int) * mpi_size_);
+   for(i = 0; i < mpi_size_; i++) 
      mpi_neighbors_[i] = NO_COMM_PARTNER;
 
-   for(i = 0; i < size; i++) {   //for each rank 
+   for(i = 0; i < mpi_size_; i++) {   //for each rank 
 
-     if(rank == i) {//it's my turn to broadcast my boundaries
+     if(mpi_rank_ == i) {//it's my turn to broadcast my boundaries
 
        for(j = 0; j < dim_; j++) {//pack up my bounds
 	 bounds[j*2] = bias_->get_min()[j];
@@ -469,8 +484,8 @@ void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 
    #ifdef EDM_MPI_DEBUG   
    //print out the unsorted neighbors
-   for(i = 0; i < size; i++) {
-     if(rank == i) {
+   for(i = 0; i < mpi_size_; i++) {
+     if(mpi_rank_ == i) {
        std::cout << "Neighobrs of " << i << " [";
        for(j = 0; j < dim_; j++)
 	 std::cout << bias_->get_min()[j] << ", ";
@@ -501,51 +516,48 @@ void EDMBias::sort_neighbors() {
   unsigned int* sorted_counts;//this is include NO_COMM_PARTNER neighbors, so is generally higher
   unsigned int i,j,k,l;
   int* b_paired;
-  int rank, size, flag;
-
-   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-   MPI_Comm_size(MPI_COMM_WORLD,&size);
+  int flag;
 
    //only execute on head node, because it's too much comm to try to parallelize it
-   if(rank == 0) {
+   if(mpi_rank_ == 0) {
      
-     sorted_neighbors = (int*) malloc(sizeof(int) * size * size);
-     unsorted_neighbors = (int*) malloc(sizeof(int) * size * size);
-     sorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * size);
-     unsorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * size);
-     b_paired = (int*) malloc(sizeof(int) * size);
+     sorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
+     unsorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
+     sorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
+     unsorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
+     b_paired = (int*) malloc(sizeof(int) * mpi_size_);
      
-     for(i = 0; i < size; i++)
+     for(i = 0; i < mpi_size_; i++)
        sorted_counts[i] = 0;
 
    }
 
-   MPI_Gather(mpi_neighbors_, size, MPI_INT, unsorted_neighbors, size, MPI_INT, 0, MPI_COMM_WORLD);
+   MPI_Gather(mpi_neighbors_, mpi_size_, MPI_INT, unsorted_neighbors, mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
    MPI_Gather(&mpi_neighbor_count_, 1, MPI_UNSIGNED, unsorted_counts, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
 
-   if(rank == 0) {
+   if(mpi_rank_ == 0) {
      
-     for(i = 0; i < size; i++) {//for each round of communication with neighbors, at most size size
+     for(i = 0; i < mpi_size_; i++) {//for each round of communication with neighbors, at most size size
        //clear paired flags
-       for(j = 0; j < size; j++)
+       for(j = 0; j < mpi_size_; j++)
 	 b_paired[j] = 0;
 
-       for(j = 0; j < size; j++) {//for each node
+       for(j = 0; j < mpi_size_; j++) {//for each node
 	 if(!b_paired[j]) {
 
 	   //assume we won't find a neighbor
-	   sorted_neighbors[j * size + sorted_counts[j]] = NO_COMM_PARTNER;
+	   sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = NO_COMM_PARTNER;
 	   
 	   //iterate through my neighbor list
-	   for(k = 0; k < size && unsorted_neighbors[j * size + k] != NO_COMM_PARTNER; k++) {
+	   for(k = 0; k < mpi_size_ && unsorted_neighbors[j * mpi_size_ + k] != NO_COMM_PARTNER; k++) {
 	     //NO_COMM_PARTNER happens to mark the end of the array
 
-	     if(!b_paired[unsorted_neighbors[j * size + k]]) { //found an unpaired neighbor!
+	     if(!b_paired[unsorted_neighbors[j * mpi_size_ + k]]) { //found an unpaired neighbor!
 
 	       //make sure we haven't already paired with it once before
 	       flag = 0;
 	       for(l = 0; l < sorted_counts[j]; l++) {
-		 if(sorted_neighbors[j * size + l] == unsorted_neighbors[j * size + k]) {
+		 if(sorted_neighbors[j * mpi_size_ + l] == unsorted_neighbors[j * mpi_size_ + k]) {
 		   flag = 1;
 		 break;
 		 }
@@ -553,12 +565,12 @@ void EDMBias::sort_neighbors() {
 
 	       if(!flag) {
 
-		 l = unsorted_neighbors[j * size + k];
+		 l = unsorted_neighbors[j * mpi_size_ + k];
 
-		 sorted_neighbors[j * size + sorted_counts[j]] = l;
+		 sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = l;
 		 unsorted_counts[j]--;
 
-		 sorted_neighbors[l * size + sorted_counts[l]] = j;
+		 sorted_neighbors[l * mpi_size_ + sorted_counts[l]] = j;
 		 b_paired[l] = 1;
 		 sorted_counts[l]++;
 		 unsorted_counts[l]--;
@@ -575,13 +587,13 @@ void EDMBias::sort_neighbors() {
 
 
 #ifdef EDM_MPI_DEBUG
-       for(j = 0; j < size; j++) {
+       for(j = 0; j < mpi_size_; j++) {
 	 std::cout << j << ": [";
 	 for(k = 0; k < sorted_counts[j]; k++)
-	   std::cout << sorted_neighbors[j * size + k] << ", ";
+	   std::cout << sorted_neighbors[j * mpi_size_ + k] << ", ";
 	 std::cout << "] <--> [";
 	 for(k = 0; k < unsorted_counts[j]; k++)
-	   std::cout << unsorted_neighbors[j * size + k] << ", ";
+	   std::cout << unsorted_neighbors[j * mpi_size_ + k] << ", ";
 	 std::cout << "]" << std::endl;
 	 
      }
@@ -591,7 +603,7 @@ void EDMBias::sort_neighbors() {
        //let's now check that we're finished by ensuring we have
        //accounted for all the neighbors
        flag = 0;
-       for(j = 0; j < size; j++) {
+       for(j = 0; j < mpi_size_; j++) {
 	 if(unsorted_counts[j] != 0) {
 	   flag = 1;
 	   break;
@@ -606,13 +618,13 @@ void EDMBias::sort_neighbors() {
    MPI_Scatter(sorted_counts, 1, MPI_UNSIGNED, &mpi_neighbor_count_,
 	       1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
 
-   MPI_Scatter(sorted_neighbors, size, MPI_INT, mpi_neighbors_,
-	       size, MPI_INT, 0, MPI_COMM_WORLD);
+   MPI_Scatter(sorted_neighbors, mpi_size_, MPI_INT, mpi_neighbors_,
+	       mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
 
    //truncate results
    mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
 
-   if(rank == 0) {     
+   if(mpi_rank_ == 0) {     
 
      free(unsorted_neighbors);
      free(sorted_neighbors);
@@ -729,7 +741,7 @@ int EDMBias::read_input(const std::string& input_filename){
     return 0;
   else
     dim_ = tmp;
- 
+  
   if(dim_ == 0 || dim_ > 3) {
     cerr << "Invalid dimesion " << dim_ << endl;
     return 0;
@@ -755,13 +767,36 @@ int EDMBias::read_input(const std::string& input_filename){
     b_targeting_ = 0;
   } else {
     b_targeting_ = 1;
-    string& tfilename = parsed_input.at("target_filename");
-    //remove surrounding whitespace 
-    size_t found = tfilename.find_first_not_of(" \t");
-    if (found != string::npos)
-      tfilename = tfilename.substr(found);
-    target_ = read_grid(dim_, tfilename, 0); //read grid, do not use interpolation
+    string tfilename = parsed_input.at("target_filename");
+    string cleaned_filename = clean_string(tfilename, 0);
+    target_ = read_grid(dim_, cleaned_filename, 0); //read grid, do not use interpolation
   }
- 
+
+  if(parsed_input.find("hills_filename") != parsed_input.end()) {
+    string hfilename = parsed_input.at("hills_filename");
+    string cleaned_filename = clean_string(hfilename, 1);
+    hill_output_.open(cleaned_filename.c_str());    
+  } else {
+    string hfilename("HILLS");
+    string cleaned_filename = clean_string(hfilename, 1);
+    hill_output_.open(cleaned_filename.c_str());
+
+}
   return 1;
+}
+
+
+ std::string EDMBias::clean_string(const std::string& input, int append_rank) {
+  std::string result(input);
+  //remove surrounding whitespace 
+    size_t found = result.find_first_not_of(" \t");
+    if (found != std::string::npos)
+      result = result.substr(found);    
+    if(append_rank) {
+  std::ostringstream oss;
+  oss << result << "_" << mpi_rank_;
+  return oss.str();
+}
+    return result;
+
 }

@@ -610,7 +610,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
 
 
 BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
-  EDMBias bias = EDMBias(EDM_SRC + "/read_test.edm");
+  EDMBias bias(EDM_SRC + "/read_test.edm");
   BOOST_REQUIRE_EQUAL(bias.dim_, 2);
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
@@ -625,7 +625,7 @@ struct EDMBiasTest {
     double high[] = {10};
     int p[] = {1};
     double skin[] = {0};
-    bias.subdivide(low, high, p, skin);    
+    bias.subdivide(low, high, low, high, p, skin);    
     
   }     
   

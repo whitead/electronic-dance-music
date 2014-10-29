@@ -97,7 +97,7 @@ void FixEDM::init()
   bias->setup(temperature, force->boltz);
   double skin[3];
   skin[0] = skin[1] = skin[2] = neighbor->skin;
-  bias->subdivide(domain->sublo, domain->subhi, domain->periodicity, skin);
+  bias->subdivide(domain->sublo, domain->subhi, domain->boxlo, domain->boxhi, domain->periodicity, skin);
   bias->set_mask(atom->mask);
 
 }

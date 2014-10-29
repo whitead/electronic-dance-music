@@ -27,7 +27,10 @@ class EDMBias {
   /** Create a grid that only occupies enough space for this processes local box
    *
    */
-  void subdivide(const double sublo[3], const double subhi[3], const int b_periodic[3], const double skin[3]);
+  void subdivide(const double sublo[3], const double subhi[3], 
+		 const double boxlo[3], const double boxhi[3],
+		 const int b_periodic[3], const double skin[3]);
+
 
   void setup(double temperature, double boltzmann_constant);
     
@@ -44,21 +47,11 @@ class EDMBias {
 
   void write_bias(const std::string& output) const;
 
-  /** This will update the height, optionally with tempering. It also
-   * will reduce across all processes the average height so that we
-   * know if global tempering is necessary.
-   *
-   */
-  void update_height(double bias_added);
-
-  void infer_neighbors(const int* b_periodic, const double* skin);
-  void sort_neighbors();
-
-  int check_for_flush();
-  double flush_buffers(int snyched);
 
   int b_tempering_;// boolean, do tempering
   int b_targeting_;// boolean, do targeting  
+  int mpi_rank_; //my MPI rank
+  int mpi_size_; //my MPI size
   unsigned int dim_;//the dimension
   double global_tempering_;// global tempering threshold
   double bias_factor_;
@@ -88,6 +81,27 @@ class EDMBias {
   double send_buffer_[BIAS_BUFFER_SIZE];
   double receive_buffer_[BIAS_BUFFER_SIZE];
   unsigned int buffer_i_;
+
+  std::ofstream hill_output_;
+
+ private:
+  EDMBias(const EDMBias& that);
+  void output_hill(const double* position, double height, double bias_added);
+  /** This will update the height, optionally with tempering. It also
+   * will reduce across all processes the average height so that we
+   * know if global tempering is necessary.
+   *
+   */
+  void update_height(double bias_added);
+
+  void infer_neighbors(const int* b_periodic, const double* skin);
+  void sort_neighbors();
+
+  int check_for_flush();
+  double flush_buffers(int snyched);
+
+  std::string clean_string(const std::string& input, int append_rank);
+
 
 };
 
