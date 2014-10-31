@@ -32,7 +32,7 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
 
   int me, size;
 
-  if (narg != 9) error->all(FLERR,"Illegal fix EDM command");
+  if (narg < 9) error->all(FLERR,"Illegal fix EDM command");
 
   MPI_Comm_rank(world,&me);
   MPI_Comm_size(world,&size);

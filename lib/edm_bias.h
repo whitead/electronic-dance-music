@@ -37,6 +37,7 @@ class EDMBias {
   int read_input(const std::string& input_filename);
   void update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
   void update_forces(int nlocal, const double* const* positions,  double** forces) const;
+  void update_force(const double* positions,  double* forces) const;
   void set_mask(const int* mask); //set a mask
   /**
    * Add hills. A precomputed array (different each time) needs to be
@@ -44,6 +45,17 @@ class EDMBias {
    **/
   void add_hills(int nlocal, const double* const* positions, const double* runiform);
   void add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask);
+
+  /**
+   * A way to add hills one at a time. Call pre_add_hill first,
+   * add_hill a fixed number of times, and finally post_add_hill. 
+   * 
+   * It's important to know how many hills will be added and call add_hill that many times.
+   *
+   **/
+  void pre_add_hill();
+  void add_hill(int times_called, const double* position, double runiform);
+  void post_add_hill();
 
   void write_bias(const std::string& output) const;
 
@@ -85,6 +97,10 @@ class EDMBias {
   std::ofstream hill_output_;
 
  private:
+  //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
+  double temp_hill_cum_;
+  double temp_hill_prefactor_;
+  
   EDMBias(const EDMBias& that);
   void output_hill(const double* position, double height, double bias_added);
   /** This will update the height, optionally with tempering. It also

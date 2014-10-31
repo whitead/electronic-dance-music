@@ -29,8 +29,8 @@ add_subdirectory ("tests")
 
 file(GLOB LammpsFiles ${CMAKE_SOURCE_DIR}/lib/*.cpp
                       ${CMAKE_SOURCE_DIR}/lib/*.h
-                      ${CMAKE_SOURCE_DIR}/fix_edm.h
-                      ${CMAKE_SOURCE_DIR}/fix_edm.cpp)
+                      ${CMAKE_SOURCE_DIR}/*.h
+                      ${CMAKE_SOURCE_DIR}/*.cpp)
 
 add_custom_target(patch)
 foreach(f ${LammpsFiles})

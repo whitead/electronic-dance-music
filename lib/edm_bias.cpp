@@ -48,7 +48,9 @@ EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 						      mask_(NULL),
 						      mpi_neighbor_count_(0),
 						      mpi_neighbors_(NULL),
-						      buffer_i_(0){
+						      buffer_i_(0),
+						      temp_hill_cum_(-1),
+						      temp_hill_prefactor_(-1){
   
   //assign rank
 #ifndef SERIAL_TEST
@@ -133,7 +135,7 @@ void EDMBias::subdivide(const double sublo[3],
     
   }
 
-  bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, 1, bias_sigma_);
+  bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, 0, bias_sigma_);
   bias_->set_boundary(min_, max_, boundary_period);
 
 #ifndef SERIAL_TEST
@@ -230,6 +232,24 @@ void EDMBias::update_forces(int nlocal, const double* const* positions, double**
   
 }
 
+void EDMBias::update_force(const double* positions, double* forces) const {
+
+  //are we active?
+  if(b_outofbounds_)
+    return;
+  
+  
+  //simply perform table look-ups of the positions to get the forces
+  int i;
+  double der[3] = {0, 0, 0};
+  bias_->get_value_deriv(positions, der);
+  for(i = 0; i < dim_; i++)
+    forces[i] -= der[i];
+
+  
+}
+
+
 void EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
   add_hills(nlocal, positions, runiform, -1);
 }
@@ -274,7 +294,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
 	    this_h *= exp(-bias_->get_value(&positions[i][0]) / 
 			  ((bias_factor_ - 1) * boltzmann_factor_));
 	  //finally clamp bias
-	  this_h = fmin(this_h, BIAS_CLAMP * boltzmann_factor_);
+	  this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
 	  bias_added += bias_->add_gaussian(&positions[i][0], this_h);
 	  
 	  //output hill
@@ -304,6 +324,86 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
     bias_added += flush_buffers(1); //flush and we are synched
   
   update_height(bias_added);
+}
+
+void EDMBias::pre_add_hill() {
+
+  //are we active?
+  if(!b_outofbounds_) {
+
+    temp_hill_prefactor_ = hill_prefactor_;
+
+    //get current hill height
+    if(global_tempering_ > 0)
+      if(cum_bias_ / total_volume_ >= global_tempering_)
+	temp_hill_prefactor_ *= exp(-(cum_bias_ / total_volume_ - 
+		   global_tempering_) / 
+		 ((bias_factor_ - 1) * boltzmann_factor_));                   
+  }
+
+  temp_hill_cum_ = 0;
+}
+
+void EDMBias::add_hill(int times_called, const double* position, double runiform) {
+
+  if(temp_hill_prefactor_ < 0);
+    //error must call pre_add_hill before add_hill
+
+  double this_h = temp_hill_prefactor_;
+  size_t i;
+
+  //are we active?
+  if(!b_outofbounds_) {
+
+    //actually add hills -> stochastic
+    if(hill_density_ < 0 || runiform < hill_density_ / times_called) {    
+      if(b_targeting_)
+	this_h *= exp(-target_->get_value(position)); // add target
+      if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
+	this_h *= exp(-bias_->get_value(position) / 
+		      ((bias_factor_ - 1) * boltzmann_factor_));
+      //finally clamp bias
+      this_h = fmin(this_h, BIAS_CLAMP * hill_prefactor_);
+      temp_hill_cum_ += bias_->add_gaussian(position, this_h);
+      
+      //output hill
+      output_hill(position, this_h, temp_hill_cum_);
+      
+      //pack result into buffer if necessary
+      if(mpi_neighbor_count_ > 0) {
+	for(i = 0; i < dim_; i++)	    
+	  send_buffer_[buffer_i_ * (dim_+1) + i] = position[i];
+	send_buffer_[buffer_i_ * (dim_+1) + i] = this_h;
+	
+	buffer_i_++;
+	
+	//do we need to flush?
+	if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
+	  temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
+      }
+    }
+  }
+
+}
+
+void EDMBias::post_add_hill() {
+
+  if(temp_hill_cum_ < 0) {
+    //error must call pre_add_hill before post_add_hill
+  }
+
+  temp_hill_cum_ += flush_buffers(0); //flush, but we don't know if we're synched
+
+  //some processors may have had to flush more than once if there are
+  //lots of hills, continue waiting for them until we all agree no more flush
+  while(check_for_flush())
+    temp_hill_cum_ += flush_buffers(1); //flush and we are synched
+  
+  update_height(temp_hill_cum_);
+
+  temp_hill_cum_ = -1;
+  temp_hill_prefactor_ = -1;
+
 }
  
 
