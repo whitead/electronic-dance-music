@@ -18,7 +18,7 @@
 namespace EDM{ 
 
 class EDMBias {
-  /** The EDM bias class.
+  /** The EDM bias class. The main biasing class
    *
    *
    */
@@ -28,24 +28,44 @@ class EDMBias {
   ~EDMBias();
   /** Create a grid that only occupies enough space for this processes local box
    *
-   */
+   **/
   void subdivide(const double sublo[3], const double subhi[3], 
 		 const double boxlo[3], const double boxhi[3],
 		 const int b_periodic[3], const double skin[3]);
 
 
+  /** This must be called so that EDM can learn the temperature and kt
+   *
+   **/
   void setup(double temperature, double boltzmann_constant);
     
   int read_input(const std::string& input_filename);
+  /**
+   * This version of update_forces is the most general and will update
+   * the forces of the arrays. apply_mask will be used to test against
+   * the mask given in the set_mask method.
+   **/
   void update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
+  /**
+   * An array-based update_forces without a mask
+   **/
   void update_forces(int nlocal, const double* const* positions,  double** forces) const;
+  /**
+   * Update the force of a single position
+   **/
   void update_force(const double* positions,  double* forces) const;
+  /**
+   * Set a mask that will be used for the add_hills/update_forces methods which can take a mask
+   **/
   void set_mask(const int* mask); //set a mask
   /**
-   * Add hills. A precomputed array (different each time) needs to be
+   * Add hills using arrays. A precomputed array (different each time) needs to be
    * passed if stochastic sampling is done (otherwise NULL).
    **/
   void add_hills(int nlocal, const double* const* positions, const double* runiform);
+  /**
+   * Add hills using arrays and taking a mask.
+   **/
   void add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask);
 
   /**
@@ -59,6 +79,9 @@ class EDMBias {
   void add_hill(int times_called, const double* position, double runiform);
   void post_add_hill();
 
+  /**
+   * Write the bias across all MPI processes. Will also output individual if EDM_MPI_DEBUG is deinfed
+   **/
   void write_bias(const std::string& output) const;
 
 
@@ -96,28 +119,40 @@ class EDMBias {
   double receive_buffer_[BIAS_BUFFER_SIZE];
   unsigned int buffer_i_;
 
-  std::ofstream hill_output_;
+  std::ofstream hill_output_;//hill writing
 
  private:
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
   double temp_hill_cum_;
   double temp_hill_prefactor_;
-  
-  EDMBias(const EDMBias& that);
+    
+  EDMBias(const EDMBias& that);//just disable copy constructor
   void output_hill(const double* position, double height, double bias_added);
-  /** This will update the height, optionally with tempering. It also
+  /* This will update the height, optionally with tempering. It also
    * will reduce across all processes the average height so that we
    * know if global tempering is necessary.
    *
    */
   void update_height(double bias_added);
 
+  /*
+   * Find out which other MPI processes I need to communicate with for add_hills
+   */
   void infer_neighbors(const int* b_periodic, const double* skin);
+  /*
+   * Sort my neighbors into a non-blocking schedule
+   */
   void sort_neighbors();
 
+  /*
+   * These two methods are used to send hills to my neighobrs
+   */
   int check_for_flush();
   double flush_buffers(int snyched);
 
+  /*
+   * Convienence method to stride whitespace from a string.
+   */
   std::string clean_string(const std::string& input, int append_rank);
 
 

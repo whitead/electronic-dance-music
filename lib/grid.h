@@ -199,10 +199,16 @@ class DimmedGrid : public Grid {
     initialize();
   }
 
+  /**
+   * Constructor from file, with interpolation specified
+   **/
  DimmedGrid(const std::string& input_grid, int b_interpolate): b_derivatives_(0), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
 
+  /**
+   * Constructor from grid file
+   **/
  DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
@@ -307,7 +313,7 @@ class DimmedGrid : public Grid {
   }
 
   /**
-   * Get value and derivatives
+   * Get value and derivatives, optionally using interpolation
    **/ 
   double get_value_deriv(const double* x, double* der) const {
     
@@ -421,6 +427,10 @@ class DimmedGrid : public Grid {
     output.close();    
   }
 
+  /**
+   * MPI-based writing that will attempt to gather all grid values. Needs to know 
+   * overall box size, since MPI processes don't normally know this.
+   **/
   void multi_write(const std::string& filename, const double box_min[DIM], 
 		   const double box_max[DIM], 
 		   const int b_periodic[DIM]) const {
@@ -755,7 +765,9 @@ class DimmedGrid : public Grid {
 };
 
 
-
+/**
+ * This is a non-template constructor which dispatches to the appropiate template
+ **/
 Grid* make_grid(unsigned int dim, 
 		const double* min, 
 		const double* max, 
@@ -764,8 +776,15 @@ Grid* make_grid(unsigned int dim,
 		int b_derivatives, 
 		int b_interpolate);
 
+/**
+ * This is a non-template constructor which dispatches to the appropiate template
+ **/
+
 Grid* read_grid(unsigned int dim, const std::string& filename, int b_interpolate);
 
+/**
+ * This is a non-template constructor which dispatches to the appropiate template
+ **/
 Grid* read_grid(unsigned int dim, const std::string& filename);
 
 

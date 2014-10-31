@@ -54,6 +54,9 @@ class DimmedGaussGrid : public GaussGrid{
     update_minigrid();
   }
 
+  /**
+   * Rebuild from a file. Files don't store sigma, so it must be set again.
+   **/
  DimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename) {
     size_t i;
     for(i = 0; i < DIM; i++) {
@@ -119,7 +122,7 @@ class DimmedGaussGrid : public GaussGrid{
     grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_);
   }
 
-  virtual void multi_write(const std::string& filename, 
+  void multi_write(const std::string& filename, 
 			   const double* box_low, 
 			   const double* box_high, 
 			   const int* b_periodic) const {
@@ -131,6 +134,9 @@ class DimmedGaussGrid : public GaussGrid{
     grid_.b_interpolate_ = b_interpolate;
   }
 
+  /**
+   * The workhorse method of the program. The source is very well-documented
+   **/
   double add_gaussian(const double* x0, double height) {
 
     size_t i,j;
@@ -314,6 +320,9 @@ class DimmedGaussGrid : public GaussGrid{
     return 1;
   }
 
+  /**
+   * Possibly wrap a value across the system boundaries to be as close as possible to the grid
+   **/
   void remap(double x[DIM]) const {
     
     double dp[2];
@@ -380,7 +389,9 @@ class DimmedGaussGrid : public GaussGrid{
   
 };
 
-
+/**
+ * Used to avoid template constructors
+ **/
 GaussGrid* make_gauss_grid(unsigned int dim, 
 			   const double* min, 
 			   const double* max, 
@@ -389,6 +400,9 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 			   int b_interpolate,
 			   const double* sigma);
 
+/**
+ * Used to avoid template constructors
+ **/
 
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 

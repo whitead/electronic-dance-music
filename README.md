@@ -8,7 +8,6 @@ possibly future engines.
 TODO
 ===============
 
-2. Write test cases for two add_hill methods and create better test framework
-3. Start documenting classes that are complete
-4. Enable specific pairwise interactions to be biased  
-5. Add loading of atomic numbers
+1. Write test cases for two add_hill methods and create better test framework
+2. Start documenting classes that are complete
+3. Add loading of atomic numbers
