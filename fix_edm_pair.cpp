@@ -43,7 +43,7 @@ FixEDMPair::FixEDMPair(LAMMPS *lmp, int narg, char **arg) :
   }
 
   //here is where we would load up the EDM bias
-  bias = new EDMBias(arg[4]);
+  bias = new EDM::EDMBias(arg[4]);
 
   if(bias->dim_ != 1)
     error->all(FLERR, "Pairwise distance must be 1 dimension in EDM input file");

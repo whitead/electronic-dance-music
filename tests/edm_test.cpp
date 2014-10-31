@@ -19,6 +19,7 @@
 #define EDM_SRC std::string(STR(TEST_EDM_SRC))
 
 using namespace boost;
+using namespace EDM;
 
 BOOST_AUTO_TEST_CASE( grid_1d_sanity )
 {

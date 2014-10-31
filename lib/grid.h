@@ -9,6 +9,8 @@
 #include <iomanip>
 #include "mpi.h"
 
+#include "edm.h"
+
 #define GRID_TYPE 32
  
 
@@ -22,6 +24,8 @@ double round(double number)
 {
   return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
 }
+
+namespace EDM{
 
 /**
  * This method was adapted from PLUMED 1.3 (Copyright (c) 2008-2011 The PLUMED team.) and is distributed under GPL * v3.
@@ -562,7 +566,7 @@ class DimmedGrid : public Grid {
 
     if(!input.is_open()) {      
       cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
-      //error
+      edm_error("", "grid.h:read");
     }
 
     // read plumed-style header
@@ -570,7 +574,7 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("FORCE") != 0) {
       cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
-      //error
+      edm_error("", "grid.h:read");
     } else {
       input >> b_derivatives_;
     }
@@ -578,25 +582,26 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("NVAR") != 0) {
       cerr << "Mangled grid file: " << filename << " No NVAR found" << endl;
-      //error
+      //edm_error
     } else {
       input >> i;
       if(i != DIM) {
 	cerr << "Dimension of this grid does not match the one found in the file" << endl;
-	//error
+	edm_error("", "grid.h:read");
+
       }
     }
 
     input >> word >> word;
     if(word.compare("TYPE") != 0) {
       cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
-      //error
+      edm_error("", "grid.h:read");
     } else {
       for(i = 0; i < DIM; i++) {
 	input >> j;
 	if(j != GRID_TYPE) {
 	  cerr << "This grid is the incorrect type" << endl;
-	  //error
+	  edm_error("", "grid.h:read");
 	}
       }
     }
@@ -604,6 +609,7 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("BIN") != 0) {
       cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
+      edm_error("", "grid.h:read");
     } else {
       for(i = 0; i < DIM; i++) {
 	input >> grid_number_[i];
@@ -613,6 +619,7 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("MIN") != 0) {
       cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
+      edm_error("", "grid.h:read");
     } else {
       for(i = 0; i < DIM; i++) {
 	input >> min_[i];
@@ -622,6 +629,7 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("MAX") != 0) {
       cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
+      edm_error("", "grid.h:read");
     } else {
       for(i = 0; i < DIM; i++) {
 	input >> max_[i];
@@ -631,6 +639,7 @@ class DimmedGrid : public Grid {
     input >> word >> word;
     if(word.compare("PBC") != 0) {
       cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
+      edm_error("", "grid.h:read");
     } else {
       for(i = 0; i < DIM; i++) {
 	input >> b_periodic_[i];
@@ -734,8 +743,7 @@ class DimmedGrid : public Grid {
     if(b_derivatives_) {
       grid_deriv_ = (double *) calloc(DIM * DIM * grid_size_, sizeof(double));
       if(!grid_deriv_) {
-	//error out of memory 
-	
+	edm_error("Out of memory!!", "grid.h:initialize");	
       }
     }
 
@@ -745,6 +753,8 @@ class DimmedGrid : public Grid {
 
   
 };
+
+
 
 Grid* make_grid(unsigned int dim, 
 		const double* min, 
@@ -759,4 +769,5 @@ Grid* read_grid(unsigned int dim, const std::string& filename, int b_interpolate
 Grid* read_grid(unsigned int dim, const std::string& filename);
 
 
+}
 #endif //GRID_H_

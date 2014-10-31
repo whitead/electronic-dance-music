@@ -3,6 +3,7 @@
 
 #include "gaussian_grid.h"
 #include "grid.h"
+#include "edm.h"
 #include <string>
 #include <iterator>
 #include <sstream>
@@ -14,6 +15,7 @@
 #define BIAS_BUFFER_SIZE 64
 #define NO_COMM_PARTNER -1
 
+namespace EDM{ 
 
 class EDMBias {
   /** The EDM bias class.
@@ -121,4 +123,5 @@ class EDMBias {
 
 };
 
+}
 #endif // EDM_BIAS_H_

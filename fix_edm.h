@@ -28,7 +28,7 @@ class FixEDM : public Fix {
   void min_post_force(int);
 
  private:
-   class EDMBias* bias;
+  class EDM::EDMBias* bias;
    char bias_file[256];
    double temperature;
    int stride;

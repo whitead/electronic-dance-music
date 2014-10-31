@@ -1,6 +1,6 @@
 #include "gaussian_grid.h"
 
-GaussGrid* make_gauss_grid(unsigned int dim, 
+EDM::GaussGrid* EDM::make_gauss_grid(unsigned int dim, 
 			   const double* min, 
 			   const double* max, 
 			   const double* bin_spacing, 
@@ -20,7 +20,7 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 }
 
 
-GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma) {
+EDM::GaussGrid* EDM::read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma) {
   switch(dim) {
   case 1:
     return new DimmedGaussGrid<1>(filename, sigma);

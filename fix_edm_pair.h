@@ -46,7 +46,7 @@ class FixEDMPair : public Fix {
   void init_list(int, class NeighList *); //override
 
  private:
-   class EDMBias* bias;
+  class EDM::EDMBias* bias;
    char bias_file[256];
    double temperature;
    int stride;

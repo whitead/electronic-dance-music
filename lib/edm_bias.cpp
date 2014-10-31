@@ -35,7 +35,7 @@ namespace std {
 }
 
 
-EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0), 
+EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0), 
 						      b_targeting_(0), 
 						      mpi_rank_(0),
 						      mpi_size_(0),
@@ -62,7 +62,7 @@ EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
   
 }
   
-  EDMBias::~EDMBias() {
+  EDM::EDMBias::~EDMBias() {
   if(target_ != NULL)
     delete target_;
   if(bias_ != NULL)
@@ -77,7 +77,7 @@ EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 //infer if the given boundary extends across the entire system. That
 //determins the acutal b_periodic
 
-void EDMBias::subdivide(const double sublo[3], 
+void EDM::EDMBias::subdivide(const double sublo[3], 
 			const double subhi[3], 
 			const double boxlo[3],
 			const double boxhi[3],
@@ -187,7 +187,7 @@ void EDMBias::subdivide(const double sublo[3],
 
 }
 
-void EDMBias::write_bias(const std::string& output) const {
+void EDM::EDMBias::write_bias(const std::string& output) const {
 #ifndef SERIAL_TEST
   bias_->multi_write(output);
 #ifdef EDM_MPI_DEBUG
@@ -200,19 +200,19 @@ void EDMBias::write_bias(const std::string& output) const {
 #endif
 }
 
-void EDMBias::setup(double temperature, double boltzmann_constant) {
+void EDM::EDMBias::setup(double temperature, double boltzmann_constant) {
 
   temperature_ = temperature;
   boltzmann_factor_ = boltzmann_constant * temperature;
 
 }
 
-void EDMBias::update_forces(int nlocal, const double* const* positions, double** forces) const {
+void EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces) const {
   update_forces(nlocal, positions, forces, -1);
 }
 
 
-void EDMBias::update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const {
+void EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const {
 
   //are we active?
   if(b_outofbounds_)
@@ -232,7 +232,7 @@ void EDMBias::update_forces(int nlocal, const double* const* positions, double**
   
 }
 
-void EDMBias::update_force(const double* positions, double* forces) const {
+void EDM::EDMBias::update_force(const double* positions, double* forces) const {
 
   //are we active?
   if(b_outofbounds_)
@@ -250,11 +250,11 @@ void EDMBias::update_force(const double* positions, double* forces) const {
 }
 
 
-void EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
+void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
   add_hills(nlocal, positions, runiform, -1);
 }
 
-void EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask) {
+void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask) {
 
   int i, j;
   double bias_added = 0;
@@ -326,7 +326,7 @@ void EDMBias::add_hills(int nlocal, const double* const* positions, const double
   update_height(bias_added);
 }
 
-void EDMBias::pre_add_hill() {
+void EDM::EDMBias::pre_add_hill() {
 
   //are we active?
   if(!b_outofbounds_) {
@@ -344,7 +344,7 @@ void EDMBias::pre_add_hill() {
   temp_hill_cum_ = 0;
 }
 
-void EDMBias::add_hill(int times_called, const double* position, double runiform) {
+void EDM::EDMBias::add_hill(int times_called, const double* position, double runiform) {
 
   if(temp_hill_prefactor_ < 0);
     //error must call pre_add_hill before add_hill
@@ -386,7 +386,7 @@ void EDMBias::add_hill(int times_called, const double* position, double runiform
 
 }
 
-void EDMBias::post_add_hill() {
+void EDM::EDMBias::post_add_hill() {
 
   if(temp_hill_cum_ < 0) {
     //error must call pre_add_hill before post_add_hill
@@ -407,7 +407,7 @@ void EDMBias::post_add_hill() {
 }
  
 
- void EDMBias::output_hill(const double* position, double height, double bias_added) {
+ void EDM::EDMBias::output_hill(const double* position, double height, double bias_added) {
    
    size_t i;
    
@@ -421,7 +421,7 @@ void EDMBias::post_add_hill() {
    
  }
 
-int EDMBias::check_for_flush() {
+int EDM::EDMBias::check_for_flush() {
   
   if(mpi_neighbor_count_ > 0) {
     
@@ -437,7 +437,7 @@ int EDMBias::check_for_flush() {
 
 }
 
-double EDMBias::flush_buffers(int synched) {
+double EDM::EDMBias::flush_buffers(int synched) {
 
   double bias_added = 0;
 
@@ -519,7 +519,7 @@ double EDMBias::flush_buffers(int synched) {
   return bias_added;
 }
 
-void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
+void EDM::EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 
    //now the hard part, we need to infer the domain decomposition topology
    size_t i,j;
@@ -606,7 +606,7 @@ void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 /** This method will take the unordered list of neighbors and create sorted versions
  * so that there will be no communication blocks
  */
-void EDMBias::sort_neighbors() {
+void EDM::EDMBias::sort_neighbors() {
 
   int* unsorted_neighbors; 
   unsigned int* unsorted_counts;
@@ -733,7 +733,7 @@ void EDMBias::sort_neighbors() {
    } 
 }
 
-void EDMBias::update_height(double bias_added) {
+void EDM::EDMBias::update_height(double bias_added) {
   double other_bias = 0;
   #ifndef SERIAL_TEST
   MPI_Allreduce(&bias_added, &other_bias, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -793,11 +793,11 @@ int extract_int(const std::string& key, std::map<std::string, std::string> map, 
 }
 
 
-void EDMBias::set_mask(const int* mask) {
+void EDM::EDMBias::set_mask(const int* mask) {
   mask_ = mask;
 }
 
-int EDMBias::read_input(const std::string& input_filename){ 
+int EDM::EDMBias::read_input(const std::string& input_filename){ 
 
   //parse file into a map
   using namespace std;
@@ -884,7 +884,7 @@ int EDMBias::read_input(const std::string& input_filename){
 }
 
 
- std::string EDMBias::clean_string(const std::string& input, int append_rank) {
+ std::string EDM::EDMBias::clean_string(const std::string& input, int append_rank) {
   std::string result(input);
   //remove surrounding whitespace 
     size_t found = result.find_first_not_of(" \t");

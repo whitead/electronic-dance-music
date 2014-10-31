@@ -52,7 +52,7 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
 
 
   //here is where we would load up the EDM bias
-  bias = new EDMBias(arg[4]);
+  bias = new EDM::EDMBias(arg[4]);
 
   random_numbers = NULL;
   random = new RanMars(lmp,seed + me);

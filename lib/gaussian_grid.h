@@ -2,11 +2,14 @@
 #define GAUSS_GRID_H_
 
 #include "grid.h"
+#include "edm.h"
 #include <string>
 #include <iostream>
 #include <cmath>
 
 #define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
+
+namespace EDM{
 
 /**
  * This class uses a compositional ("has-a") relationship with Grid. This is the 
@@ -389,5 +392,5 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 
-
+}
 #endif //GAUSS_GRID_H_
