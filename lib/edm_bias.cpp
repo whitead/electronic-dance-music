@@ -582,7 +582,6 @@ void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
      }
    }
 
-   #ifdef EDM_MPI_DEBUG   
    //print out the unsorted neighbors
    for(i = 0; i < mpi_size_; i++) {
      if(mpi_rank_ == i) {
@@ -601,7 +600,6 @@ void EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
      }
    }
    std::cout << std::endl;
-   #endif
  }
 
 

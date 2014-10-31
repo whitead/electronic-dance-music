@@ -731,8 +731,15 @@ class DimmedGrid : public Grid {
     for(i = 0; i < DIM; i++)
       grid_size_ *= grid_number_[i];
     grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
-    if(b_derivatives_)
+    if(b_derivatives_) {
       grid_deriv_ = (double *) calloc(DIM * DIM * grid_size_, sizeof(double));
+      if(!grid_deriv_) {
+	//error out of memory 
+	
+      }
+    }
+
+
 
   }
 
