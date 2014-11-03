@@ -17,8 +17,6 @@ class FixEDM : public Fix {
  public:
   FixEDM(class LAMMPS *, int, char **);
   ~FixEDM();
-  // class EDM included: a pointer that initialize the class and create all the interfaces 
-  class EDM *EDM;
   int setmask();
   void init();
   void setup(int);

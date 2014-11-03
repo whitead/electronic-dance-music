@@ -34,8 +34,6 @@ class FixEDMPair : public Fix {
  public:
   FixEDMPair(class LAMMPS *, int, char **);
   ~FixEDMPair();
-  // class EDMPair included: a pointer that initialize the class and create all the interfaces 
-  class EDMPair *EDMPair;
   int setmask();
   void init();
   void setup(int);
