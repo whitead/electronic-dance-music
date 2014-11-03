@@ -234,13 +234,15 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
   double fhat = g.get_value_deriv(array,der);
 
   //Make sure it's reasonably accurate
-  BOOST_REQUIRE(pow(fhat- sin(array[0]), 2) < 0.1);
+  BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
 
   //test periodic
   array[0] = 5 * M_PI / 4;
   fhat = g.get_value_deriv(array,der);
 
+  g.write("grid.test");
+  
   BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
 
@@ -312,7 +314,6 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
 
   double test_point[] = {0}; //should not remap
   g.remap(test_point);
-  std::cout << test_point[0] << ", " << test_point[1] <<")" << std::endl;
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
 
   test_point[0] = -1;//shoul not remap
@@ -321,7 +322,6 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
 
   test_point[0] = 9;//should remap
   g.remap(test_point);
-  std::cout << test_point[0] << std::endl;
   BOOST_REQUIRE(pow(test_point[0] - -1, 2) < 0.1);
 
   test_point[0] = 6;//should not remap
@@ -406,7 +406,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
   double max[] = {10};
   double sigma[] = {1};
   double bin_spacing[] = {1};
-  int periodic[] = {0};
+  int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
 
   //add 1 gaussian
@@ -509,7 +509,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   double max[] = {100};
   double sigma[] = {1.2};
   double bin_spacing[] = {1};
-  int periodic[] = {0};
+  int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
 
   //add N gaussian
@@ -543,7 +543,90 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
 }
 
+BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double offsets = 1. / N;
+  double g_integral = 0;
+
+  //generate a random number but use sequential grid point offsets
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    g_integral += g.add_gaussian(x, 1.5);
+  }
+
+  //now we integrate the grid
+  double area = 0;
+  double dx = 0.1;
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    area += g.get_value(x) * dx;
+  }
+
+  //Make sure the integrated area is correct
+  //unnormalized, so a little height scaling is necessary
+  std::cout << area / N << " " << 1.5 * sigma[0] * sqrt(2 * M_PI) << std::endl;
+  BOOST_REQUIRE(pow(area - N * 1.5 * sigma[0] * sqrt(2 * M_PI), 2) < 1);
+
+  //now make sure that add_gaussian returned the correct answers as well
+   BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
+}
+
+
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double offsets = 1. / N;
+  double g_integral = 0;
+
+  //generate a random number but use sequential grid point offsets
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    g_integral += g.add_gaussian(x, 1.5);
+  }
+
+  //now we calculate finite differences on the grid
+  double vlast, vlastlast, v, approx_der;  
+
+  double der[1];
+  double der_last;
+  double dx = 0.1;
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    v = g.get_value_deriv(x,der);
+    if(i > 1) {
+      approx_der = (v - vlastlast) / (2*dx);
+      BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.01);
+    }
+    vlastlast = vlast;
+    vlast = v;
+
+    der_last = der[0];
+  }
+
+}
+
+BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   double min[] = {-100};
   double max[] = {100};
   double sigma[] = {1.2};
@@ -576,7 +659,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
     v = g.get_value_deriv(x,der);
     if(i > 1) {
       approx_der = (v - vlastlast) / (2*dx);
-      BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.01);
+      BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.001);
     }
     vlastlast = vlast;
     vlast = v;

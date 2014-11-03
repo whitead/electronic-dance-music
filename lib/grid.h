@@ -348,9 +348,8 @@ class DimmedGrid : public Grid {
       for(i = 0; i < DIM; i++) {
 	//wrap x, if needed
 	wrapped_x = x[i];
-	//commented out, because the index should already have taken care of that 
-	//	if(b_periodic_[i])
-	//	  wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
+	if(b_periodic_[i])
+	  wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
 	//get position relative to neighbors
 	where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	//treat possible stride wrap

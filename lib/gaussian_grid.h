@@ -47,11 +47,9 @@ class DimmedGaussGrid : public GaussGrid{
     size_t i;
     for(i = 0; i < DIM; i++) {
       sigma_[i] = sigma[i];
-      boundary_min_[i] = min[i];
-      boundary_max_[i] = max[i];
-      b_periodic_boundary_[i] = b_periodic[i];
     }
     
+    set_boundary(min, max, b_periodic);
     update_minigrid();
   }
 
@@ -62,11 +60,9 @@ class DimmedGaussGrid : public GaussGrid{
     size_t i;
     for(i = 0; i < DIM; i++) {
       sigma_[i] = sigma[i];
-      boundary_min_[i] = grid_.min_[i];
-      boundary_max_[i] = grid_.max_[i];
-      b_periodic_boundary_[i] = 0;
     }
-    
+
+    set_boundary(grid_.min_, grid_.max_, grid_.b_periodic_);    
     update_minigrid();
   }
 
@@ -258,10 +254,12 @@ class DimmedGaussGrid : public GaussGrid{
 	mcgdb_denom = 1.0;
 	for(j = 0; j < DIM; j++) {
 	  if(!b_periodic_boundary_[j]) {
+	    std::cout << boundary_min_[j]
 	    //this will automatically cast to int
-	    mcgdb_index = (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
+	    mcgdb_index = MCGDB_TABLE_SIZE * (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
 	    mcgdb_denom *= mcgdb_denom_table_[j][mcgdb_index];
 	    mcgdb_force[j] = expo * mcgdb_denom_deriv_table_[j][mcgdb_index] / mcgdb_denom_table_[j][mcgdb_index];
+	    std::cout << xx[j] << " = " << mcgdb_denom_table_[j][mcgdb_index] << std::endl;
 	  }
 	  else{
 	    mcgdb_force[j] = 0;
@@ -300,13 +298,16 @@ class DimmedGaussGrid : public GaussGrid{
 
     //pre-compute mcgdb boundaries if necessary
     for(i = 0; i < DIM; i++) {
-      if(b_periodic_boundary_[i]) {
+      if(!b_periodic_boundary_[i]) {
 	for(j = 0; j < MCGDB_TABLE_SIZE; j++) {
 	  s = j * (boundary_max_[i] - boundary_min_[i]) / MCGDB_TABLE_SIZE + boundary_min_[i];
-	  mcgdb_denom_table_[i][j] = sigma_[i] / ( boundary_max_[i] - boundary_min_[i]) * 
+	  mcgdb_denom_table_[i][j] = sqrt(M_PI / 2.) * sigma_[i] / ( boundary_max_[i] - boundary_min_[i]) * 
 	    ( erf((s - boundary_min_[i]) / sqrt(2.) / sigma_[i]) + 
 	      erf((boundary_max_[i] - s) / sqrt(2.) / sigma_[i]));
-	  mcgdb_denom_deriv_table_[i][j] = sqrt(2.) / (boundary_max_[i] - boundary_min_[i])  / 2. / sqrt(M_PI) * 
+
+	  std::cout << s <<  " = " << mcgdb_denom_table_[i][j] << std::endl;
+
+	  mcgdb_denom_deriv_table_[i][j] = 1. / (boundary_max_[i] - boundary_min_[i])  / 2. * 
 	    (exp( -(s - boundary_min_[i]) * (s - boundary_min_[i]) / 2. / sigma_[i] / sigma_[i]) -
 	     exp( -(boundary_max_[i] - s) * (boundary_max_[i] - s) / 2. / sigma_[i] / sigma_[i]));
 	}
