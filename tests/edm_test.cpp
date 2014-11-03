@@ -559,8 +559,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   double g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
+  //avoid boundary, where the McGDB hills don't integrate to a constant 
   for(i = 0; i < N; i++) {
-    x[0] = rand() % 200 - 100 + i * offsets;
+    x[0] = rand() % 100 - 50 + i * offsets;
     g_integral += g.add_gaussian(x, 1.5);
   }
 

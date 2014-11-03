@@ -254,12 +254,10 @@ class DimmedGaussGrid : public GaussGrid{
 	mcgdb_denom = 1.0;
 	for(j = 0; j < DIM; j++) {
 	  if(!b_periodic_boundary_[j]) {
-	    std::cout << boundary_min_[j]
 	    //this will automatically cast to int
 	    mcgdb_index = MCGDB_TABLE_SIZE * (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
 	    mcgdb_denom *= mcgdb_denom_table_[j][mcgdb_index];
 	    mcgdb_force[j] = expo * mcgdb_denom_deriv_table_[j][mcgdb_index] / mcgdb_denom_table_[j][mcgdb_index];
-	    std::cout << xx[j] << " = " << mcgdb_denom_table_[j][mcgdb_index] << std::endl;
 	  }
 	  else{
 	    mcgdb_force[j] = 0;
@@ -301,13 +299,10 @@ class DimmedGaussGrid : public GaussGrid{
       if(!b_periodic_boundary_[i]) {
 	for(j = 0; j < MCGDB_TABLE_SIZE; j++) {
 	  s = j * (boundary_max_[i] - boundary_min_[i]) / MCGDB_TABLE_SIZE + boundary_min_[i];
-	  mcgdb_denom_table_[i][j] = sqrt(M_PI / 2.) * sigma_[i] / ( boundary_max_[i] - boundary_min_[i]) * 
+	  mcgdb_denom_table_[i][j] = 0.5 * 
 	    ( erf((s - boundary_min_[i]) / sqrt(2.) / sigma_[i]) + 
 	      erf((boundary_max_[i] - s) / sqrt(2.) / sigma_[i]));
-
-	  std::cout << s <<  " = " << mcgdb_denom_table_[i][j] << std::endl;
-
-	  mcgdb_denom_deriv_table_[i][j] = 1. / (boundary_max_[i] - boundary_min_[i])  / 2. * 
+	  mcgdb_denom_deriv_table_[i][j] = sqrt(2. / M_PI) / (4 * sigma_[i]) * 
 	    (exp( -(s - boundary_min_[i]) * (s - boundary_min_[i]) / 2. / sigma_[i] / sigma_[i]) -
 	     exp( -(boundary_max_[i] - s) * (boundary_max_[i] - s) / 2. / sigma_[i] / sigma_[i]));
 	}
