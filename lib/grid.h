@@ -609,8 +609,7 @@ class DimmedGrid : public Grid {
       for(i = 0; i < DIM; i++) {
 	input >> j;
 	if(j != GRID_TYPE) {
-	  cerr << "This grid is the incorrect type" << endl;
-	  edm_error("", "grid.h:read");
+	  cerr << "WARNING: Read grid type is the incorrect type" << endl;
 	}
       }
     }

@@ -667,6 +667,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
 
     der_last = der[0];
   }
+  
+  approx_der = (vlast - vlastlast) / dx;
+  BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.1);
 
 }
 
