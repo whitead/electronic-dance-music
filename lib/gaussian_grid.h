@@ -8,6 +8,7 @@
 #include <cmath>
 
 #define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
+#define MCGDB_TABLE_SIZE 512 //Function look up size 
 
 namespace EDM{
 
@@ -153,7 +154,11 @@ class DimmedGaussGrid : public GaussGrid{
     double dp2; //essentially magnitude of distance vector, changes in course of calculation
     double expo; //exponential portion used in calculation
     double bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
-    double vol_element = 1;
+    double vol_element = 1;//integration volume element
+
+    double mcgdb_denom; //McGovern-De Pablo Hill denominator
+    double mcgdb_force[DIM]; //McGovern-De Pablo Hill denominator
+    size_t mcgdb_index; //McGovern-De Pablo Hill index
 
     //get volume element for bias integration
     for(i = 0; i < DIM; i++) {
@@ -248,6 +253,22 @@ class DimmedGaussGrid : public GaussGrid{
       dp2 *= 0.5;
       if(dp2 < GAUSS_SUPPORT) {
 	expo = height * exp(-dp2);
+
+	//treat McGovern De-Pablo hill boundaries if necessary
+	mcgdb_denom = 1.0;
+	for(j = 0; j < DIM; j++) {
+	  if(!b_periodic_boundary_[j]) {
+	    //this will automatically cast to int
+	    mcgdb_index = (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
+	    mcgdb_denom *= mcgdb_denom_table_[j][mcgdb_index];
+	    mcgdb_force[j] = expo * mcgdb_denom_deriv_table_[j][mcgdb_index] / mcgdb_denom_table_[j][mcgdb_index];
+	  }
+	  else{
+	    mcgdb_force[j] = 0;
+	  }
+	}
+	expo /= mcgdb_denom;
+	
       
 	//actually add hill now!
 	xx_index1 = grid_.multi2one(xx_index);
@@ -255,7 +276,8 @@ class DimmedGaussGrid : public GaussGrid{
 	bias_added += expo * vol_element;
 	//and POSITIVE derivative!! (different than plumed)
 	for(j = 0; j < DIM; j++) {
-	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= dp[j] / sigma_[j] * expo;
+	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= (dp[j] / sigma_[j] * expo) / mcgdb_denom;
+	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= mcgdb_force[j] / mcgdb_denom;
 	}
       }
     }
@@ -267,11 +289,28 @@ class DimmedGaussGrid : public GaussGrid{
    * the boundary, not necessarily along the grid bounds
    **/
   void set_boundary(const double* min, const double* max, const int* b_periodic) {
-    size_t i;
+    size_t i,j;
+    double s;
+
     for(i = 0; i < DIM; i++) {
       boundary_min_[i] = min[i];
       boundary_max_[i] = max[i];
       b_periodic_boundary_[i] = b_periodic[i];
+    }
+
+    //pre-compute mcgdb boundaries if necessary
+    for(i = 0; i < DIM; i++) {
+      if(b_periodic_boundary_[i]) {
+	for(j = 0; j < MCGDB_TABLE_SIZE; j++) {
+	  s = j * (boundary_max_[i] - boundary_min_[i]) / MCGDB_TABLE_SIZE + boundary_min_[i];
+	  mcgdb_denom_table_[i][j] = sigma_[i] / ( boundary_max_[i] - boundary_min_[i]) * 
+	    ( erf((s - boundary_min_[i]) / sqrt(2.) / sigma_[i]) + 
+	      erf((boundary_max_[i] - s) / sqrt(2.) / sigma_[i]));
+	  mcgdb_denom_deriv_table_[i][j] = sqrt(2.) / (boundary_max_[i] - boundary_min_[i])  / 2. / sqrt(M_PI) * 
+	    (exp( -(s - boundary_min_[i]) * (s - boundary_min_[i]) / 2. / sigma_[i] / sigma_[i]) -
+	     exp( -(boundary_max_[i] - s) * (boundary_max_[i] - s) / 2. / sigma_[i] / sigma_[i]));
+	}
+      }
     }
     
   }
@@ -370,6 +409,8 @@ class DimmedGaussGrid : public GaussGrid{
   double boundary_max_[DIM]; //optional boundary maximum
   int b_periodic_boundary_[DIM];//optional, this means the explicitly set boundary is treated as periodic
   DimmedGrid<DIM> grid_; //the underlying grid
+  double mcgdb_denom_table_[DIM][MCGDB_TABLE_SIZE];
+  double mcgdb_denom_deriv_table_[DIM][MCGDB_TABLE_SIZE];
 
  private:
   /**
@@ -403,7 +444,6 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 /**
  * Used to avoid template constructors
  **/
-
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 
 }

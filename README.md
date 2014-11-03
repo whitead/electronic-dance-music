@@ -8,6 +8,6 @@ possibly future engines.
 TODO
 ===============
 
-1. Write test cases for two add_hill methods and create better test framework
-2. Start documenting classes that are complete
+1. Write test framework
+2. MGDP Hills 
 3. Add loading of atomic numbers
