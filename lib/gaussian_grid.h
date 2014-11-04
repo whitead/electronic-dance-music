@@ -8,7 +8,28 @@
 #include <cmath>
 
 #define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
-#define BC_TABLE_SIZE 512 //boundary correction function look up size 
+#define BC_TABLE_SIZE 65536 //boundary correction function look up size 
+#define BC_MAR 1.0
+
+
+inline
+double sigmoid(double x) {
+  if(x < 0)
+    return 1;
+  if(x > 1)
+    return 0;
+  return 2*x*x*x - 3*x*x + 1;
+}
+
+inline
+double sigmoid_dx(double x) {
+  if(x < 0)
+    return 0;
+  if(x > 1)
+    return 0;
+  return 6*x*x - 6*x;
+}
+
 
 namespace EDM{
 
@@ -46,7 +67,7 @@ class DimmedGaussGrid : public GaussGrid{
     
     size_t i;
     for(i = 0; i < DIM; i++) {
-      sigma_[i] = sigma[i];
+      sigma_[i] = sigma[i] * sqrt(2.);
     }
     
     set_boundary(min, max, b_periodic);
@@ -59,7 +80,7 @@ class DimmedGaussGrid : public GaussGrid{
  DimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename) {
     size_t i;
     for(i = 0; i < DIM; i++) {
-      sigma_[i] = sigma[i];
+      sigma_[i] = sigma[i] * sqrt(2.);
     }
 
     set_boundary(grid_.min_, grid_.max_, grid_.b_periodic_);    
@@ -153,8 +174,10 @@ class DimmedGaussGrid : public GaussGrid{
     double vol_element = 1;//integration volume element
 
     double bc_denom; //Boundary correction denominator
+    double bc_correction;
     double bc_force[DIM]; //Boundary correction force denominator
     size_t bc_index; //Boundary correction index
+    double temp1, temp2, temp3, temp4, temp5, temp6, temp7;
 
     //get volume element for bias integration
     for(i = 0; i < DIM; i++) {
@@ -168,6 +191,12 @@ class DimmedGaussGrid : public GaussGrid{
 
 
     remap(x); //attempt to remap to be close or in grid
+
+    //now do check on if we are in the boundary of the overall grid
+    for(i = 0; i < DIM; i++)
+      if(!b_periodic_boundary_[i] && (x[i] < boundary_min_[i] || x[i] > boundary_max_[i]))
+	return 0;
+
 
     //now we are at the closest possible image, find an index            
     //normally, would be grid_.get_index(x, x_index);
@@ -233,6 +262,7 @@ class DimmedGaussGrid : public GaussGrid{
       if(b_flag)
 	continue;
 
+      
       //nope, it's a valid point we need to put gaussian mass on 
       dp2 = 0;
       for(j = 0; j < DIM; j++) {
@@ -246,21 +276,44 @@ class DimmedGaussGrid : public GaussGrid{
 	dp2 += dp[j] * dp[j];
       }
 
-      dp2 *= 0.5;
+      //This no longer happens. It is accounted for during file read and construction
+      //      dp2 *= 0.5;
       if(dp2 < GAUSS_SUPPORT) {
-	expo = height * exp(-dp2);
+	expo = exp(-dp2);
 
 	//treat boundary corrected hill if necessary
-	bc_denom = 1.0;
+	bc_denom = 1.0;	
+	bc_correction = 0;
 	for(j = 0; j < DIM; j++) {
 	  if(!b_periodic_boundary_[j]) {
 	    //this will automatically cast to int
-	    bc_index = BC_TABLE_SIZE * (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
+	    bc_index = (BC_TABLE_SIZE - 1) * (xx[j] - boundary_min_[j]) / (boundary_max_[j] - boundary_min_[j]);
+
+	    temp1 = exp(-pow(x[j] - boundary_min_[j], 2) / (pow(sigma_[j],2)));
+	    temp2 = sigmoid((xx[j] - boundary_min_[j]) / (sigma_[j] * BC_MAR));
+	    temp3 = exp(-pow(x[j] - boundary_max_[j], 2) / (pow(sigma_[j],2)));
+	    temp4 = sigmoid((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR));
+
+	    bc_correction = (temp1  - expo ) * temp2 + (temp3 - expo ) * temp4;
+	    //	    std::cout << xx[j] << " " << temp2 << " " << temp4 << std::endl;
 	    bc_denom *= bc_denom_table_[j][bc_index];
-	    bc_force[j] = expo * bc_denom_deriv_table_[j][bc_index] / bc_denom_table_[j][bc_index];
-	  }
-	  else{
-	    bc_force[j] = 0;
+	    
+	    //dp has been divided by sigma once already
+	    temp5 = -2 * dp[j] / sigma_[j];
+	    temp6 = sigmoid_dx((xx[j] - boundary_min_[j]) / (sigma_[j] * BC_MAR)) / (BC_MAR * sigma_[j]);
+	    temp7 = -sigmoid_dx((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR)) / (BC_MAR * sigma_[j]);
+	    
+	    //this is just the force of the uncorrected
+	    bc_force[j] = temp5 * expo + 
+	      (temp1 - expo) * temp6 - 
+	      temp5 * expo * temp2 + 
+	      (temp3 - expo) * temp7  -
+	      temp5 * expo * temp4;
+	    
+	    bc_force[j] = bc_force[j] * bc_denom - bc_denom_deriv_table_[j][bc_index] * (expo + bc_correction);	    
+	    bc_force[j] /= bc_denom * bc_denom;
+	    bc_correction /= bc_denom;
+	    
 	  }
 	}
 	expo /= bc_denom;
@@ -268,12 +321,13 @@ class DimmedGaussGrid : public GaussGrid{
       
 	//actually add hill now!
 	xx_index1 = grid_.multi2one(xx_index);
-	grid_.grid_[xx_index1] += expo;      
-	bias_added += expo * vol_element;
-	//and POSITIVE derivative!! (different than plumed)
+	grid_.grid_[xx_index1] += height * (expo + bc_correction);
+	bias_added += height * (expo + bc_correction) * vol_element;
 	for(j = 0; j < DIM; j++) {
-	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= (dp[j] / sigma_[j] * expo) / bc_denom;
-	  grid_.grid_deriv_[(xx_index1) * DIM + j] -= bc_force[j] / bc_denom;
+	  if(b_periodic_boundary_[j])
+	    grid_.grid_deriv_[(xx_index1) * DIM + j] -= height * (2 * dp[j] / sigma_[j] * expo);
+	  else
+	    grid_.grid_deriv_[(xx_index1) * DIM + j] += height * bc_force[j];
 	}
       }
     }
@@ -287,6 +341,7 @@ class DimmedGaussGrid : public GaussGrid{
   void set_boundary(const double* min, const double* max, const int* b_periodic) {
     size_t i,j;
     double s;
+    double tmp1,tmp2;
 
     for(i = 0; i < DIM; i++) {
       boundary_min_[i] = min[i];
@@ -298,13 +353,41 @@ class DimmedGaussGrid : public GaussGrid{
     for(i = 0; i < DIM; i++) {
       if(!b_periodic_boundary_[i]) {
 	for(j = 0; j < BC_TABLE_SIZE; j++) {
-	  s = j * (boundary_max_[i] - boundary_min_[i]) / BC_TABLE_SIZE + boundary_min_[i];
-	  bc_denom_table_[i][j] = 0.5 * 
-	    ( erf((s - boundary_min_[i]) / sqrt(2.) / sigma_[i]) + 
-	      erf((boundary_max_[i] - s) / sqrt(2.) / sigma_[i]));
-	  bc_denom_deriv_table_[i][j] = sqrt(2. / M_PI) / (4 * sigma_[i]) * 
-	    (exp( -(s - boundary_min_[i]) * (s - boundary_min_[i]) / 2. / sigma_[i] / sigma_[i]) -
-	     exp( -(boundary_max_[i] - s) * (boundary_max_[i] - s) / 2. / sigma_[i] / sigma_[i]));
+	  s = j * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1) + boundary_min_[i];
+
+	  //mcgovern-de pablo contribution
+	  tmp1 = sqrt(M_PI) * sigma_[i] / 2. * 
+	    ( erf((s - boundary_min_[i]) / sigma_[i]) + 
+	      erf((boundary_max_[i] - s) / sigma_[i]));
+
+	  bc_denom_table_[i][j] = tmp1;
+
+	  bc_denom_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	    sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
+	  bc_denom_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	    sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
+
+	  //mcgovern-de pablo contribution derivative
+	  tmp2 = 1. * 
+	    (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
+	     exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
+
+	  bc_denom_deriv_table_[i][j] = tmp2;
+
+	  bc_denom_deriv_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	    sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
+	    tmp2 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
+	  bc_denom_deriv_table_[i][j] += -(0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	    sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
+	    tmp2 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
+
+	  /*
+	  if(j > 2) {
+	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
+	      }
+	  	  bc_denom_table_[i][j] = 1;
+	  	  bc_denom_deriv_table_[i][j] = 0;
+	  */
 	}
       }
     }
@@ -438,7 +521,7 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 			   const double* sigma);
 
 /**
- * Used to avoid template constructors
+p * Used to avoid template constructors
  **/
 GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 
