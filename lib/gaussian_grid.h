@@ -9,7 +9,7 @@
 
 #define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
 #define BC_TABLE_SIZE 65536 //boundary correction function look up size 
-#define BC_MAR 1.0
+#define BC_MAR 3.0
 
 
 inline
@@ -381,13 +381,13 @@ class DimmedGaussGrid : public GaussGrid{
 	    sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	    tmp2 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
 
-	  /*
+
 	  if(j > 2) {
-	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
+	    //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	      }
-	  	  bc_denom_table_[i][j] = 1;
-	  	  bc_denom_deriv_table_[i][j] = 0;
-	  */
+	  //	  	  bc_denom_table_[i][j] = 1;
+	  //	  bc_denom_deriv_table_[i][j] = 0;
+
 	}
       }
     }
