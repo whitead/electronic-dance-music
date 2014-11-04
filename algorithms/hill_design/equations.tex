@@ -1,0 +1,79 @@
+\documentclass{article}
+
+\author{Andrew White}
+\title{Interval Bound Hills with Zero Derivative}
+
+
+\newcommand{\erf}{\mathop{\rm erf}\nolimits}
+
+\begin{document}
+
+\maketitle
+
+\section{An interval sigmoid with exact tails}
+To achive a sigmoid on an interval with exactly zero tails, I'd like
+to find 3rd degree polynomial with the following properties: 
+\[
+\begin{array}{lr}
+f(0) = 1 & f'(0) = 0\\
+f(1) = 0 & f'(1) = 0\\
+\end{array}
+\]
+This polynomial will work:
+\begin{equation}
+u(x) = 2 x^3 - 3x^2 + 1
+\end{equation}
+
+
+\section{Gaussian with Boundary Condition} 
+The hills will be added at $x$ and $s$ is the resulting bias. I'd like
+a guassian with the following boundary condition:
+\[
+\frac{\partial}{\partial x} e^{-(x - s)^2 / \sigma^2} h(s,x) = 0
+\]
+\[
+\frac{\partial h(s,x)}{\partial s} = \frac{2(s - x)}{\sigma} h(s,x)
+\]
+\[
+h(s,x) = e^{(x - s)^2 / \sigma^2}
+\]
+
+Therefore, the function should be
+\[
+e^{-(x - s)^2 / \sigma^2} \left[e^{(x - s)^2/\sigma^2}u(s) + (1 - u(s)) \right]
+\]
+Adding an additional constraint on $G(s,x) = C(x)$ is, we have the
+following equation for a single boundary:
+\begin{equation}
+G(s,x) = e^{-(x - s)^2 / \sigma^2} + \left(C(x) - e^{-(x - s)^2 / \sigma^2}\right)u(s)
+\end{equation}
+
+\section{Gaussian with 2 Boundary Conditions} 
+\[
+G(s,x) = e^{-(x - s)^2 / \sigma^2} + \left(e^{-(x-L)^2/\sigma^2} - e^{-(x - s)^2 / \sigma^2}\right)u\left(\frac{s-L}{b\sigma}\right)
+\]
+\begin{equation}
++ \left(e^{-(U-x)^2/\sigma^2} - e^{-(x - s)^2 / \sigma^2}\right)u\left(\frac{U-s}{b\sigma}\right)
+\end{equation}
+
+\section{Boundary Corrected Gaussian with Zero Derivatives}
+Now we must calculate the correction, just like in McGovern-De Pablo
+Hills
+\[
+\int G(s,x) dx = A
+\]
+All the exponential terms are corrected just like normal McGovern-De
+Pablo equations. The ones that do not depend on $s$ are, presuming the
+bounds are far greater than $2b\sigma$, just half the integral of the
+exponential. I'll indicate the McGovern De-Pablo correction as
+$m(s,U,L)$.
+\[
+\bar{G}(s,L,U,b,\sigma) = m(s,U,L) + \left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)u(\frac{s-L}{b\sigma}) + 
+\]
+\begin{equation}
+\left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)u(\frac{U-s}{b\sigma}) + 
+\end{equation}
+\begin{equation}
+m(s,U,L) = \frac{\sqrt{\pi}}{2} \sigma \left[\erf\left(\frac{s - L}{\sigma}\right) + \erf\left(\frac{U - s}{\sigma}\right)\right]
+\end{equation}
+\end{document}
