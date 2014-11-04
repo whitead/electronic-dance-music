@@ -359,6 +359,33 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
 }
 
 
+BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {-2};
+  double max[] = {7};
+  double bin_spacing[] = {0.1};
+  int periodic[] = {0};
+  double sigma[] = {0.1};
+  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  min[0] = 0;
+  max[0] = 10;
+  periodic[0] = 0;
+  g.set_boundary(min, max, periodic);
+
+  double point[] = {-0.01};
+  g.add_gaussian(point,1);
+  double der[1];
+  point[0] = 0;
+  g.get_value_deriv(point, der);
+  BOOST_REQUIRE(fabs(point[0]) < EPSILON);
+
+
+}
+
+
 
 
 BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
@@ -546,7 +573,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
 BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   double min[] = {-100};
   double max[] = {100};
-  double sigma[] = {1.2};
+  double sigma[] = {10};
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
@@ -559,9 +586,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   double g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
-  //avoid boundary, where the McGDB hills don't integrate to a constant 
   for(i = 0; i < N; i++) {
-    x[0] = rand() % 100 - 50 + i * offsets;
+    x[0] = rand() % 200 - 100 + i * offsets;
     g_integral += g.add_gaussian(x, 1.5);
   }
 
@@ -661,6 +687,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
     if(i > 1) {
       approx_der = (v - vlastlast) / (2*dx);
       BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.001);
+    } else {
+      BOOST_REQUIRE(pow(der_last, 2) < 0.001);
     }
     vlastlast = vlast;
     vlast = v;
@@ -670,6 +698,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   
   approx_der = (vlast - vlastlast) / dx;
   BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.1);
+  BOOST_REQUIRE(pow(der_last, 2) < 0.01);
 
 }
 
@@ -705,6 +734,8 @@ BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
   BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
 }
 
+
+
 struct EDMBiasTest {
   EDMBiasTest() : bias(EDM_SRC + "/sanity.edm") {
         
@@ -713,7 +744,7 @@ struct EDMBiasTest {
     double high[] = {10};
     int p[] = {1};
     double skin[] = {0};
-    bias.subdivide(low, high, low, high, p, skin);    
+    bias.subdivide(low, high, low, high, p, skin);
     
   }     
   
@@ -726,7 +757,7 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   double** positions = (double**) malloc(sizeof(double*));
   positions[0] = (double*) malloc(sizeof(double));
   double runiform[] = {1};
-  double integral = sqrt(2 * M_PI) * bias.bias_sigma_[0];
+  double integral = sqrt(M_PI) * bias.bias_sigma_[0];
   
   positions[0][0] = 5.0;
   bias.add_hills(1, positions, runiform);

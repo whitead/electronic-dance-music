@@ -123,7 +123,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
 
     //check if we encapsulate the entire bounds in any dimension
     if(fabs(sublo[i] - min_[i]) < 0.000001 && fabs(subhi[i] - max_[i]) < 0.000001) {
-      grid_period[i] = boundary_period[i];
+      grid_period[i] = b_periodic[i];
       bounds_flag = 0;      
     } else {
       min[i] -= skin[i];
