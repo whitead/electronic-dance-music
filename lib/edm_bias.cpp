@@ -261,6 +261,7 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
   double h = hill_prefactor_;  
   double this_h;
   int natoms = 0;
+  double temp;
 
   //are we active?
   if(!b_outofbounds_) {
@@ -295,11 +296,14 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 			  ((bias_factor_ - 1) * boltzmann_factor_));
 	  //finally clamp bias
 	  this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
-	  bias_->add_gaussian(&positions[i][0], this_h);
-	  bias_added += hill_prefactor_;
+	  temp = bias_->add_gaussian(&positions[i][0], this_h);
+	  //remove influence of target
+	  if(b_targeting_)
+	    bias_added += temp / exp(-target_->get_value(&positions[i][0]));
+
 	  
 	  //output hill
-	  output_hill(&positions[i][0], this_h, bias_added);
+	  output_hill(&positions[i][0], this_h, temp);
 
 	  //pack result into buffer if necessary
 	  if(mpi_neighbor_count_ > 0) {
@@ -351,6 +355,7 @@ void EDM::EDMBias::add_hill(int times_called, const double* position, double run
     //error must call pre_add_hill before add_hill
 
   double this_h = temp_hill_prefactor_;
+  double temp;
   size_t i;
 
   //are we active?
@@ -365,10 +370,14 @@ void EDM::EDMBias::add_hill(int times_called, const double* position, double run
 		      ((bias_factor_ - 1) * boltzmann_factor_));
       //finally clamp bias
       this_h = fmin(this_h, BIAS_CLAMP * hill_prefactor_);
-      temp_hill_cum_ += bias_->add_gaussian(position, this_h);
+      temp = bias_->add_gaussian(position, this_h);
+      //remove influence of target
+      if(b_targeting_)
+	temp_hill_cum_ += temp / exp(-target_->get_value(position));
+
       
       //output hill
-      output_hill(position, this_h, temp_hill_cum_);
+      output_hill(position, this_h, temp);
       
       //pack result into buffer if necessary
       if(mpi_neighbor_count_ > 0) {
@@ -441,6 +450,7 @@ int EDM::EDMBias::check_for_flush() {
 double EDM::EDMBias::flush_buffers(int synched) {
 
   double bias_added = 0;
+  double temp;
 
   if(mpi_neighbor_count_ > 0) {
     
@@ -464,12 +474,15 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
 	  for(j = 0; j < buffer_j; j++) {
-	    bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
+	    temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					      receive_buffer_[j * (dim_+1) + dim_]);
-	    bias_added += hill_prefactor_;
+	    //remove influence of targeting
+	    if(b_targeting_)
+	      bias_added += temp / exp(-target_->get_value(&receive_buffer_[j * (dim_+1)]));
+
 
 	    hill_output_ << "[" << i << "] ";
-	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
+	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
 	  }
 	}
       }
@@ -499,11 +512,14 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
 	for(j = 0; j < buffer_j; j++) {
-	  bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
-					    receive_buffer_[j * (dim_+1) + dim_]);	
-	  bias_added += hill_prefactor_;
+	  temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
+				     receive_buffer_[j * (dim_+1) + dim_]);
+	  //remove influence of targeting
+	  if(b_targeting_)
+	    bias_added += temp / exp(-target_->get_value(&receive_buffer_[j * (dim_+1)]));
+
 	  hill_output_ << "[" << mpi_neighbors_[i] << "] ";
-	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
+	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
 	}
 
 	//Technically, I don't need to do this here but 
