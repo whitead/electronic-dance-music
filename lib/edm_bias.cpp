@@ -295,7 +295,8 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 			  ((bias_factor_ - 1) * boltzmann_factor_));
 	  //finally clamp bias
 	  this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
-	  bias_added += bias_->add_gaussian(&positions[i][0], this_h);
+	  bias_->add_gaussian(&positions[i][0], this_h);
+	  bias_added += hill_prefactor_;
 	  
 	  //output hill
 	  output_hill(&positions[i][0], this_h, bias_added);
@@ -463,8 +464,10 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
 	  for(j = 0; j < buffer_j; j++) {
-	    bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
+	    bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					      receive_buffer_[j * (dim_+1) + dim_]);
+	    bias_added += hill_prefactor_;
+
 	    hill_output_ << "[" << i << "] ";
 	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
 	  }
@@ -496,8 +499,9 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
 	for(j = 0; j < buffer_j; j++) {
-	  bias_added += bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
+	  bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					    receive_buffer_[j * (dim_+1) + dim_]);	
+	  bias_added += hill_prefactor_;
 	  hill_output_ << "[" << mpi_neighbors_[i] << "] ";
 	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], bias_added);
 	}

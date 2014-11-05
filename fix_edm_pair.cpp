@@ -184,6 +184,14 @@ void FixEDMPair::post_force(int vflag)
       //get force on r-vector
       edm_force[0] = 0;
       bias->update_force(&r, edm_force);
+      /*
+      //list forces
+      if(r < 1.0) {
+	double force_r = delx * f[i][0] + dely * f[i][1] + delz * f[i][2];
+	std::cout << r << " " << edm_force[0] <<   " " << force_r << std::endl;
+      }
+      */
+
 
       //convert to pair-wise force
       f[i][0] += delx * edm_force[0];
