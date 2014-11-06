@@ -26,6 +26,7 @@ FixStyle(edm_pair,FixEDMPair)
 #include "neighbor.h"
 #include "pair.h"
 #include "neigh_request.h"
+#include "lmptype.h"
 
 
 

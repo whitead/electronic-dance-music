@@ -172,6 +172,7 @@ void FixEDMPair::post_force(int vflag)
 
     for (jj = 0; jj < jnum; jj++) {
       j = jlist[jj];
+      j &= NEIGHMASK; //no idea why....
       jtype = type[j];
 
       if(jtype != ipair && jtype != jpair)
