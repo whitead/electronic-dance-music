@@ -24,6 +24,7 @@ FixStyle(edm_pair,FixEDMPair)
 #include "group.h"
 #include "memory.h"
 #include "neighbor.h"
+#include "pair.h"
 #include "neigh_request.h"
 
 

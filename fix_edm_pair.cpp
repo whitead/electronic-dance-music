@@ -93,7 +93,8 @@ void FixEDMPair::init()
   skin[0] = neighbor->skin;
   double lo[3], hi[3];
   lo[0] = 0;
-  hi[0] = neighbor->cutneighmax;
+  // cannot use neighbor->cutneighmax b/c neighbor has not yet been init
+  hi[0] = force->pair->cutforce + neighbor->skin;
   int p[3] = {0,0,0};
 
   bias->subdivide(lo, hi, lo, hi, p, skin);
