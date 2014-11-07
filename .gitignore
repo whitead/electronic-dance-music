@@ -34,3 +34,10 @@
 
 #Cmake
 build/*
+
+#LaTeX
+*.aux
+*.log
+
+Images
+*.png
