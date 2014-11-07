@@ -273,7 +273,7 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
       if(cum_bias_ / total_volume_ >= global_tempering_)
 	h *= exp(-(cum_bias_ / total_volume_ - 
 		   global_tempering_) / 
-		 ((bias_factor_ - 1) * boltzmann_factor_));                   
+		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
 
     
     //count how many atoms we have in bounds
@@ -343,7 +343,7 @@ void EDM::EDMBias::pre_add_hill() {
       if(cum_bias_ / total_volume_ >= global_tempering_)
 	temp_hill_prefactor_ *= exp(-(cum_bias_ / total_volume_ - 
 		   global_tempering_) / 
-		 ((bias_factor_ - 1) * boltzmann_factor_));                   
+		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
   }
 
   temp_hill_cum_ = 0;
