@@ -297,11 +297,7 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 	  //finally clamp bias
 	  this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
 	  temp = bias_->add_gaussian(&positions[i][0], this_h);
-	  //remove influence of target
-	  if(b_targeting_)
-	    bias_added += temp / exp(-target_->get_value(&positions[i][0]));
-	  else
-	    bias_added += temp;
+	  bias_added += temp;
 
 	  
 	  //output hill
@@ -373,11 +369,7 @@ void EDM::EDMBias::add_hill(int times_called, const double* position, double run
       //finally clamp bias
       this_h = fmin(this_h, BIAS_CLAMP * hill_prefactor_);
       temp = bias_->add_gaussian(position, this_h);
-      //remove influence of target
-      if(b_targeting_)
-	temp_hill_cum_ += temp / exp(-target_->get_value(position));
-      else
-	temp_hill_cum_ += temp;
+      temp_hill_cum_ += temp;
 
       
       //output hill
@@ -480,11 +472,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	  for(j = 0; j < buffer_j; j++) {
 	    temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 					      receive_buffer_[j * (dim_+1) + dim_]);
-	    //remove influence of targeting
-	    if(b_targeting_)
-	      bias_added += temp / exp(-target_->get_value(&receive_buffer_[j * (dim_+1)]));
-	    else
-	      bias_added += temp;
+	    bias_added += temp;
 
 	    hill_output_ << "[" << i << "] ";
 	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
@@ -519,11 +507,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	for(j = 0; j < buffer_j; j++) {
 	  temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
 				     receive_buffer_[j * (dim_+1) + dim_]);
-	  //remove influence of targeting
-	  if(b_targeting_)
-	    bias_added += temp / exp(-target_->get_value(&receive_buffer_[j * (dim_+1)]));
-	  else
-	    bias_added += temp;
+	  bias_added += temp;
 
 	  hill_output_ << "[" << mpi_neighbors_[i] << "] ";
 	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
