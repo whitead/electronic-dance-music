@@ -10,7 +10,7 @@
 #include <iostream>
 #include <map>
 
-#define BIAS_CLAMP 1000
+#define BIAS_CLAMP 100000
 //number of doubles
 #define BIAS_BUFFER_SIZE 64
 #define NO_COMM_PARTNER -1
