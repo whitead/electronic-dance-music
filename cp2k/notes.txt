@@ -1,0 +1,67 @@
+Atom kind -> Defined in atomic_kind_types.F
+
+This is how atom typing/particle typing is treated. It contains lots of information like mass, name, element symbol etc. 
+
+Neighbor lists-> An example of iterating them is found in fist_nonbonded_force.F
+
+There are a few details. the first is that there are multiple "kinds"
+of neighbor lists. I presume that referes to their components and not
+their construction or usage. Yes, that's correct. The type information
+is defined in fist_neighbor_list_types.F and contains information on
+ij_kind, id_kind, npairs, rmax, etc. nscale apparently means the
+number of pairs..? in neighbor_kind_paris, list gives the actual
+nieghobr lits. What I need to figure out is WTF kind means for
+neighbor lists
+
+A better example is found in qmmm_force_mixing about line 375. QMMM creates an nlist
+.
+
+Ok, let's see what we need for this
+
+build_neighbor_list(
+	1. subsys%atomic_kind%els, the atomic_kind_set
+	2. subsys%particles%els, the particle set
+	3. (a) force_env_get(force_env, cell=cell) (b) cell. The cell
+	4. r_max. passed
+	5. r_minsq, EPSILON (smallest dobule)
+	6. ei_scale14, 1.0, unclear what this is for. 
+	7. vdw_scale14, 1.0
+	8. the return value, nlist
+	9. subsys%para_env.
+	10. build_from_scratch=.TRUE.
+	11. geo_check=.FALSE. Check geometry..?
+	12. mm_section= input file section. Requires further investigation. Ok, this is a section of the input file called "MM" section. Hmmm, maybe neighbor lists aren't related to MD?
+	13. error=error. Error handler I presume
+
+Based on the syntax I see in cp2k, an "env" is what I should
+create. Simliar to the free energy environment. The md_run file is
+where I will hook in. It turns out the neighbor list sutff given above
+is only for QM/MM. I'll need to see if there is any issue in
+repurposing it.
+
+Ok, it looks like QS has its own neighbor lists. One thing is that the
+operator type needs to be "PP", simple atomic pari potential
+lists. Yup, ok qs_dftb_dispersion, that's where I want to look. So
+qs_neighbor_lists.F (620) will handle creating the PP neighborlists I
+want. I just need to make sure scptb or dftb or nddo are set. I have
+no idea what those are though. Ah, I see, semi_empricial is nddo and
+scptb is a part of the dftb section. I'll just create a new part of
+the quick-step control. Let's design this:
+
+&QS
+  &EDM
+    INPUT_FILE [input file]
+    STRIDE [integer]
+    TYPE [i] [j]
+    SEED [seed]    
+  &END EDM
+&END QS
+
+
+ok, then in the qs_build_neighbor_lists at line 620 I'll add a check
+for edm. Right around qs_force.F line 289 I'll also add in the
+dispersion correction force. Something about harris flag though, not
+sure what that is. I'll also need to hook in at the qs_energy_utils.F.
+
+After examining qs_dftb_dispersion in more depth, I think that's the
+way to go for modeling my code. 
