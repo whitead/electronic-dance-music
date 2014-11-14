@@ -165,6 +165,7 @@ class Grid {
   virtual const double* get_min() const = 0;
   virtual size_t get_grid_size() const = 0;
   virtual void one2multi(size_t index, size_t* result) const = 0;
+  virtual double expected_bias() const = 0;
 
 };
 
@@ -565,6 +566,28 @@ class DimmedGrid : public Grid {
     }
     if(b_amwriting)
       output.close();
+  }
+
+  //calculate the expected bias assuming the grid is made 
+  //up of unormalized -ln(p)
+  double expected_bias() const {
+    size_t i;
+    double Z, offset, avg;
+    Z = offset = avg = 0;
+
+    //make sure the highest value is 0
+    for(i = 0; i < grid_size_; i++)
+      offset = fmax(offset, grid_[i]);
+
+    //get partition coefficient
+    for(i = 0; i < grid_size_; i++)
+      Z += exp(grid_[i] - offset);
+
+    //integrate
+    for(i = 0; i < grid_size_; i++)
+      avg += grid_[i]  * exp(grid_[i] - offset);
+    
+    return avg / Z;
   }
   
   void read(const std::string& filename) {

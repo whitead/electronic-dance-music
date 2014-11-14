@@ -52,7 +52,8 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 						      mpi_neighbors_(NULL),
 						      buffer_i_(0),
 						      temp_hill_cum_(-1),
-						      temp_hill_prefactor_(-1){
+							   temp_hill_prefactor_(-1),
+							   shuffled_index(NULL){
   
   //assign rank
 #ifndef SERIAL_TEST
@@ -69,6 +70,8 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
     delete target_;
   if(bias_ != NULL)
     delete bias_;
+  if(shuffled_index != NULL)
+    free(shuffled_index);
   
   if(mpi_neighbors_ != NULL)
     free(mpi_neighbors_);
@@ -258,7 +261,7 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 
 void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask) {
 
-  int i, j;
+  int i, j, stoch_i;
   double bias_added = 0;
   double h = hill_prefactor_;  
   double this_h;
@@ -277,52 +280,68 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 		   global_tempering_) / 
 		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
 
-    
-    //count how many atoms we have in bounds
+    //prepare shuffling array
+    if(shuffled_index == NULL) {
+      shuffled_index = (int*) malloc(sizeof(int) * nlocal);
+      shuffled_index_size = nlocal;
+    } else if(shuflled_index < nlocal) {
+      shuffled_index = (int*) realloc(shuffled_index, nlocal);
+      shuffled_index_size = nlocal;
+    }
+
+    //set-up shuffling array
     for(i = 0; i < nlocal; i++)
       if(apply_mask > 0 && mask_[i] & apply_mask)
 	if(bias_->in_bounds(&positions[i][0]))
-	  natoms++;
+	  shuffled_index[natoms++] = i;
+
+    //Fisher-Yates Shuffle
     
-    
-    for(i = 0; i < nlocal; i++)  {   
+    for(i = natoms - 1; i > 0; i--)  {   
+
+      j = (int) floor(runiform[i] * natoms);
+      stoch_i = shuffled_index[j];
+      //grab the element from the end of available region
+      shuffled_index[j] = shuffled_index[i];
       
-      if(apply_mask < 0 || mask_[i] & apply_mask) {
-	//actually add hills -> stochastic
-	if(hill_density_ < 0 || runiform[i] < hill_density_ / natoms) {    
-	  this_h = h; 
-	  if(b_targeting_)
-	    this_h *= exp(-target_->get_value(&positions[i][0])); // add target
-	  if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
-	    this_h *= exp(-bias_->get_value(&positions[i][0]) / 
-			  ((bias_factor_ - 1) * boltzmann_factor_));
-	  //finally clamp bias
-	  this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
-	  temp = bias_->add_gaussian(&positions[i][0], this_h);
-	  bias_added += temp;
+      //compensate for targeting bias
+      this_h = h * exp(expected_target_);; 
+      if(b_targeting_)
+	this_h *= exp(-target_->get_value(&positions[stoch_i][0])); // add target
+      if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
+	this_h *= exp(-bias_->get_value(&positions[stoch_i][0]) / 
+		      ((bias_factor_ - 1) * boltzmann_factor_));
 
-	  
-	  //output hill
-	  output_hill(&positions[i][0], this_h, temp);
-
-	  //pack result into buffer if necessary
-	  if(mpi_neighbor_count_ > 0) {
-	    for(j = 0; j < dim_; j++)	    
-	      send_buffer_[buffer_i_ * (dim_+1) + j] = positions[i][j];
-	    send_buffer_[buffer_i_ * (dim_+1) + j] = this_h;
-
-	    buffer_i_++;
-	    
-	    //do we need to flush?
-	    if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
-	      bias_added += flush_buffers(0); //flush and we don't know if we're synched
-	  }
-	}
+      //finally clamp bias
+      this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
+      temp = bias_->add_gaussian(&positions[stoch_i][0], this_h);
+      bias_added += temp;
+      
+      
+      //output hill
+      output_hill(&positions[stoch_i][0], this_h, temp);
+      
+      //pack result into buffer if necessary
+      if(mpi_neighbor_count_ > 0) {
+	for(j = 0; j < dim_; j++)	    
+	  send_buffer_[buffer_i_ * (dim_+1) + j] = positions[stoch_i][j];
+	send_buffer_[buffer_i_ * (dim_+1) + j] = this_h;
+	
+	buffer_i_++;
+	
+	//do we need to flush?
+	if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
+	  bias_added += flush_buffers(0); //flush and we don't know if we're synched
       }
+
+      //check if we've added enough bias already and are ready to stop
+      if(bias_added > h)
+	break;
     }
   }
-  bias_added += flush_buffers(0); //flush, but we don't know if we're synched
 
+  bias_added += flush_buffers(0); //flush, but we don't know if we're synched
+  
   //some processors may have had to flush more than once if there are
   //lots of hills, continue waiting for them until we all agree no more flush
   while(check_for_flush())
@@ -380,7 +399,7 @@ void EDM::EDMBias::add_hill(int times_called, const double* position, double run
       //pack result into buffer if necessary
       if(mpi_neighbor_count_ > 0) {
 	for(i = 0; i < dim_; i++)	    
-	  send_buffer_[buffer_i_ * (dim_+1) + i] = position[i];
+	  send_buffer_[buffer_i_ * (dim_+1) + i] = position[stoch_i];
 	send_buffer_[buffer_i_ * (dim_+1) + i] = this_h;
 	
 	buffer_i_++;
@@ -876,11 +895,13 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   //get target
   if(parsed_input.find("target_filename") == parsed_input.end()) {
     b_targeting_ = 0;
+    expected_target_ = 0;
   } else {
     b_targeting_ = 1;
     string tfilename = parsed_input.at("target_filename");
     string cleaned_filename = clean_string(tfilename, 0);
     target_ = read_grid(dim_, cleaned_filename, 0); //read grid, do not use interpolation
+    expected_target_ = target_->expected_bias();
   }
 
   if(parsed_input.find("hills_filename") != parsed_input.end()) {

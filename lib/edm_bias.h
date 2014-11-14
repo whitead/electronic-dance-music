@@ -98,6 +98,7 @@ class EDMBias {
   double hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
   double total_volume_;//total volume of grid 
+  double expected_target_; //the expected value of the target factor
 
   int b_outofbounds_; //true if this MPI instance will always be out of grid
 
@@ -125,6 +126,10 @@ class EDMBias {
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
   double temp_hill_cum_;
   double temp_hill_prefactor_;
+  
+  //these are used for scrambling atom indices
+  int* shuffled_index;
+  int shuffled_index_size;
     
   EDMBias(const EDMBias& that);//just disable copy constructor
   void output_hill(const double* position, double height, double bias_added);
