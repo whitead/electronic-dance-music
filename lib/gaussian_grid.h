@@ -532,13 +532,23 @@ class DimmedGaussGrid : public GaussGrid{
 
     grid_.get_index(boundary_min_, min_i);
     grid_.get_index(boundary_max_, max_i);
-    
+
+    //move inwards one if necessary
+    for(i = 0; i < DIM; i++) {
+      while(min_i[i] * grid_.dx_[i] + grid_.min_[i] < boundary_min_[i])
+	min_i[i] += 1; 
+      while(max_i[i] * grid_.dx_[i] + grid_.min_[i] > boundary_max_[i] || 
+	    max_i[i] == grid_.grid_number_[i])
+	max_i[i] -= 1; 
+    }
+
     //we need to consider the combination of min-1, min, max, max+1 for all points
     size_t offset_size = pow(4,DIM);
     int offset[DIM];
-    size_t temp = offset_size;
+    size_t temp;
     for(i = 0; i < offset_size; i++) {
       b_flag = 0;
+      temp = i;
       for(j = 0; j < DIM; j++) {
 	offset[j] = temp % 4;
 	temp = (temp - offset[j]) / 4;
@@ -556,17 +566,17 @@ class DimmedGaussGrid : public GaussGrid{
 	case 2:
 	  index_outter[j] = max_i[j];
 	  index_bound[j] = max_i[j];
-	    break;
+	  break;
 	case 3:
 	  b_flag |= b_periodic_boundary_[j];
-	  b_flag |= max_i[j] == grid_.grid_number_[j];
+	  b_flag |= max_i[j] == grid_.grid_number_[j] - 1;
 	  index_outter[j] = max_i[j] + 1;
 	  index_bound[j] = max_i[j];
 	  break;
 	}
       }
       if(!b_flag) {
-	//true if this dimension is not periodic
+	//true if this dimension is not periodic or at a boundary
 	k = grid_.multi2one(index_outter);
 	l = grid_.multi2one(index_bound);
 	grid_.grid_[k] = grid_.grid_[l];

@@ -19,6 +19,8 @@
 #define GAUSS_SUPPORT 6.25
 #endif
 
+#define INTERPOLATE 1
+
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
@@ -135,7 +137,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
     
   }
 
-  bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, 0, bias_sigma_);
+  bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, INTERPOLATE, bias_sigma_);
   bias_->set_boundary(min_, max_, boundary_period);
 
 #ifndef SERIAL_TEST

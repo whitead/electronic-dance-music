@@ -705,7 +705,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   double min[] = {-100};
   double max[] = {100};
-  double sigma[] = {1.2};
+  double sigma[] = {10.0};
   double bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
@@ -728,6 +728,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   }
 
   //Check if the boundaries were duplicated
+  BOOST_REQUIRE(pow(g.grid_.grid_[50] - g.grid_.grid_[49] ,2) < EPSILON);
+  BOOST_REQUIRE(pow(g.grid_.grid_[150] - g.grid_.grid_[151] ,2) < EPSILON);
+
   x[0] = 50.1;
   v = g.get_value(x);
   x[0] = 50.0;
@@ -750,11 +753,11 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
   double min[] = {-10, -10, -10};
   double max[] = {10, 10, 10};
-  double sigma[] = {1.0, 1.0, 1.0};
-  double bin_spacing[] = {1, 1, 1};
+  double sigma[] = {3.0, 3.0, 3.0};
+  double bin_spacing[] = {0.9, 1.1, 1.4};
   int periodic[] = {1, 1, 1};
   DimmedGaussGrid<3> g (min, max, bin_spacing, periodic, 1, sigma);
-  periodic[0]  = periodic[1] = periodic[2] = 1;
+  periodic[0]  = periodic[1] = periodic[2] = 0;
   min[0]  = min[1] = min[2] = -5;
   max[0]  = max[1] = max[2] = 5;
   g.set_boundary(min, max, periodic);
@@ -771,7 +774,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
     x[0] = rand() % 20 - 10;
     x[1] = rand() % 20 - 10;
     x[2] = rand() % 20 - 10;
-    g.add_gaussian(x, 1.0);
+    g.add_gaussian(x, 5.0);
   }
 
   //Check if the boundaries were duplicated
@@ -783,14 +786,14 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
 
   //boundaries should be 0, even with interpolation
   g.get_value_deriv(x,der);  
-  BOOST_REQUIRE(der[0] * der[0] < EPSILON);
+  BOOST_REQUIRE(der[0] * der[0] < 0.001);
 
   //check another location
   x[0] = -5.1;
   x[2] = 5.1;
   v = g.get_value(x);
   x[0] = x[2] = -5.0;
-  BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
+  BOOST_REQUIRE(pow(v - g.get_value(x),2) < 0.001);
   g.get_value_deriv(x,der);  
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
