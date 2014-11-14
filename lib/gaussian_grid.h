@@ -62,7 +62,7 @@ class DimmedGaussGrid : public GaussGrid{
 		 const double* bin_spacing, 
 		 const int* b_periodic, 
 		 int b_interpolate,
-		 const double* sigma) : grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate){
+		 const double* sigma) : grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate), b_dirty_bounds(0){
     //the 1 means we always use derivatives for a gaussian grid
     
     size_t i;
@@ -77,7 +77,7 @@ class DimmedGaussGrid : public GaussGrid{
   /**
    * Rebuild from a file. Files don't store sigma, so it must be set again.
    **/
- DimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename) {
+ DimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename), b_dirty_bounds(0) {
     size_t i;
     for(i = 0; i < DIM; i++) {
       sigma_[i] = sigma[i] * sqrt(2.);
@@ -120,12 +120,6 @@ class DimmedGaussGrid : public GaussGrid{
     //Attempt to wrap around the specified boundaries (separate from grid bounds)
     if(!in_bounds(xx)) {
       remap(xx);
-    }
-
-    //If we have added gaussians and are trying to maintain 
-    //out of bounds with 0 derivative, we need to update the out of bounds potential
-    if(b_dirty_bounds) {
-      duplicate_boundary();
     }
 
     return grid_.get_value_deriv(xx, der);
@@ -341,6 +335,15 @@ class DimmedGaussGrid : public GaussGrid{
 
       }
     }
+
+    //If we have added gaussians and are trying to maintain 
+    //out of bounds with 0 derivative, we need to update the out of bounds potential
+    if(b_dirty_bounds) {
+      duplicate_boundary();
+      b_dirty_bounds = 0;
+    }
+
+
     return bias_added;
   }
 
@@ -531,9 +534,9 @@ class DimmedGaussGrid : public GaussGrid{
     grid_.get_index(boundary_max_, max_i);
     
     //we need to consider the combination of min-1, min, max, max+1 for all points
-    offset_size = pow(4,DIM);
+    size_t offset_size = pow(4,DIM);
     int offset[DIM];
-    temp = offset_size;
+    size_t temp = offset_size;
     for(i = 0; i < offset_size; i++) {
       b_flag = 0;
       for(j = 0; j < DIM; j++) {
@@ -542,6 +545,7 @@ class DimmedGaussGrid : public GaussGrid{
 	switch(offset[j]) {
 	case 0:
 	  b_flag |= b_periodic_boundary_[j];
+	  b_flag |= min_i[j] == 0;
 	  index_outter[j] = min_i[j] - 1;
 	  index_bound[j] = min_i[j];
 	  break;
@@ -551,10 +555,11 @@ class DimmedGaussGrid : public GaussGrid{
 	  break;
 	case 2:
 	  index_outter[j] = max_i[j];
-	  index_bound[j] = max_i[j]
+	  index_bound[j] = max_i[j];
 	    break;
 	case 3:
 	  b_flag |= b_periodic_boundary_[j];
+	  b_flag |= max_i[j] == grid_.grid_number_[j];
 	  index_outter[j] = max_i[j] + 1;
 	  index_bound[j] = max_i[j];
 	  break;
@@ -565,6 +570,7 @@ class DimmedGaussGrid : public GaussGrid{
 	k = grid_.multi2one(index_outter);
 	l = grid_.multi2one(index_bound);
 	grid_.grid_[k] = grid_.grid_[l];
+      }
     }
   }
 };
