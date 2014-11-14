@@ -122,6 +122,12 @@ class DimmedGaussGrid : public GaussGrid{
       remap(xx);
     }
 
+    //If we have added gaussians and are trying to maintain 
+    //out of bounds with 0 derivative, we need to update the out of bounds potential
+    if(b_dirty_bounds) {
+      duplicate_boundary();
+    }
+
     return grid_.get_value_deriv(xx, der);
   }
 
@@ -329,6 +335,10 @@ class DimmedGaussGrid : public GaussGrid{
 	  else
 	    grid_.grid_deriv_[(xx_index1) * DIM + j] += height * bc_force[j];
 	}
+
+	if(!b_dirty_bounds && bc_correction * bc_correction >  0)
+	  b_dirty_bounds = 1; //set it to be true that our bounds are dirty.
+
       }
     }
     return bias_added;
@@ -342,6 +352,8 @@ class DimmedGaussGrid : public GaussGrid{
     size_t i,j;
     double s;
     double tmp1,tmp2;
+
+    b_dirty_bounds = 0;
 
     for(i = 0; i < DIM; i++) {
       boundary_min_[i] = min[i];
@@ -492,6 +504,7 @@ class DimmedGaussGrid : public GaussGrid{
   double bc_denom_deriv_table_[DIM][BC_TABLE_SIZE];
 
  private:
+  int b_dirty_bounds; //true if we've added hills and our bounds may be inconsitent. Only needed for simulations where we have 0 derivative forces
   /**
    * Calculate the amount of grid that needs to be considered based on gaussian width and grid width 
    **/
@@ -506,7 +519,54 @@ class DimmedGaussGrid : public GaussGrid{
       minisize_total_ *= (2 * minisize_[i] + 1);
     }
   }
-  
+
+  void duplicate_boundary() {
+    
+    size_t i,j,k,l;
+    size_t index_outter[DIM], index_bound[DIM];
+    size_t min_i[DIM], max_i[DIM];
+    int b_flag;
+
+    grid_.get_index(boundary_min_, min_i);
+    grid_.get_index(boundary_max_, max_i);
+    
+    //we need to consider the combination of min-1, min, max, max+1 for all points
+    offset_size = pow(4,DIM);
+    int offset[DIM];
+    temp = offset_size;
+    for(i = 0; i < offset_size; i++) {
+      b_flag = 0;
+      for(j = 0; j < DIM; j++) {
+	offset[j] = temp % 4;
+	temp = (temp - offset[j]) / 4;
+	switch(offset[j]) {
+	case 0:
+	  b_flag |= b_periodic_boundary_[j];
+	  index_outter[j] = min_i[j] - 1;
+	  index_bound[j] = min_i[j];
+	  break;
+	case 1:
+	  index_outter[j] = min_i[j];
+	  index_bound[j] = min_i[j];
+	  break;
+	case 2:
+	  index_outter[j] = max_i[j];
+	  index_bound[j] = max_i[j]
+	    break;
+	case 3:
+	  b_flag |= b_periodic_boundary_[j];
+	  index_outter[j] = max_i[j] + 1;
+	  index_bound[j] = max_i[j];
+	  break;
+	}
+      }
+      if(!b_flag) {
+	//true if this dimension is not periodic
+	k = grid_.multi2one(index_outter);
+	l = grid_.multi2one(index_bound);
+	grid_.grid_[k] = grid_.grid_[l];
+    }
+  }
 };
 
 /**
