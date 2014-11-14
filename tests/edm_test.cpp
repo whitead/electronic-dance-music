@@ -164,8 +164,8 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
     //grab the grid for comparison
     size_t ref_length = g->get_grid_size();
     double ref_grid[ref_length];
-    for(i = 0; i < ref_length; i++)
-      ref_grid[i] = g->get_grid()[i];
+    for(j = 0; j < ref_length; j++)
+      ref_grid[j] = g->get_grid()[j];
     //re-read
     g->read(output);
     //now compare
@@ -688,7 +688,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
       approx_der = (v - vlastlast) / (2*dx);
       BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.001);
     } else {
-      BOOST_REQUIRE(pow(der_last, 2) < 0.001);
+      BOOST_REQUIRE(pow(der[0], 2) < 0.001);
     }
     vlastlast = vlast;
     vlast = v;
