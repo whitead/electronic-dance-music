@@ -95,7 +95,7 @@ class EDMBias {
   double boltzmann_factor_;
   double temperature_;
   double hill_prefactor_; //hill height prefactor
-  double hill_density_;// hills sampling density
+  int hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
   double total_volume_;//total volume of grid 
   double expected_target_; //the expected value of the target factor
@@ -128,8 +128,10 @@ class EDMBias {
   double temp_hill_prefactor_;
   
   //these are used for scrambling atom indices
-  int* shuffled_index;
-  int shuffled_index_size;
+  int* shuffled_index_;
+  int shuffled_index_size_;
+  int hills_added_;
+  long long int steps_;
     
   EDMBias(const EDMBias& that);//just disable copy constructor
   void output_hill(const double* position, double height, double bias_added);

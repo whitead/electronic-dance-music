@@ -857,7 +857,6 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   double** positions = (double**) malloc(sizeof(double*));
   positions[0] = (double*) malloc(sizeof(double));
   double runiform[] = {1};
-  double integral = sqrt(M_PI) * bias.bias_sigma_[0];
   
   positions[0][0] = 5.0;
   bias.add_hills(1, positions, runiform);
@@ -865,10 +864,10 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   bias.write_bias("BIAS");
 
   
-  std::cout << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " 
-	    << bias.bias_->get_value(positions[0]) << std::endl;
+  //  std::cout << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " 
+  //	    << bias.bias_->get_value(positions[0]) << std::endl;
   BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
-  BOOST_REQUIRE(pow(bias.cum_bias_ - integral * bias.hill_prefactor_, 2) < 0.001);
+  BOOST_REQUIRE(pow(bias.cum_bias_ - bias.hill_prefactor_, 2) < 0.001);
   
   //now  check that the forces point away from the hills
   double der[0];
