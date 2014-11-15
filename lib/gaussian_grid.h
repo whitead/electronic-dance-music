@@ -314,6 +314,8 @@ class DimmedGaussGrid : public GaussGrid{
 	    bc_force[j] /= bc_denom * bc_denom;
 	    bc_correction /= bc_denom;
 	    
+	  } else {
+	    bc_denom *=  sqrt(M_PI) * sigma_[j];
 	  }
 	}
 	expo /= bc_denom;
@@ -436,6 +438,10 @@ class DimmedGaussGrid : public GaussGrid{
 
   const double* get_max() const{
     return grid_.get_max();
+  }
+
+  double expected_bias() const {
+    return grid_.expected_bias();
   }
 
   size_t get_grid_size() const{

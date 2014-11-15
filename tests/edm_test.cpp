@@ -441,7 +441,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
   g.add_gaussian(x, 1);
 
   //now check a few points
-  BOOST_REQUIRE(pow(g.get_value(x) - 1, 2) < EPSILON);
+  BOOST_REQUIRE(pow(g.get_value(x) - 1 / sqrt(2 * M_PI), 2) < EPSILON);
   
   int i;
   double der[1];
@@ -449,8 +449,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
   for( i = -6; i < 7; i++) {
     x[0] = i;
     value = g.get_value_deriv(x, der);
-    BOOST_REQUIRE(pow(value - exp(-x[0]*x[0]/2.), 2) < 0.01);
-    BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)), 2) < 0.01);
+    BOOST_REQUIRE(pow(value - exp(-x[0]*x[0]/2.) / sqrt(2*M_PI), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)) / sqrt(2*M_PI), 2) < 0.01);
   }
  
 }
@@ -479,12 +479,13 @@ BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
     /*
     std::cout << "x = " << x[0]
 	      << " dx = " << dx 
+	      << "(" << 
 	      << " value = " << value 
 	      << " (" << exp(-dx*dx/2.) << ")" 
 	      << std::endl;
     */
-    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.), 2) < 0.01);
-    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)), 2) < 0.01);
+    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
  
 }
@@ -524,8 +525,8 @@ BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
 	      << std::endl;
     */
 
-    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.), 2) < 0.01);
-    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)), 2) < 0.01);
+    BOOST_REQUIRE(pow(value - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
  
 }
@@ -563,8 +564,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
 
   //Make sure the integrated area is correct
   //unnormalized, so a little height scaling is necessary
-  //  std::cout << area << " " << N * 1.5 * sigma[0] * sqrt(2 * M_PI) << std::endl;
-  BOOST_REQUIRE(pow(area - N * 1.5 * sigma[0] * sqrt(2 * M_PI), 2) < 1);
+  //  std::cout << area << " " << N * 1.5 << std::endl;
+  BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
 
   //now make sure that add_gaussian returned the correct answers as well
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
@@ -819,7 +820,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
 
   //unnormalized, so a little height scaling is necessary
   //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
-  BOOST_REQUIRE(pow(bias_added - h * sqrt(2 * M_PI) * sigma[0], 2) < 0.1);
+  BOOST_REQUIRE(pow(bias_added - h, 2) < 0.1);
 
   delete g;
 }
@@ -862,8 +863,11 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   bias.add_hills(1, positions, runiform);
 
   bias.write_bias("BIAS");
+
   
-  BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_, 2) < EPSILON);
+  std::cout << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " 
+	    << bias.bias_->get_value(positions[0]) << std::endl;
+  BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
   BOOST_REQUIRE(pow(bias.cum_bias_ - integral * bias.hill_prefactor_, 2) < 0.001);
   
   //now  check that the forces point away from the hills
