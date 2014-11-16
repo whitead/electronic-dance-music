@@ -10,10 +10,18 @@
 #include <iostream>
 #include <map>
 
-#define BIAS_CLAMP 100000
-//number of doubles
-#define BIAS_BUFFER_SIZE 64
+#define BIAS_CLAMP 3
+#define BIAS_BUFFER_SIZE 512
+#define BIAS_BUFFER_DBLS 2048
 #define NO_COMM_PARTNER -1
+#define INTERPOLATE 1
+
+#define NEIGH_HILL 'n'
+#define BUFF_HILL 'b'
+#define BUFF_UNDO_HILL 'v'
+#define ADD_HILL 'h'
+#define ADD_UNDO_HILL 'u'
+#define BUFF_ZERO_HILL 'z'
 
 namespace EDM{ 
 
@@ -23,7 +31,7 @@ class EDMBias {
    *
    */
  public:
-  
+
   EDMBias(const std::string& input_filename);
   ~EDMBias();
   /** Create a grid that only occupies enough space for this processes local box
@@ -72,11 +80,14 @@ class EDMBias {
    * A way to add hills one at a time. Call pre_add_hill first,
    * add_hill a fixed number of times, and finally post_add_hill. 
    * 
-   * It's important to know how many hills will be added and call add_hill that many times.
+   * It's important to know how many hills will be added and call
+   * add_hill that many times.  Times called is the estimated number
+   * of times add hill will be called, so it should be the same number
+   * each time wihtin a pre/add/post cycle.
    *
    **/
-  void pre_add_hill();
-  void add_hill(int times_called, const double* position, double runiform);
+  void pre_add_hill(int est_hill_count);
+  void add_hill(int est_hill_count, const double* position, double runiform);
   void post_add_hill();
 
   /**
@@ -95,7 +106,7 @@ class EDMBias {
   double boltzmann_factor_;
   double temperature_;
   double hill_prefactor_; //hill height prefactor
-  int hill_density_;// hills sampling density
+  double hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
   double total_volume_;//total volume of grid 
   double expected_target_; //the expected value of the target factor
@@ -116,9 +127,10 @@ class EDMBias {
   int* mpi_neighbors_;//who my neighbors are
   
   //buffers for sending and receiving with neighbors
-  double send_buffer_[BIAS_BUFFER_SIZE];
-  double receive_buffer_[BIAS_BUFFER_SIZE];
+  double send_buffer_[BIAS_BUFFER_DBLS];
+  double receive_buffer_[BIAS_BUFFER_DBLS];
   unsigned int buffer_i_;
+
 
   std::ofstream hill_output_;//hill writing
 
@@ -127,14 +139,19 @@ class EDMBias {
   double temp_hill_cum_;
   double temp_hill_prefactor_;
   
-  //these are used for scrambling atom indices
-  int* shuffled_index_;
-  int shuffled_index_size_;
+  //for printing
   int hills_added_;
   long long int steps_;
+
+  //buffers for bias overflow
+  double overflow_buffer_[BIAS_BUFFER_DBLS];
+  size_t overflow_left_i_;
+  size_t overflow_right_i_;
+  int b_skip_hill_add_;
+
     
   EDMBias(const EDMBias& that);//just disable copy constructor
-  void output_hill(const double* position, double height, double bias_added);
+  void output_hill(const double* position, double height, double bias_added, char type);
   /* This will update the height, optionally with tempering. It also
    * will reduce across all processes the average height so that we
    * know if global tempering is necessary.
@@ -156,6 +173,20 @@ class EDMBias {
    */
   int check_for_flush();
   double flush_buffers(int snyched);
+
+  /*
+   * Add hills that are in the buffer of hills to add. These are hills
+   * that couldn't be added because the amount of bias would have been
+   * too high.
+   */
+  double flush_bias_buffer(double max_bias);
+  
+  double do_add_hill(const double* position, double height, int communicate);
+
+  /*
+   * Debug method
+   */
+  void dump_bias_buffer();
 
   /*
    * Convienence method to stride whitespace from a string.

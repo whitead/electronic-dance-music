@@ -155,7 +155,7 @@ void FixEDMPair::post_force(int vflag)
   firstneigh = list->firstneigh;    
 
   if(update->ntimestep % stride == 0)
-    bias->pre_add_hill();
+    bias->pre_add_hill(last_calls);
 
   
   for (ii = 0; ii < inum; ii++) {

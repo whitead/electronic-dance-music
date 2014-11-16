@@ -19,8 +19,6 @@
 #define GAUSS_SUPPORT 6.25
 #endif
 
-#define INTERPOLATE 1
-
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
@@ -53,8 +51,9 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 						      buffer_i_(0),
 						      temp_hill_cum_(-1),
 							   temp_hill_prefactor_(-1),
-						 shuffled_index_(NULL),
-						 steps_(0){
+						 steps_(0),
+						 overflow_left_i_(0),
+						 overflow_right_i_(0){
   
   //assign rank
 #ifndef SERIAL_TEST
@@ -71,9 +70,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
     delete target_;
   if(bias_ != NULL)
     delete bias_;
-  if(shuffled_index_ != NULL)
-    free(shuffled_index_);
-  
+
   if(mpi_neighbors_ != NULL)
     free(mpi_neighbors_);
 }
@@ -150,11 +147,10 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   //make hill density a per-system measurement not per replica
   //make hill prefactor also lower so bias per timestep is not a function of replica number
   if(hill_density_ > 0)  {
-    hill_density_ /= mpi_size_;
+    hill_density_ /=  mpi_size_;
     if(hill_density_ == 0)
       hill_density_  = 1;
   }
-  hill_prefactor_ /= mpi_size_;
 
   //We have two comm cases, global and neighbors. In global, we build
   //a broadcast tree so that the number of comms is logrithmic in the
@@ -256,8 +252,86 @@ void EDM::EDMBias::update_force(const double* positions, double* forces) const {
   bias_->get_value_deriv(positions, der);
   for(i = 0; i < dim_; i++)
     forces[i] -= der[i];
-
   
+}
+
+double EDM::EDMBias::flush_bias_buffer(double max_bias) {
+  
+  double temp;
+  double bias_added = 0;
+
+  //#ifdef EDM_MPI_DEBUG
+  //  std::cout << "--------PREFLUSH [" << mpi_rank_ << "]---------" << std::endl;
+  //  dump_bias_buffer();
+  //#endif
+ 
+  for(; overflow_left_i_ < overflow_right_i_; overflow_left_i_++) {
+    temp = bias_->add_gaussian(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
+			       overflow_buffer_[overflow_left_i_ * (dim_+1) + dim_]);
+
+    hills_added_++;
+    bias_added += temp;
+    output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
+		overflow_buffer_[overflow_left_i_ * (dim_+1) + dim_], 
+		temp, BUFF_HILL);
+    
+
+    if(bias_added > max_bias) {
+
+      //now put the remaining part that we'll need to add 
+      overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_] = bias_added - max_bias;
+
+      //undo the hill
+      temp = bias_->add_gaussian(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
+				 max_bias - bias_added);      
+      output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
+		  max_bias - bias_added, 
+		  temp,
+		  BUFF_UNDO_HILL);
+
+      hills_added_++;
+      bias_added += temp;
+
+      break;
+    }	    
+  }
+
+  if(overflow_left_i_ == overflow_right_i_) {
+    overflow_left_i_ = overflow_right_i_ = 0;
+  } else {
+#ifdef EDM_MPI_DEBUG
+    //output other hills
+    size_t i;
+    for(i = overflow_left_i_; i < overflow_right_i_; i++) {
+      output_hill(&overflow_buffer_[i * (dim_ + 1)], 
+		  0, 
+		  0,
+		  BUFF_ZERO_HILL);
+    }
+#endif
+  } 
+
+  //#ifdef EDM_MPI_DEBUG
+  //  std::cout << "--------POSTFLUSH [" << mpi_rank_ << "]---------" << std::endl;
+  //  dump_bias_buffer();
+  //#endif
+
+
+  return bias_added;
+}
+
+void EDM::EDMBias::dump_bias_buffer() {
+  std::cout << "Left: " << overflow_left_i_ << std::endl;
+  std::cout << "Right: " << overflow_right_i_ << std::endl;
+  /*
+  size_t i;
+  for(i = overflow_left_i_; i < overflow_right_i_; i++) {
+    std::cout << overflow_buffer_[i * (dim_ + 1) + dim_] << " ";
+    if(i % 30 == 0)
+      std::cout << std::endl;
+      }
+  std::cout << std::endl;
+  */
 }
 
 
@@ -267,108 +341,19 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 
 void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask) {
 
-  int i, j, stoch_i;
-  double bias_added = 0;
-  double h = hill_prefactor_;  
-  double this_h;
-  int natoms = 0;
-  double temp;
-  hills_added_ = 0;
+  int i;
+  pre_add_hill(nlocal);
+  for(i = 0; i < nlocal; i++)
+    add_hill(nlocal, &positions[i][0], runiform[i]);
+  post_add_hill();
 
-  //are we active?
-  if(!b_outofbounds_) {
-
-
-
-    //get current hill height
-    if(global_tempering_ > 0)
-      if(cum_bias_ / total_volume_ >= global_tempering_)
-	h *= exp(-(cum_bias_ / total_volume_ - 
-		   global_tempering_) / 
-		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
-
-    //prepare shuffling array
-    if(shuffled_index_ == NULL) {
-      shuffled_index_ = (int*) malloc(sizeof(int) * nlocal);
-      shuffled_index_size_ = nlocal;
-    } else if(shuffled_index_size_ < nlocal) {
-      shuffled_index_ = (int*) realloc(shuffled_index_, sizeof(int) * nlocal);
-      shuffled_index_size_ = nlocal;
-    }
-
-    //set-up shuffling array
-    for(i = 0; i < nlocal; i++)
-      if(apply_mask < 0 || mask_[i] & apply_mask)
-	if(bias_->in_bounds(&positions[i][0]))
-	  shuffled_index_[natoms++] = i;
-
-    //Fisher-Yates Shuffle    
-    for(i = natoms - 1; i >= 0; i--)  {   
-
-      j = (int) floor(runiform[i] * i);
-      stoch_i = shuffled_index_[j];
-      //grab the element from the end of available region
-      shuffled_index_[j] = shuffled_index_[i];
-      
-      //compensate for targeting bias and number of hills
-      this_h = h * exp(expected_target_);
-      if(hill_density_ < 0)
-	this_h /= natoms;
-      else
-	this_h /= hill_density_;
-
-
-      if(b_targeting_)
-	this_h *= exp(-target_->get_value(&positions[stoch_i][0])); // add target
-      if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
-	this_h *= exp(-bias_->get_value(&positions[stoch_i][0]) / 
-		      ((bias_factor_ - 1) * boltzmann_factor_));
-
-      //finally clamp bias
-      this_h = fmin(this_h, hill_prefactor_ * BIAS_CLAMP);
-      temp = bias_->add_gaussian(&positions[stoch_i][0], this_h);
-      hills_added_++;
-      bias_added += temp;
-      
-      
-      //output hill
-      output_hill(&positions[stoch_i][0], this_h, temp);
-      
-      //pack result into buffer if necessary
-      if(mpi_neighbor_count_ > 0) {
-	for(j = 0; j < dim_; j++)	    
-	  send_buffer_[buffer_i_ * (dim_+1) + j] = positions[stoch_i][j];
-	send_buffer_[buffer_i_ * (dim_+1) + j] = this_h;
-	
-	buffer_i_++;
-	
-	//do we need to flush?
-	if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
-	  bias_added += flush_buffers(0); //flush and we don't know if we're synched
-      }
-
-      //check if we've added enough bias already and are ready to stop or 
-      //we are doing this with hill density
-      if(hill_density_ > 0 && natoms - i == hill_density_)
-	break;
-    }
-  }
-
-  bias_added += flush_buffers(0); //flush, but we don't know if we're synched
-  
-  //some processors may have had to flush more than once if there are
-  //lots of hills, continue waiting for them until we all agree no more flush
-  while(check_for_flush())
-    bias_added += flush_buffers(1); //flush and we are synched
-  
-  update_height(bias_added);
-  steps_++;
 }
 
-void EDM::EDMBias::pre_add_hill() {
+void EDM::EDMBias::pre_add_hill(int est_hill_count) {
 
   //are we active?
   if(!b_outofbounds_) {
+
 
     temp_hill_prefactor_ = hill_prefactor_;
 
@@ -378,56 +363,139 @@ void EDM::EDMBias::pre_add_hill() {
 	temp_hill_prefactor_ *= exp(-(cum_bias_ / total_volume_ - 
 		   global_tempering_) / 
 		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
+
+    temp_hill_cum_ = 0;
+    hills_added_ = 0;
+
+    //do we have have left overs from last time? Deal with it
+    temp_hill_cum_ += flush_bias_buffer(temp_hill_prefactor_);    
+    
+    //we can only skip entire rounds, otherwise we begin to bias our sampling.
+    //Are we skipping an entire round?
+    if(overflow_left_i_ == 0 && overflow_right_i_ == 0)
+      b_skip_hill_add_ = 0;
+    else
+      b_skip_hill_add_ = 1;
   }
 
-  temp_hill_cum_ = 0;
-  hills_added_ = 0;
 }
 
-void EDM::EDMBias::add_hill(int times_called, const double* position, double runiform) {
+double EDM::EDMBias::do_add_hill(const double* position, double this_h, int communicate) {
 
-  if(temp_hill_prefactor_ < 0);
-    //error must call pre_add_hill before add_hill
-
-  double this_h = temp_hill_prefactor_;
-  double temp;
+  int buffer_flag = 0;
   size_t i;
+  double bias_added = 0; 
+
+  //deal with communication
+  //pack result into buffer if necessary
+  if(mpi_neighbor_count_ > 0 && communicate) {
+    for(i = 0; i < dim_; i++)	    
+      send_buffer_[buffer_i_ * (dim_+1) + i] = position[i];
+    send_buffer_[buffer_i_ * (dim_+1) + i] = this_h;
+    
+    buffer_i_++;
+    
+    //do we need to flush?
+    if(buffer_i_ >= BIAS_BUFFER_SIZE)
+      temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
+  }      
+
+  //now add the hill
+  if(temp_hill_cum_ < temp_hill_prefactor_) {
+    bias_added = bias_->add_gaussian(position, this_h);
+    temp_hill_cum_ += bias_added;
+    hills_added_++;
+
+    //output hill
+    output_hill(position, this_h, bias_added, ADD_HILL);
+    
+    //check if the hill is too big.
+    if(temp_hill_cum_ > temp_hill_prefactor_) {
+      //undo the hill
+      bias_added = bias_->add_gaussian(position, temp_hill_prefactor_ - temp_hill_cum_);
+      
+      hills_added_++;
+      output_hill(position, temp_hill_prefactor_ - temp_hill_cum_, bias_added, ADD_UNDO_HILL);
+      
+      temp_hill_cum_ += bias_added;
+      buffer_flag = 1;
+      }
+        
+    //now if we undid that hill add, we'll put the remaining amount of bias into the overflow buffer
+    if(buffer_flag) 
+      this_h = this_h + bias_added;	    
+  } else {
+    output_hill(position, 0, 0, ADD_HILL);
+    buffer_flag = 1;
+  }
+  
+  //check if we can add this hill
+  if(buffer_flag) {
+    //no we cannot, put into buffer of hills
+    //check if buffer is full
+    if(overflow_right_i_ == BIAS_BUFFER_SIZE) {
+      //can we add left?
+      if(overflow_left_i_ == 0) {
+	dump_bias_buffer();
+	std::cout.flush();
+	edm_error("The bias overflow buffer is full. Too many hills. Either increase & recompile, lower hill_density, or lower bias",
+		  "edm_bias.cpp:add_hill");
+
+      } else {
+	//add to left
+	overflow_left_i_--;
+	for(i = 0; i < dim_; i++)
+	  overflow_buffer_[overflow_left_i_ * (dim_ + 1) + i] = position[i];
+	overflow_buffer_[overflow_left_i_ * (dim_ + 1) + i] = this_h;	  
+      }
+    } else {
+      //add to right
+      overflow_right_i_++;
+      for(i = 0; i < dim_; i++)
+	overflow_buffer_[overflow_right_i_ * (dim_ + 1) + i] = position[i];
+      overflow_buffer_[overflow_right_i_ * (dim_ + 1) + i] = this_h;	  
+    }
+  }
+
+  return bias_added;
+}
+
+void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double runiform) {
+
+  if(temp_hill_prefactor_ < 0)
+    edm_error("Must call pre_add_hill before add_hill", "edm_bias.cpp:add_hill");
+
+  //Did we decide to skip this round?
+  if(b_skip_hill_add_)
+    return;
+  
+  double this_h = temp_hill_prefactor_;
 
   //are we active?
   if(!b_outofbounds_) {
 
     //actually add hills -> stochastic
-    if(hill_density_ < 0 || runiform < hill_density_ / times_called) {    
+    if(hill_density_ < 0 || runiform < hill_density_ / est_hill_count) {    
+
       if(b_targeting_)
 	this_h *= exp(-target_->get_value(position)); // add target
       if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
 	this_h *= exp(-bias_->get_value(position) / 
 		      ((bias_factor_ - 1) * boltzmann_factor_));
-      //finally clamp bias
-      this_h = fmin(this_h, BIAS_CLAMP * hill_prefactor_);
-      temp = bias_->add_gaussian(position, this_h);
-      temp_hill_cum_ += temp;
-      hills_added_++;
 
-      
-      //output hill
-      output_hill(position, this_h, temp);
-      
-      //pack result into buffer if necessary
-      if(mpi_neighbor_count_ > 0) {
-	for(i = 0; i < dim_; i++)	    
-	  send_buffer_[buffer_i_ * (dim_+1) + i] = position[i];
-	send_buffer_[buffer_i_ * (dim_+1) + i] = this_h;
-	
-	buffer_i_++;
-	
-	//do we need to flush?
-	if((buffer_i_ + 1) * (dim_+1) >= BIAS_BUFFER_SIZE)
-	  temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
-      }
+      //compensate for targeting bias and number of hills
+      this_h *= exp(expected_target_);
+      if(hill_density_ < 0)
+	this_h /= est_hill_count;
+      else
+	this_h /= hill_density_;
+
+      //finally clamp bias
+      this_h = fmin(this_h, BIAS_CLAMP * temp_hill_prefactor_);
+
+      do_add_hill(position, this_h, 1);
     }
   }
-
 }
 
 void EDM::EDMBias::post_add_hill() {
@@ -451,12 +519,13 @@ void EDM::EDMBias::post_add_hill() {
 }
  
 
- void EDM::EDMBias::output_hill(const double* position, double height, double bias_added) {
+void EDM::EDMBias::output_hill(const double* position, double height, double bias_added, char type) {
    
    size_t i;
    
    hill_output_ << std::setprecision(8) << std::fixed;
    hill_output_ << steps_ << " ";
+   hill_output_ << type << " ";
    hill_output_ << hills_added_ << " ";
    for(i = 0; i < dim_; i++)  {
      hill_output_ << position[i] << " ";
@@ -510,12 +579,8 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
 	  for(j = 0; j < buffer_j; j++) {
-	    temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
-					      receive_buffer_[j * (dim_+1) + dim_]);
-	    hills_added_++;
-	    bias_added += temp;
-
-	    output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
+	    do_add_hill(&receive_buffer_[j * (dim_+1)], 
+			receive_buffer_[j * (dim_+1) + dim_],0);
 	  }
 	}
       }
@@ -545,12 +610,8 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
 	for(j = 0; j < buffer_j; j++) {
-	  temp = bias_->add_gaussian(&receive_buffer_[j * (dim_+1)], 
-				     receive_buffer_[j * (dim_+1) + dim_]);
-	  hills_added_++;
-	  bias_added += temp;	  
-
-	  output_hill(&receive_buffer_[j * (dim_ + 1)], receive_buffer_[j * (dim_+1) + dim_], temp);
+	  do_add_hill(&receive_buffer_[j * (dim_+1)], 
+		      receive_buffer_[j * (dim_+1) + dim_], 0);
 	}
 
 	//Technically, I don't need to do this here but 
@@ -884,7 +945,7 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   
   if(!extract_double("hill_prefactor", parsed_input, 1, &hill_prefactor_))
     return 0;
-  extract_int("hill_density", parsed_input, 0, &hill_density_);
+  extract_double("hill_density", parsed_input, 0, &hill_density_);
   int tmp;
   if(!extract_int("dimension", parsed_input, 1, &tmp))
     return 0;
