@@ -2,7 +2,17 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
-plt.figure(figsize=(4,4))
+def set_tick_number(ax, n, axis='yaxis'):
+    
+    loc = plt.MaxNLocator(n)
+    if(axis == 'yaxis'):
+        ax.yaxis.set_major_locator(loc)
+    else:
+        ax.xaxis.set_major_locator(loc)
+
+
+
+plt.figure(figsize=(4,3))
 ax = plt.subplot(1, 1, 1)
 color = '#999999'
 plt.gca().tick_params(axis='x', color=color)
@@ -11,6 +21,8 @@ for child in plt.gca().get_children():
     if isinstance(child, matplotlib.spines.Spine):
         child.set_color(color)
 
+set_tick_number(ax, 3, 'yaxis')
+set_tick_number(ax, 4, 'xaxis')
 
 grid_number = 7
 cm = plt.get_cmap('gist_earth')
@@ -24,5 +36,6 @@ for i in range(1,grid_number + 1):
     plt.xlim(0,2)
     ax.set_xlabel("$\sigma$")
     ax.set_ylabel("$h$")
+plt.tight_layout()
 plt.savefig("hills.png", dpi=250)
 
