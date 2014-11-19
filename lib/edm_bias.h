@@ -10,11 +10,11 @@
 #include <iostream>
 #include <map>
 
-#define BIAS_CLAMP 3
+#define BIAS_CLAMP 1.0
 #define BIAS_BUFFER_SIZE 512
 #define BIAS_BUFFER_DBLS 2048
 #define NO_COMM_PARTNER -1
-#define INTERPOLATE 1
+#define INTERPOLATE 0
 
 #define NEIGH_HILL 'n'
 #define BUFF_HILL 'b'

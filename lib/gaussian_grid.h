@@ -7,9 +7,10 @@
 #include <iostream>
 #include <cmath>
 
-#define GAUSS_SUPPORT 6.25 // sigma^2 considered for gaussian
+#define GAUSS_SUPPORT 15.0 // sigma^2 considered for gaussian
 #define BC_TABLE_SIZE 65536 //boundary correction function look up size 
-#define BC_MAR 1.0
+#define BC_MAR 2.0
+#define BC_CORRECTION
 
 
 inline
@@ -294,8 +295,9 @@ class DimmedGaussGrid : public GaussGrid{
 	    temp3 = exp(-pow(x[j] - boundary_max_[j], 2) / (pow(sigma_[j],2)));
 	    temp4 = sigmoid((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR));
 
+#ifdef BC_CORRECTION
 	    bc_correction = (temp1  - expo ) * temp2 + (temp3 - expo ) * temp4;
-	    //	    std::cout << xx[j] << " " << temp2 << " " << temp4 << std::endl;
+#endif
 	    bc_denom *= bc_denom_table_[j][bc_index];
 	    
 	    //dp has been divided by sigma once already
@@ -304,12 +306,15 @@ class DimmedGaussGrid : public GaussGrid{
 	    temp7 = -sigmoid_dx((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR)) / (BC_MAR * sigma_[j]);
 	    
 	    //this is just the force of the uncorrected
-	    bc_force[j] = temp5 * expo + 
-	      (temp1 - expo) * temp6 - 
+	    bc_force[j] = temp5 * expo;
+
+#ifdef BC_CORRECTION
+	    bc_force[j] +=  (temp1 - expo) * temp6 - 
 	      temp5 * expo * temp2 + 
 	      (temp3 - expo) * temp7  -
 	      temp5 * expo * temp4;
-	    
+#endif
+
 	    bc_force[j] = bc_force[j] * bc_denom - bc_denom_deriv_table_[j][bc_index] * (expo + bc_correction);	    
 	    bc_force[j] /= bc_denom * bc_denom;
 	    bc_correction /= bc_denom;
@@ -356,7 +361,7 @@ class DimmedGaussGrid : public GaussGrid{
   void set_boundary(const double* min, const double* max, const int* b_periodic) {
     size_t i,j;
     double s;
-    double tmp1,tmp2;
+    double tmp1,tmp2,tmp3;
 
     b_dirty_bounds = 0;
 
@@ -373,32 +378,33 @@ class DimmedGaussGrid : public GaussGrid{
 	  s = j * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1) + boundary_min_[i];
 
 	  //mcgovern-de pablo contribution
-	  tmp1 = sqrt(M_PI) * sigma_[i] / 2. * 
+	  tmp1 = sqrt(M_PI) * sigma_[i] / 2.  * 
 	    ( erf((s - boundary_min_[i]) / sigma_[i]) + 
 	      erf((boundary_max_[i] - s) / sigma_[i]));
 
 	  bc_denom_table_[i][j] = tmp1;
+#ifdef BC_CORRECTION
+	  tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
 
-	  bc_denom_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	  bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	    sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
-	  bc_denom_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	  bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	    sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
-
+#endif
 	  //mcgovern-de pablo contribution derivative
-	  tmp2 = 1. * 
+	  tmp3 = 1. * 
 	    (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
 	     exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
 
-	  bc_denom_deriv_table_[i][j] = tmp2;
-
-	  bc_denom_deriv_table_[i][j] += (0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	  bc_denom_deriv_table_[i][j] = tmp3;
+#ifdef BC_CORRECTION
+	  bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
 	    sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
-	    tmp2 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
-	  bc_denom_deriv_table_[i][j] += -(0.5 * sqrt(M_PI) * sigma_[i] - tmp1) * 
+	    tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
+	  bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
 	    sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
-	    tmp2 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
-
-
+	    tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
+#endif
 	  if(j > 2) {
 	    //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	      }

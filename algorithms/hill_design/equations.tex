@@ -68,10 +68,10 @@ bounds are far greater than $2b\sigma$, just half the integral of the
 exponential. I'll indicate the McGovern De-Pablo correction as
 $m(s,U,L)$.
 \[
-\bar{G}(s,L,U,b,\sigma) = m(s,U,L) + \left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)u\left(\frac{s-L}{b\sigma}\right) + 
+\bar{G}(s,L,U,b,\sigma) = m(s,U,L) + \left(\frac{1}{2}\sqrt{\pi}\sigma \erf\left(\frac{U - L}{\sigma}\right) - m(s,U,L)\right)u\left(\frac{s-L}{b\sigma}\right) + 
 \]
 \begin{equation}
-\left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)u\left(\frac{U-s}{b\sigma}\right)
+\left(\frac{1}{2}\sqrt{\pi}\sigma\erf\left(\frac{U - L}{\sigma}\right) - m(s,U,L)\right)u\left(\frac{U-s}{b\sigma}\right)
 \end{equation}
 \begin{equation}
 m(s,U,L) = \frac{\sqrt{\pi}}{2} \sigma \left[\erf\left(\frac{s - L}{\sigma}\right) + \erf\left(\frac{U - s}{\sigma}\right)\right]
@@ -88,10 +88,10 @@ m(s,U,L) = \frac{\sqrt{\pi}}{2} \sigma \left[\erf\left(\frac{s - L}{\sigma}\righ
 \left(e^{-(U-x)^2/\sigma^2} - e^{-(x - s)^2 / \sigma^2}\right)\frac{\partial u}{\partial x}\left(\frac{U-s}{b\sigma}\right)\frac{1}{b\sigma} - \frac{2(s - x)}{\sigma^2} e^{-(x - s)^2 / \sigma^2} u\left(\frac{U-s}{b\sigma}\right)
 \]
 \[
-\frac{\partial \bar{G}}{\partial s} = \frac{\partial m(s, U, L)}{\partial s} + \left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)\frac{\partial u}{\partial x}\left(\frac{s-L}{b\sigma}\right)\frac{1}{b\sigma} - \frac{\partial m(s, U, L)}{\partial s}u\left(\frac{s-L}{b\sigma}\right) -
+\frac{\partial \bar{G}}{\partial s} = \frac{\partial m(s, U, L)}{\partial s} + \left(\frac{1}{2}\sqrt{\pi}\sigma \erf\left(\frac{U - L}{\sigma}\right) - m(s,U,L)\right)\frac{\partial u}{\partial x}\left(\frac{s-L}{b\sigma}\right)\frac{1}{b\sigma} - \frac{\partial m(s, U, L)}{\partial s}u\left(\frac{s-L}{b\sigma}\right) -
 \]
 \[
-\left(\frac{1}{2}\sqrt{\pi}\sigma - m(s,U,L)\right)\frac{\partial u}{\partial x}\left(\frac{U-s}{b\sigma}\right)\frac{1}{b\sigma} - \frac{\partial m(s, U, L)}{\partial s}u\left(\frac{U-s}{b\sigma}\right)
+\left(\frac{1}{2}\sqrt{\pi}\sigma \erf\left(\frac{U - L}{\sigma}\right) - m(s,U,L)\right)\frac{\partial u}{\partial x}\left(\frac{U-s}{b\sigma}\right)\frac{1}{b\sigma} - \frac{\partial m(s, U, L)}{\partial s}u\left(\frac{U-s}{b\sigma}\right)
 \]
 \[
 \frac{\partial G/\bar{G}}{\partial s} = \frac{\frac{\partial G}{\partial s}\bar{G} - \frac{\partial \bar{G}}{\partial s}G}{\bar{G}^2}

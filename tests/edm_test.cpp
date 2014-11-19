@@ -585,11 +585,26 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   double x[1];
   double offsets = 1. / N;
   double g_integral = 0;
+  double temp;
+
+  //get boundaries
+  x[0] = -100.0;
+  temp = g.add_gaussian(x, 1.5);
+  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
+  g_integral += temp;		      
+
+  x[0] = 100.0;
+  temp = g.add_gaussian(x, 1.5);
+  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
+  g_integral += temp;		      
+
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g_integral += g.add_gaussian(x, 1.5);
+    temp = g.add_gaussian(x, 1.5);
+    std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
+    g_integral += temp;		      
   }
 
   //now we integrate the grid
@@ -603,7 +618,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
 
   //Make sure the integrated area is correct
   //unnormalized, so a little height scaling is necessary
-  //  std::cout << area / N << " " << 1.5 * sigma[0] * sqrt(2 * M_PI) << std::endl;
+  std::cout << area / N << " " << 1.5  << std::endl;
   BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
 
   //now make sure that add_gaussian returned the correct answers as well

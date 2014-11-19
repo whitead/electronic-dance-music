@@ -15,10 +15,6 @@
 #include "unistd.h"
 #endif
 
-#ifndef GAUSS_SUPPORT
-#define GAUSS_SUPPORT 6.25
-#endif
-
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
@@ -258,7 +254,7 @@ void EDM::EDMBias::update_force(const double* positions, double* forces) const {
 double EDM::EDMBias::flush_bias_buffer(double max_bias) {
   
   double temp;
-  double bias_added = 0;
+  double bias_added = 0, h;
 
   //#ifdef EDM_MPI_DEBUG
   //  std::cout << "--------PREFLUSH [" << mpi_rank_ << "]---------" << std::endl;
@@ -278,14 +274,18 @@ double EDM::EDMBias::flush_bias_buffer(double max_bias) {
 
     if(bias_added > max_bias) {
 
+      //round-off error (bad grid size) can lead to disagreement between bias added and desired bias added
+      //correct for this, so that we don't have a negative bias that exceeds the original
+      h = fmax(max_bias - bias_added, -overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_]);
+
       //now put the remaining part that we'll need to add 
-      overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_] = bias_added - max_bias;
+      overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_] = -h;
 
       //undo the hill
       temp = bias_->add_gaussian(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
-				 max_bias - bias_added);      
+				 h);      
       output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
-		  max_bias - bias_added, 
+		  h, 
 		  temp,
 		  BUFF_UNDO_HILL);
 
@@ -343,8 +343,10 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
 
   int i;
   pre_add_hill(nlocal);
-  for(i = 0; i < nlocal; i++)
-    add_hill(nlocal, &positions[i][0], runiform[i]);
+  for(i = 0; i < nlocal; i++) {
+    if(apply_mask < 0 || apply_mask & mask_[i])
+      add_hill(nlocal, &positions[i][0], runiform[i]);
+  }
   post_add_hill();
 
 }
@@ -384,7 +386,7 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
 
   int buffer_flag = 0;
   size_t i;
-  double bias_added = 0; 
+  double bias_added = 0, temp_h; 
 
   //deal with communication
   //pack result into buffer if necessary
@@ -412,18 +414,22 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
     //check if the hill is too big.
     if(temp_hill_cum_ > temp_hill_prefactor_) {
       //undo the hill
-      bias_added = bias_->add_gaussian(position, temp_hill_prefactor_ - temp_hill_cum_);
+
+      //round-off error (bad grid size) can lead to disagreement between bias added and desired bias added
+      //correct for this, so that we don't have a negative bias that exceeds the original
+      temp_h = fmax(temp_hill_prefactor_ - temp_hill_cum_, -this_h);
+
+      bias_added = bias_->add_gaussian(position, temp_h);
       
       hills_added_++;
-      output_hill(position, temp_hill_prefactor_ - temp_hill_cum_, bias_added, ADD_UNDO_HILL);
+      output_hill(position, temp_h, bias_added, ADD_UNDO_HILL);
       
       temp_hill_cum_ += bias_added;
       buffer_flag = 1;
-      }
-        
-    //now if we undid that hill add, we'll put the remaining amount of bias into the overflow buffer
-    if(buffer_flag) 
-      this_h = this_h + bias_added;	    
+      //now if we undid that hill add, we'll put the remaining amount of bias into the overflow buffer
+      this_h = -temp_h;
+      }        
+
   } else {
     output_hill(position, 0, 0, ADD_HILL);
     buffer_flag = 1;
