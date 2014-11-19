@@ -1,0 +1,23 @@
+variable index loop 7
+
+units lj
+atom_style atomic
+atom_modify map array sort 100000 5
+boundary p p p
+region bbox block 0 10 0 1 0 1
+create_box 1 bbox
+create_atoms 1 single 2.0 0 0
+
+
+mass 1 1.0
+run 0
+
+
+
+label loop
+      fix edm_1 all edm 1.0 test.edm 1 1 grid.dat 4389
+      run 0
+      displace_atoms all move 1.0 0.0 0.0 units box
+      shell mv grid.dat grid_${index}.dat
+      next index
+jump lammps.in loop
