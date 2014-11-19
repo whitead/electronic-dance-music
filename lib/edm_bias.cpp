@@ -32,20 +32,21 @@ namespace std {
 
 
 EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0), 
-						      b_targeting_(0), 
-						      mpi_rank_(0),
-						      mpi_size_(0),
-						      global_tempering_(0), 
-						      hill_density_(-1),
-						      cum_bias_(0), 
-						      b_outofbounds_(0), 
-						      target_(NULL), 
-						      bias_(NULL), 
-						      mask_(NULL),
-						      mpi_neighbor_count_(0),
-						      mpi_neighbors_(NULL),
-						      buffer_i_(0),
-						      temp_hill_cum_(-1),
+							   b_targeting_(0), 
+							   mpi_rank_(0),
+							   mpi_size_(0),
+							   global_tempering_(0), 
+							   temperature_(-1.0),
+							   hill_density_(-1),
+							   cum_bias_(0), 
+							   b_outofbounds_(0), 
+							   target_(NULL), 
+							   bias_(NULL), 
+							   mask_(NULL),
+							   mpi_neighbor_count_(0),
+							   mpi_neighbors_(NULL),
+							   buffer_i_(0),
+							   temp_hill_cum_(-1),
 							   temp_hill_prefactor_(-1),
 						 steps_(0),
 						 overflow_left_i_(0),
@@ -101,6 +102,10 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   //has subdivide already been called?
   if(bias_ != NULL)
     return;
+
+  //has setup been called?
+  if(temperature_ < 0)
+    edm_error("Must call setup before subdivide", "edm_bias.cpp:subdivide");
   
   int grid_period[] = {0, 0, 0};
   int boundary_period[] = {0, 0, 0};
@@ -136,6 +141,9 @@ void EDM::EDMBias::subdivide(const double sublo[3],
 
   bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, INTERPOLATE, bias_sigma_);
   bias_->set_boundary(min_, max_, boundary_period);
+  if(initial_bias_ != NULL)
+    bias_->add(initial_bias_, 1.0, 0.0);
+  
 
 #ifndef SERIAL_TEST
   infer_neighbors(b_periodic, skin);
@@ -370,7 +378,7 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
     hills_added_ = 0;
 
     //do we have have left overs from last time? Deal with it
-    temp_hill_cum_ += flush_bias_buffer(temp_hill_prefactor_);    
+    temp_hill_cum_ += flush_bias_buffer(bias_per_step_);    
     
     //we can only skip entire rounds, otherwise we begin to bias our sampling.
     //Are we skipping an entire round?
@@ -403,7 +411,7 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
   }      
 
   //now add the hill
-  if(temp_hill_cum_ < temp_hill_prefactor_) {
+  if(temp_hill_cum_ < bias_per_step_) {
     bias_added = bias_->add_gaussian(position, this_h);
     temp_hill_cum_ += bias_added;
     hills_added_++;
@@ -412,12 +420,12 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
     output_hill(position, this_h, bias_added, ADD_HILL);
     
     //check if the hill is too big.
-    if(temp_hill_cum_ > temp_hill_prefactor_) {
+    if(temp_hill_cum_ > bias_per_step_) {
       //undo the hill
 
       //round-off error (bad grid size) can lead to disagreement between bias added and desired bias added
       //correct for this, so that we don't have a negative bias that exceeds the original
-      temp_h = fmax(temp_hill_prefactor_ - temp_hill_cum_, -this_h);
+      temp_h = fmax(bias_per_step_ - temp_hill_cum_, -this_h);
 
       bias_added = bias_->add_gaussian(position, temp_h);
       
@@ -497,7 +505,7 @@ void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double r
 	this_h /= hill_density_;
 
       //finally clamp bias
-      this_h = fmin(this_h, BIAS_CLAMP * temp_hill_prefactor_);
+      this_h = fmin(this_h, BIAS_CLAMP * bias_per_step_);
 
       do_add_hill(position, this_h, 1);
     }
@@ -951,6 +959,8 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   
   if(!extract_double("hill_prefactor", parsed_input, 1, &hill_prefactor_))
     return 0;
+  if(!extract_double("bias_per_step", parsed_input, 0, &bias_per_step_))
+    bias_per_step_ = hill_prefactor_;
   extract_double("hill_density", parsed_input, 0, &hill_density_);
   int tmp;
   if(!extract_int("dimension", parsed_input, 1, &tmp))
@@ -990,6 +1000,15 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
     expected_target_ = target_->expected_bias();
     std::cout << "Expected Target is " << expected_target_ << std::endl;
   }
+
+  if(parsed_input.find("initial_bias_filename") == parsed_input.end()) {
+    initial_bias_ = NULL;
+  } else {
+    string ibfilename = parsed_input.at("initial_bias_filename");
+    string cleaned_filename = clean_string(ibfilename, 0);
+    initial_bias_ = read_grid(dim_, cleaned_filename, 1); //read grid, do use interpolation
+  }
+
 
   if(parsed_input.find("hills_filename") != parsed_input.end()) {
     string hfilename = parsed_input.at("hills_filename");

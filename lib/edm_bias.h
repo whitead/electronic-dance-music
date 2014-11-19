@@ -10,7 +10,8 @@
 #include <iostream>
 #include <map>
 
-#define BIAS_CLAMP 1.0
+
+#define BIAS_CLAMP 5.0
 #define BIAS_BUFFER_SIZE 512
 #define BIAS_BUFFER_DBLS 2048
 #define NO_COMM_PARTNER -1
@@ -34,7 +35,8 @@ class EDMBias {
 
   EDMBias(const std::string& input_filename);
   ~EDMBias();
-  /** Create a grid that only occupies enough space for this processes local box
+  /** Create a grid that only occupies enough space for this processes local box.
+   * MUSt CALL SETUP FIRST
    *
    **/
   void subdivide(const double sublo[3], const double subhi[3], 
@@ -106,6 +108,7 @@ class EDMBias {
   double boltzmann_factor_;
   double temperature_;
   double hill_prefactor_; //hill height prefactor
+  double bias_per_step_; //Maximum bias per step to add
   double hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
   double total_volume_;//total volume of grid 
@@ -120,6 +123,7 @@ class EDMBias {
  
 
   Grid* target_; //target PMF
+  Grid* initial_bias_; //Initial PMF
   GaussGrid* bias_;// bias
   const int* mask_;// a mask to use to exclude atoms
 

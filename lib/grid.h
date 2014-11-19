@@ -163,6 +163,9 @@ class Grid {
   virtual const double* get_dx() const = 0;
   virtual const double* get_max() const = 0;
   virtual const double* get_min() const = 0;
+  virtual double max_value() const = 0;
+  virtual double min_value() const = 0;
+  virtual void add(const Grid* other, double scale, double offset) = 0;
   virtual size_t get_grid_size() const = 0;
   virtual void one2multi(size_t index, size_t* result) const = 0;
   virtual double expected_bias() const = 0;
@@ -260,6 +263,43 @@ class DimmedGrid : public Grid {
     }
   }
 
+  void add(const Grid* other, double scale, double offset) {
+    //probably should specialize here, but I'll blindly assume the dimensions are the same
+    size_t index[DIM];
+    double x[DIM];
+    double der[DIM];
+    size_t i,j;
+    for(i = 0; i < grid_size_; i++) {
+      one2multi(i, index);
+      for(j = 0; j < DIM; j++) {
+	x[j] = min_[j] + dx_[j] * index[j];
+      }
+      grid_[i] += scale * other->get_value_deriv(x, der) + offset;
+      for(j = 0; j < DIM; j++)
+	grid_deriv_[i*DIM + j] += scale * der[j];
+    }
+  }
+  
+  double max_value() const {
+    double max = grid_[0];
+    size_t i;
+    for(i = 0; i < grid_size_; i++) {
+      max = fmax(max, grid_[i]);
+    }
+    
+    return max;
+  }
+
+  double min_value() const {
+    double min = grid_[0];
+    size_t i;
+    for(i = 0; i < grid_size_; i++) {
+      min = fmin(min, grid_[i]);
+    }
+    return min;
+  }
+
+
   /**
    * Go from an array of indices to a single index
    **/
@@ -294,11 +334,13 @@ class DimmedGrid : public Grid {
   double get_value(const double* x) const{
 
     if(!in_grid(x)) {
+      /*
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
 	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
+      */
       return 0;
     }
 
@@ -325,11 +367,15 @@ class DimmedGrid : public Grid {
     
     //checks
     if(!in_grid(x)) {
+      /*
       std::cerr << "Bad grid value (";
       size_t i;
       for(i = 0; i < DIM; i++)
 	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
+      */
+      for(i = 0; i < DIM; i++)
+	der[i] = 0;
       return 0;
     }
 

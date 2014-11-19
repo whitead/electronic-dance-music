@@ -104,6 +104,8 @@ class DimmedGaussGrid : public GaussGrid{
     //Attempt to wrap around the specified boundaries (possibly separate from grid bounds)
     if(!in_bounds(xx)) {
       remap(xx);
+      if(!in_bounds(xx))
+	return 0;
     }
     
     return grid_.get_value(xx);
@@ -121,6 +123,11 @@ class DimmedGaussGrid : public GaussGrid{
     //Attempt to wrap around the specified boundaries (separate from grid bounds)
     if(!in_bounds(xx)) {
       remap(xx);
+      if(!in_bounds(xx)) {
+	for(i = 0; i < DIM; i++)
+	  der[i] = 0;
+	return 0;
+      }
     }
 
     return grid_.get_value_deriv(xx, der);
@@ -444,6 +451,18 @@ class DimmedGaussGrid : public GaussGrid{
 
   const double* get_max() const{
     return grid_.get_max();
+  }
+
+  double max_value() const {
+    return grid_.max_value();
+  }
+
+  double min_value() const {
+    return grid_.min_value();
+  }
+
+  void add(const Grid* other, double scale, double offset) {
+    grid_.add(other, scale, offset);
   }
 
   double expected_bias() const {

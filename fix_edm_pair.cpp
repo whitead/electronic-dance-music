@@ -144,6 +144,7 @@ void FixEDMPair::post_force(int vflag)
   double **x = atom->x;
   double **f = atom->f;
   int* type = atom->type;
+  int* mask = atom->mask;
   
   int nlocal = atom->nlocal;
   int newton_pair = force->newton_pair; //use newton's third law or communicate?
@@ -186,13 +187,16 @@ void FixEDMPair::post_force(int vflag)
       //get force on r-vector
       edm_force[0] = 0;
       bias->update_force(&r, edm_force);
-      /*
+
       //list forces
-      if(r < 1.0) {
-	double force_r = delx * f[i][0] + dely * f[i][1] + delz * f[i][2];
-	std::cout << r << " " << edm_force[0] <<   " " << force_r << std::endl;
+      /*    if(r < 5.0) {	
+	if(mask[i] == 1 && update->ntimestep % 10000 == 0) {
+	  double force_r = delx * f[i][0] + dely * f[i][1] + delz * f[i][2];
+	  std::cout << update->ntimestep << " " << mask[i] << " " << r << " " << edm_force[0] <<   " " << force_r << std::endl;
+	}
       }
-      */
+*/
+
 
 
       //convert to pair-wise force
