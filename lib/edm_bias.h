@@ -11,7 +11,7 @@
 #include <map>
 
 
-#define BIAS_CLAMP 5.0
+#define BIAS_CLAMP 1.0
 #define BIAS_BUFFER_SIZE 2048
 #define BIAS_BUFFER_DBLS 8192
 #define NO_COMM_PARTNER -1
