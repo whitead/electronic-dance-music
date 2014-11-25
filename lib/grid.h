@@ -580,7 +580,8 @@ class DimmedGrid : public Grid {
 	
 	//to synchronize
 	otherrank = -1;
-	MPI_Allreduce(&otherrank, &otherrank, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+	//use value to throw away result
+	MPI_Allreduce(&otherrank, &value, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
 	if(b_amwriting) {
 	  //	  cout << "[" << i << "] I am " <<  myrank << "and I will stop, due to out of grid" << endl;
