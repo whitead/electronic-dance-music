@@ -147,7 +147,9 @@ void FixEDMPair::post_force(int vflag)
   int* mask = atom->mask;
   
   int nlocal = atom->nlocal;
-  int newton_pair = force->newton_pair; //use newton's third law or communicate?
+  if(force->newton_pair) {
+    error->all(FLERR,"fix edm_pair requires 'newton off' to be declared in the lammps input script");
+  }
 
 
   inum = list->inum;
@@ -162,7 +164,7 @@ void FixEDMPair::post_force(int vflag)
   for (ii = 0; ii < inum; ii++) {
     i = ilist[ii];
     itype = type[i];
-    if(itype != ipair && itype != jpair)
+    if(itype != ipair)
       continue;
 
     xtmp = x[i][0];
@@ -176,7 +178,7 @@ void FixEDMPair::post_force(int vflag)
       j &= NEIGHMASK; //no idea why....
       jtype = type[j];
 
-      if(jtype != ipair && jtype != jpair)
+      if(jtype != jpair)
 	continue;
 
       delx = xtmp - x[j][0];
@@ -188,27 +190,11 @@ void FixEDMPair::post_force(int vflag)
       edm_force[0] = 0;
       bias->update_force(&r, edm_force);
 
-      //list forces
-      /*    if(r < 5.0) {	
-	if(mask[i] == 1 && update->ntimestep % 10000 == 0) {
-	  double force_r = delx * f[i][0] + dely * f[i][1] + delz * f[i][2];
-	  std::cout << update->ntimestep << " " << mask[i] << " " << r << " " << edm_force[0] <<   " " << force_r << std::endl;
-	}
-      }
-*/
-
-
-
       //convert to pair-wise force
       f[i][0] += delx * edm_force[0];
       f[i][1] += dely * edm_force[0];
       f[i][2] += delz * edm_force[0];
-      if (newton_pair || j < nlocal) { //if we're not communicating or if j is local
-	f[j][0] -= delx * edm_force[0];
-	f[j][1] -= dely * edm_force[0];
-	f[j][2] -= delz * edm_force[0];
-      }
-      
+
       //add hill
       if(update->ntimestep % stride == 0) {
 	//make sure we don't double count
