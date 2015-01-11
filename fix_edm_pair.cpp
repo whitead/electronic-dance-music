@@ -145,9 +145,10 @@ void FixEDMPair::post_force(int vflag)
   double **f = atom->f;
   int* type = atom->type;
   int* mask = atom->mask;
+  int newton_pair = force->newton_pair;
   
   int nlocal = atom->nlocal;
-  if(force->newton_pair) {
+  if(newton_pair) {
     error->all(FLERR,"fix edm_pair requires 'newton off' to be declared in the lammps input script");
   }
 
@@ -194,6 +195,11 @@ void FixEDMPair::post_force(int vflag)
       f[i][0] += delx * edm_force[0];
       f[i][1] += dely * edm_force[0];
       f[i][2] += delz * edm_force[0];
+      if (newton_pair || j < nlocal) { //if we're not communicating or if j is local
+       f[j][0] -= delx * edm_force[0];
+       f[j][1] -= dely * edm_force[0];
+       f[j][2] -= delz * edm_force[0];
+      }
 
       //add hill
       if(update->ntimestep % stride == 0) {
