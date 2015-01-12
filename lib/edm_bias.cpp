@@ -152,6 +152,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   //make hill prefactor also lower so bias per timestep is not a function of replica number
   if(hill_density_ > 0)  {
     hill_density_ /=  mpi_size_;
+    hill_prefactor_ /=  mpi_size_;
     if(hill_density_ == 0)
       hill_density_  = 1;
   }
@@ -163,10 +164,10 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   if(mpi_neighbor_count_ < log(mpi_size_)) {
     //  if(1)
     sort_neighbors();
-    std::cout << "Using neighbors" << std::endl;
+    std::cout << "Using P2P with " << mpi_neighbor_count_ << " neighbors" << std::endl;
   } else{
-    mpi_neighbor_count_ = mpi_size_; //just communicate with all
-    std::cout << "Using broadcast" << std::endl;
+    mpi_neighbor_count_ = mpi_size_ - 1; //just communicate with all
+    std::cout << "Using broadcast with " << mpi_neighbor_count_ << " neighbors" << std::endl;
   }
 
 
@@ -584,7 +585,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
     unsigned int buffer_j;
     MPI_Request srequest1, srequest2;
 
-    if(mpi_neighbor_count_ == mpi_size_) {
+    if(mpi_neighbor_count_ == mpi_size_ - 1) {
       for(i = 0; i < mpi_size_; i++) {
 	if(mpi_rank_ == i) {
 	  MPI_Bcast(&buffer_i_, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
