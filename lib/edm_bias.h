@@ -147,13 +147,6 @@ class EDMBias {
   int hills_added_;
   long long int steps_;
 
-  //buffers for bias overflow
-  double overflow_buffer_[BIAS_BUFFER_DBLS];
-  size_t overflow_left_i_;
-  size_t overflow_right_i_;
-  int b_skip_hill_add_;
-
-    
   EDMBias(const EDMBias& that);//just disable copy constructor
   void output_hill(const double* position, double height, double bias_added, char type);
   /* This will update the height, optionally with tempering. It also
