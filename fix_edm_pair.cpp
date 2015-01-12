@@ -203,8 +203,9 @@ void FixEDMPair::post_force(int vflag)
 
       //add hill
       if(update->ntimestep % stride == 0) {
-	//make sure we don't double count
-	if(atom->tag[i] < atom->tag[j]) {
+	  bias->add_hill(last_calls, &r, random->uniform());
+	  ncalls++;
+	if(newton_pair || j < nlocal) {
 	  bias->add_hill(last_calls, &r, random->uniform());
 	  ncalls++;
 	}
