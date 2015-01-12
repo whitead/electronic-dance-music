@@ -152,7 +152,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   //make hill prefactor also lower so bias per timestep is not a function of replica number
   if(hill_density_ > 0)  {
     hill_density_ /=  mpi_size_;
-    hill_prefactor_ /=  mpi_size_;
+    hill_prefactor_ /= mpi_size_;
     if(hill_density_ == 0)
       hill_density_  = 1;
   }
