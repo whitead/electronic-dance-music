@@ -54,6 +54,9 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
   //here is where we would load up the EDM bias
   bias = new EDM::EDMBias(arg[4]);
 
+  //indicate we calculate energy
+  thermo_energy = 1;
+
   random_numbers = NULL;
   random = new RanMars(lmp,seed + me);
 
@@ -100,6 +103,10 @@ void FixEDM::init()
   bias->subdivide(domain->sublo, domain->subhi, domain->boxlo, domain->boxhi, domain->periodicity, skin);
   bias->set_mask(atom->mask);
 
+  //set energy just in case
+  edm_energy = 0;
+
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -129,8 +136,8 @@ void FixEDM::post_force(int vflag)
 
   //  domain->pbc(); //make sure particles are with thier processors
 
-  //update force
-  bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
+  //update force/energy
+  edm_energy = bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
   //treat add hills
   if(update->ntimestep % stride == 0) {
 
@@ -166,4 +173,12 @@ void FixEDM::post_force_respa(int vflag, int ilevel, int iloop)
 void FixEDM::min_post_force(int vflag)
 {
   post_force(vflag);
+}
+
+/* ----------------------------------------------------------------------
+   Passing energy is apparently done via computer scalar...? I wish
+   there was some documentation for this stuff.
+ ---------------------------------------------------------------------- */
+double FixEDM::compute_scalar() {
+  return edm_energy;
 }

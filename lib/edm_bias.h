@@ -53,17 +53,17 @@ class EDMBias {
   /**
    * This version of update_forces is the most general and will update
    * the forces of the arrays. apply_mask will be used to test against
-   * the mask given in the set_mask method.
+   * the mask given in the set_mask method. Returns energy
    **/
-  void update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
+  double update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
   /**
    * An array-based update_forces without a mask
    **/
-  void update_forces(int nlocal, const double* const* positions,  double** forces) const;
+  double update_forces(int nlocal, const double* const* positions,  double** forces) const;
   /**
    * Update the force of a single position
    **/
-  void update_force(const double* positions,  double* forces) const;
+  double update_force(const double* positions,  double* forces) const;
   /**
    * Set a mask that will be used for the add_hills/update_forces methods which can take a mask
    **/

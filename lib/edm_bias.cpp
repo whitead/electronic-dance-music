@@ -217,45 +217,46 @@ void EDM::EDMBias::setup(double temperature, double boltzmann_constant) {
 
 }
 
-void EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces) const {
-  update_forces(nlocal, positions, forces, -1);
+double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces) const {
+  return update_forces(nlocal, positions, forces, -1);
 }
 
 
-void EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const {
+double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const {
 
   //are we active?
   if(b_outofbounds_)
-    return;
+    return 0.0;
   
   
   //simply perform table look-ups of the positions to get the forces
   int i,j;
   double der[3] = {0, 0, 0};
+  double energy = 0;
   for(i = 0; i < nlocal; i++) {
     if(apply_mask < 0 || mask_[i] & apply_mask) {
-      bias_->get_value_deriv(&positions[i][0], der);
+      energy += bias_->get_value_deriv(&positions[i][0], der);
       for(j = 0; j < dim_; j++)
 	forces[i][j] -= der[j];
     }
   }
-  
+  return energy;
 }
 
-void EDM::EDMBias::update_force(const double* positions, double* forces) const {
+double EDM::EDMBias::update_force(const double* positions, double* forces) const {
 
   //are we active?
   if(b_outofbounds_)
-    return;
+    return 0.0;
   
   
   //simply perform table look-ups of the positions to get the forces
   int i;
   double der[3] = {0, 0, 0};
-  bias_->get_value_deriv(positions, der);
+  double energy = bias_->get_value_deriv(positions, der);
   for(i = 0; i < dim_; i++)
     forces[i] -= der[i];
-  
+  return energy;
 }
 
 

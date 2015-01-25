@@ -43,12 +43,14 @@ class FixEDMPair : public Fix {
   void post_force(int);
   void post_force_respa(int, int, int);
   void min_post_force(int);
-  void init_list(int, class NeighList *); //override
+  void init_list(int, class NeighList *); 
+  double compute_scalar(); //gives the energy
 
  private:
   class EDM::EDMBias* bias;
    char bias_file[256];
    double temperature;
+   double edm_energy;
    int stride;
    int write_stride;
    double* random_numbers;

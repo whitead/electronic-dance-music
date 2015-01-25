@@ -42,6 +42,9 @@ FixEDMPair::FixEDMPair(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR, "Illegeal EDM command, invalid types");
   }
 
+  //by default calculate energy
+  thermo_energy = 1;
+
   //here is where we would load up the EDM bias
   bias = new EDM::EDMBias(arg[4]);
 
@@ -100,11 +103,14 @@ void FixEDMPair::init()
   bias->subdivide(lo, hi, lo, hi, p, skin);
   last_calls = atom->nmax; //make very conservative estimate of the number of pairs
 
-  /*request neighborlists */
+  //request neighbor lists
   int irequest = neighbor->request((void *) this);
   neighbor->requests[irequest]->pair = 0;
   neighbor->requests[irequest]->fix = 1;
 
+
+  //set energy just in case
+  edm_energy = 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -157,6 +163,8 @@ void FixEDMPair::post_force(int vflag)
   ilist = list->ilist;
   numneigh = list->numneigh;
   firstneigh = list->firstneigh;    
+  
+  edm_energy = 0;
 
   if(update->ntimestep % stride == 0)
     bias->pre_add_hill(last_calls);
@@ -189,7 +197,7 @@ void FixEDMPair::post_force(int vflag)
       
       //get force on r-vector
       edm_force[0] = 0;
-      bias->update_force(&r, edm_force);
+      edm_energy += bias->update_force(&r, edm_force);
 
       //convert to pair-wise force
       f[i][0] += delx * edm_force[0];
@@ -250,3 +258,11 @@ void FixEDMPair::min_post_force(int vflag)
 
    list = ptr;
  }
+
+/* ----------------------------------------------------------------------
+   Passing energy is apparently done via computer scalar...? I wish
+   there was some documentation for this stuff.
+ ---------------------------------------------------------------------- */
+double FixEDMPair::compute_scalar() {
+  return edm_energy;
+}
