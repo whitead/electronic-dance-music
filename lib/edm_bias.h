@@ -15,7 +15,7 @@
 #define BIAS_BUFFER_SIZE 2048
 #define BIAS_BUFFER_DBLS 8192
 #define NO_COMM_PARTNER -1
-#define INTERPOLATE 0
+#define INTERPOLATE 1
 
 #define NEIGH_HILL 'n'
 #define BUFF_HILL 'b'
