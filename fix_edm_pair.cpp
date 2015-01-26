@@ -153,6 +153,7 @@ void FixEDMPair::post_force(int vflag)
   int* type = atom->type;
   int* mask = atom->mask;
   int newton_pair = force->newton_pair;
+  double rinv;
   
   int nlocal = atom->nlocal;
   if(newton_pair) {
@@ -195,6 +196,10 @@ void FixEDMPair::post_force(int vflag)
       dely = ytmp - x[j][1];
       delz = ztmp - x[j][2];
       r = sqrt(delx*delx + dely*dely + delz*delz);      
+      rinv = 1.0 /r;
+      delx *= rinv;
+      dely *= rinv;
+      delz *= rinv;
       
       //get force on r-vector
       edm_force[0] = 0;
