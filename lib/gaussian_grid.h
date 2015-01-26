@@ -49,6 +49,10 @@ class GaussGrid : public Grid {
   virtual double get_volume() const = 0;
   virtual int in_bounds(const double* x) const = 0;
   virtual void multi_write(const std::string& filename) const = 0;
+  /**
+   *Write out the file in lammps tabular potential format.
+   **/
+  virtual void lammps_multi_write(const std::string& filename) const = 0;
 };
 
 template<int DIM>
@@ -145,14 +149,20 @@ class DimmedGaussGrid : public GaussGrid{
    * Uses its known boundaries to handle assembling all grids
    **/
   void multi_write(const std::string& filename) const {
-    grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_);
+    grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 0);
   }
 
+  void lammps_multi_write(const std::string& filename) const {
+    grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 1);
+  }
+
+
   void multi_write(const std::string& filename, 
-			   const double* box_low, 
-			   const double* box_high, 
-			   const int* b_periodic) const {
-    grid_.multi_write(filename, box_low, box_high, b_periodic);
+		   const double* box_low, 
+		   const double* box_high, 
+		   const int* b_periodic,
+		   int b_lammps_format) const {
+    grid_.multi_write(filename, box_low, box_high, b_periodic, 0);
   }
 
   

@@ -212,6 +212,13 @@ void EDM::EDMBias::write_bias(const std::string& output) const {
 #endif
 }
 
+void EDM::EDMBias::write_lammps_table(const std::string& output) const {
+#ifndef SERIAL_TEST
+  bias_->lammps_multi_write(output);
+#endif
+
+}
+
 void EDM::EDMBias::setup(double temperature, double boltzmann_constant) {
 
   temperature_ = temperature;

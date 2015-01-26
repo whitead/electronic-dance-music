@@ -48,7 +48,8 @@ class FixEDMPair : public Fix {
 
  private:
   class EDM::EDMBias* bias;
-   char bias_file[256];
+   char bias_file[512];
+   char lammps_table_file[512];
    double temperature;
    double edm_energy;
    int stride;

@@ -29,6 +29,7 @@ FixEDMPair::FixEDMPair(LAMMPS *lmp, int narg, char **arg) :
   stride = atoi(arg[5]);
   write_stride = atoi(arg[6]);
   strcpy(bias_file, arg[7]);
+  sprintf(lammps_table_file, "%s.ltab", arg[7]);
   seed = atoi(arg[8]);
   if(stride < 0)
     error->all(FLERR,"Illegal stride given to edm_pair command");
@@ -231,6 +232,7 @@ void FixEDMPair::post_force(int vflag)
   
   if(update->ntimestep % write_stride == 0) {
     bias->write_bias(bias_file);
+    bias->write_lammps_table(lammps_table_file);
   }
  
 }

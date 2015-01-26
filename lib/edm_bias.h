@@ -97,6 +97,12 @@ class EDMBias {
    **/
   void write_bias(const std::string& output) const;
 
+  /**
+   * Write a lammps table across all MPI processes.  Only valid if
+   * we're working with a 1D pairwise-distance potential.
+   **/
+  void write_lammps_table(const std::string& output) const;
+
 
   int b_tempering_;// boolean, do tempering
   int b_targeting_;// boolean, do targeting  
@@ -111,7 +117,7 @@ class EDMBias {
   double bias_per_step_; //Maximum bias per step to add
   double hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
-  double total_volume_;//total volume of grid 
+  double total_volume_;//total volume of grid
   double expected_target_; //the expected value of the target factor
 
   int b_outofbounds_; //true if this MPI instance will always be out of grid
