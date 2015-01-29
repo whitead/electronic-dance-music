@@ -154,6 +154,7 @@ void FixEDMPair::post_force(int vflag)
   int* mask = atom->mask;
   int newton_pair = force->newton_pair;
   double rinv;
+  int type_ind = 0;
   
   int nlocal = atom->nlocal;
   if(newton_pair) {
@@ -175,7 +176,12 @@ void FixEDMPair::post_force(int vflag)
   for (ii = 0; ii < inum; ii++) {
     i = ilist[ii];
     itype = type[i];
-    if(itype != ipair)
+
+    if(itype == ipair)
+      type_ind = 1;
+    else if(itype == jpair)
+      type_ind = 0;
+    else
       continue;
 
     xtmp = x[i][0];
@@ -189,8 +195,12 @@ void FixEDMPair::post_force(int vflag)
       j &= NEIGHMASK; //no idea why....
       jtype = type[j];
 
-      if(jtype != jpair)
+      if(type_ind && jtype != jpair)
 	continue;
+      else if(!type_ind && jtype != ipair)
+	continue;
+	
+
 
       delx = xtmp - x[j][0];
       dely = ytmp - x[j][1];
