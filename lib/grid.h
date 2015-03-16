@@ -144,6 +144,12 @@ class Grid {
 
  public:  
   virtual double get_value(const double* x) const = 0;
+  /**
+   * Adds the given value to the grid and then returns how much was
+   * actually added. The discrepancy can arise due to boundaries
+   * and/or kernels.
+   */
+  virtual double add_value(const double* x0, double value) = 0;
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
@@ -354,6 +360,26 @@ class DimmedGrid : public Grid {
     size_t index[DIM];
     get_index(x, index);
     return grid_[multi2one(index)];
+  }
+
+  /**
+   * Add a value to the grid. Only makes sense if there is no derivative
+   **/
+  double add_value(const double* x0, double value) {
+    if(b_interpolate_) {
+      edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
+    }
+
+    if(!in_grid(x0)) {
+      return 0;
+    }
+
+    size_t index[DIM];
+    size_t index1;
+    get_index(x0, index);
+    index1 = multi2one(index);
+    grid_[index1] += value;    
+    return value;
   }
 
   /**
@@ -625,7 +651,10 @@ class DimmedGrid : public Grid {
 	for(j = 0; j < DIM; j++) {
 	  output << setprecision(8) << std::fixed << x[j] << " ";
 	}
-	value = get_value_deriv(x, der);
+	if(b_derivatives_)
+	  value = get_value_deriv(x, der);
+	else
+	  value = get_value(x);
 	output << setprecision(8) << std::fixed << value << " ";
 	if(b_derivatives_) {
 	  for(j = 0; j < DIM; j++) {

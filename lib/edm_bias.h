@@ -98,6 +98,11 @@ class EDMBias {
   void write_bias(const std::string& output) const;
 
   /**
+   * Write out the CV histogram, possibly across multiple processors
+   **/
+  void write_cv_histogram(const std::string& output) const;
+
+  /**
    * Write a lammps table across all MPI processes.  Only valid if
    * we're working with a 1D pairwise-distance potential.
    **/
@@ -126,6 +131,7 @@ class EDMBias {
   double* bias_sigma_;
   double* min_; //boundary minimum
   double* max_; //boundary maximum
+  int* b_periodic_boundary_;//true if the boundaries are periodic
  
 
   Grid* target_; //target PMF
@@ -148,10 +154,15 @@ class EDMBias {
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
   double temp_hill_cum_;
   double temp_hill_prefactor_;
+
+  Grid* cv_hist_;//Histogram of observed collective variables
   
   //for printing
   int hills_added_;
   long long int steps_;
+
+  //histogram output
+  std::string hist_output_;
 
   //buffers for bias overflow
   double overflow_buffer_[BIAS_BUFFER_DBLS];

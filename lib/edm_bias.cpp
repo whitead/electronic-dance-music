@@ -48,9 +48,14 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 							   buffer_i_(0),
 							   temp_hill_cum_(-1),
 							   temp_hill_prefactor_(-1),
-						 steps_(0),
-						 overflow_left_i_(0),
-						 overflow_right_i_(0){
+							   steps_(0),
+							   overflow_left_i_(0),
+							   overflow_right_i_(0),
+							   min_(NULL),
+							   max_(NULL),
+							   bias_dx_(NULL),
+							   bias_sigma_(NULL),
+							   b_periodic_boundary_(NULL){
   
   //assign rank
 #ifndef SERIAL_TEST
@@ -67,9 +72,23 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
     delete target_;
   if(bias_ != NULL)
     delete bias_;
+  
+  if(bias_ != cv_hist_)
+    delete cv_hist_;
 
   if(mpi_neighbors_ != NULL)
     free(mpi_neighbors_);
+  if(bias_dx_ != NULL)
+    free(bias_dx_);
+  if(bias_sigma_ != NULL)
+    free(bias_sigma_);
+  if(min_ != NULL)
+    free(min_);
+  if(max_ != NULL)
+    free(max_);
+  if(b_periodic_boundary_ != NULL)
+    free(b_periodic_boundary_);
+
 }
   
 
@@ -108,16 +127,17 @@ void EDM::EDMBias::subdivide(const double sublo[3],
     edm_error("Must call setup before subdivide", "edm_bias.cpp:subdivide");
   
   int grid_period[] = {0, 0, 0};
-  int boundary_period[] = {0, 0, 0};
   double min[3];
   double max[3];
   size_t i;
   int bounds_flag = 1;
 
   for(i = 0; i < dim_; i++) {
+    b_periodic_boundary_[i] = 0;
     //check if the given boundary matches the system boundary, if so then use the system periodicity
     if(fabs(boxlo[i] - min_[i]) < 0.000001 && fabs(boxhi[i] - max_[i]) < 0.000001)
-      boundary_period[i] = b_periodic[i];
+      b_periodic_boundary_[i] = b_periodic[i];
+    
   }
 
   for(i = 0; i < dim_; i++) {
@@ -140,7 +160,10 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   }
 
   bias_ = make_gauss_grid(dim_, min, max, bias_dx_, grid_period, INTERPOLATE, bias_sigma_);
-  bias_->set_boundary(min_, max_, boundary_period);
+  //create histogram with no interpolation/no derivatives for tracking CV
+  cv_hist_ = make_grid(dim_, min, max, bias_sigma_, grid_period, 0, 0);
+    
+  bias_->set_boundary(min_, max_, b_periodic_boundary_);
   if(initial_bias_ != NULL)
     bias_->add(initial_bias_, 1.0, 0.0);
   
@@ -210,12 +233,30 @@ void EDM::EDMBias::write_bias(const std::string& output) const {
 #else //SERIAL TEST
   bias_->write(output);
 #endif
+  write_cv_histogram(hist_output_);
 }
+
+void EDM::EDMBias::write_cv_histogram(const std::string& output) const {
+#ifndef SERIAL_TEST
+  cv_hist_->multi_write(output, min_, max_, b_periodic_boundary_, 0);
+#ifdef EDM_MPI_DEBUG
+  std::ostringstream oss;
+  oss << output << "_" << mpi_rank_;
+  cv_hist_->write(oss.str());
+#endif //EDM_DEBUG
+#else //SERIAL TEST
+  cv_hist_->write(output);
+#endif
+}
+
 
 void EDM::EDMBias::write_lammps_table(const std::string& output) const {
 #ifndef SERIAL_TEST
   bias_->lammps_multi_write(output);
-#endif
+#else
+  bias_->write(output);
+#endif//SERIAL TEST  
+
 
 }
 
@@ -279,7 +320,7 @@ double EDM::EDMBias::flush_bias_buffer(double max_bias) {
   //#endif
  
   for(; overflow_left_i_ < overflow_right_i_; overflow_left_i_++) {
-    temp = bias_->add_gaussian(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
+    temp = bias_->add_value(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
 			       overflow_buffer_[overflow_left_i_ * (dim_+1) + dim_]);
 
     hills_added_++;
@@ -299,7 +340,7 @@ double EDM::EDMBias::flush_bias_buffer(double max_bias) {
       overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_] = -h;
 
       //undo the hill
-      temp = bias_->add_gaussian(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
+      temp = bias_->add_value(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
 				 h);      
       output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
 		  h, 
@@ -421,7 +462,7 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
 
   //now add the hill
   if(temp_hill_cum_ < bias_per_step_) {
-    bias_added = bias_->add_gaussian(position, this_h);
+    bias_added = bias_->add_value(position, this_h);
     temp_hill_cum_ += bias_added;
     hills_added_++;
 
@@ -436,7 +477,7 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
       //correct for this, so that we don't have a negative bias that exceeds the original
       temp_h = fmax(bias_per_step_ - temp_hill_cum_, -this_h);
 
-      bias_added = bias_->add_gaussian(position, temp_h);
+      bias_added = bias_->add_value(position, temp_h);
       
       hills_added_++;
       output_hill(position, temp_h, bias_added, ADD_UNDO_HILL);
@@ -556,6 +597,17 @@ void EDM::EDMBias::output_hill(const double* position, double height, double bia
    hill_output_ << height << " ";
    hill_output_ << bias_added << " ";
    hill_output_ << cum_bias_ / total_volume_ << std::endl;
+
+   //histogram it
+   if(type == NEIGH_HILL ||
+      type == BUFF_HILL ||
+      type == ADD_HILL) {
+     cv_hist_->add_value(position, 1);
+   } else if(type == ADD_UNDO_HILL ||
+	     type == BUFF_UNDO_HILL) {
+     //undo histogram
+     cv_hist_->add_value(position, -1);
+   }
    
  }
 
@@ -988,6 +1040,8 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   bias_sigma_ = (double*) malloc(sizeof(double) * dim_);
   min_ = (double*) malloc(sizeof(double) * dim_);
   max_ = (double*) malloc(sizeof(double) * dim_);
+  b_periodic_boundary_ = (int*) malloc(sizeof(int) * dim_);
+  
   if(!extract_double_array("bias_spacing", parsed_input, 1, bias_dx_, dim_))
     return 0;
   if(!extract_double_array("bias_sigma", parsed_input, 1, bias_sigma_, dim_))
@@ -1028,7 +1082,16 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
     string cleaned_filename = clean_string(hfilename, 1);
     hill_output_.open(cleaned_filename.c_str());
 
-}
+  }
+
+  if(parsed_input.find("histogram_filename") != parsed_input.end()) {
+    string hist_filename = parsed_input.at("histogram_filename");
+    hist_output_ = clean_string(hist_filename, 0);
+  } else {
+    string hist_filename("HIST");
+    hist_output_ = clean_string(hist_filename, 0);
+  }
+
   return 1;
 }
 

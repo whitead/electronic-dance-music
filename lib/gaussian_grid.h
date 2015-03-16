@@ -44,7 +44,7 @@ class GaussGrid : public Grid {
    **/
  public:
   virtual ~GaussGrid() {};
-  virtual double add_gaussian(const double* x, double height) = 0;
+  virtual double add_value(const double* x, double height) = 0;
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
   virtual int in_bounds(const double* x) const = 0;
@@ -173,7 +173,7 @@ class DimmedGaussGrid : public GaussGrid{
   /**
    * The workhorse method of the program. The source is very well-documented
    **/
-  double add_gaussian(const double* x0, double height) {
+  double add_value(const double* x0, double height) {
 
     size_t i,j;
 
