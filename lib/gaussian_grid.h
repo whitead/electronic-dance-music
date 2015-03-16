@@ -479,6 +479,10 @@ class DimmedGaussGrid : public GaussGrid{
     return grid_.expected_bias();
   }
 
+  void clear() {
+    grid_.clear();
+  }
+
   size_t get_grid_size() const{
     return grid_.get_grid_size();
   }

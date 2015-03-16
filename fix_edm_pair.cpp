@@ -248,6 +248,8 @@ void FixEDMPair::post_force(int vflag)
   if(update->ntimestep % write_stride == 0) {
     bias->write_bias(bias_file);
     bias->write_lammps_table(lammps_table_file);
+    bias->write_histogram();
+    bias->clear_histogram();    
   }
  
 }

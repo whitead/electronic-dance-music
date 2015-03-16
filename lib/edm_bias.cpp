@@ -233,22 +233,24 @@ void EDM::EDMBias::write_bias(const std::string& output) const {
 #else //SERIAL TEST
   bias_->write(output);
 #endif
-  write_cv_histogram(hist_output_);
 }
 
-void EDM::EDMBias::write_cv_histogram(const std::string& output) const {
+void EDM::EDMBias::write_histogram() const {
 #ifndef SERIAL_TEST
-  cv_hist_->multi_write(output, min_, max_, b_periodic_boundary_, 0);
+  cv_hist_->multi_write(hist_output_, min_, max_, b_periodic_boundary_, 0);
 #ifdef EDM_MPI_DEBUG
   std::ostringstream oss;
-  oss << output << "_" << mpi_rank_;
+  oss << hist_output_ << "_" << mpi_rank_;
   cv_hist_->write(oss.str());
 #endif //EDM_DEBUG
 #else //SERIAL TEST
-  cv_hist_->write(output);
+  cv_hist_->write(hist_output_);
 #endif
 }
 
+void EDM::EDMBias::clear_histogram() {
+  cv_hist_->clear();
+}
 
 void EDM::EDMBias::write_lammps_table(const std::string& output) const {
 #ifndef SERIAL_TEST

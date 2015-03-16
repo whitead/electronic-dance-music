@@ -176,6 +176,8 @@ class Grid {
   virtual size_t get_grid_size() const = 0;
   virtual void one2multi(size_t index, size_t* result) const = 0;
   virtual double expected_bias() const = 0;
+  //clear all values and derivatives
+  virtual void clear() = 0;
 
 };
 
@@ -671,6 +673,20 @@ class DimmedGrid : public Grid {
       output.close();
   }
 
+  /**
+   * Clears all values and derivatives
+   **/
+  void clear() {
+    int i, j;
+    for(i = 0; i < grid_size_; i++) {
+      grid_[i] = 0;
+      if(b_derivatives_)
+	for(j = 0; j < DIM; j++)
+	  grid_deriv_[i * DIM + j] = 0;
+    }
+    
+  }
+
   //calculate the expected bias assuming the grid is made 
   //up of unormalized -ln(p)
   double expected_bias() const {
@@ -880,12 +896,7 @@ class DimmedGrid : public Grid {
 	edm_error("Out of memory!!", "grid.h:initialize");	
       }
     }
-
-
-
-  }
-
-  
+  }  
 };
 
 

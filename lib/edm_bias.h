@@ -98,9 +98,15 @@ class EDMBias {
   void write_bias(const std::string& output) const;
 
   /**
-   * Write out the CV histogram, possibly across multiple processors
+   * Write out histogram of observed points, possibly across multiple processors.
    **/
-  void write_cv_histogram(const std::string& output) const;
+  void write_histogram() const;
+
+  /**
+   * Clear CV histogram
+   **/
+  void clear_histogram();
+
 
   /**
    * Write a lammps table across all MPI processes.  Only valid if
