@@ -21,6 +21,7 @@
 using namespace boost;
 using namespace EDM;
 
+
 BOOST_AUTO_TEST_CASE( grid_1d_sanity )
 {
   /* Visual:
@@ -349,7 +350,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
   g.set_boundary(min, max, periodic);
 
   double point[] = {0.01};
-  g.add_gaussian(point,1);
+  g.add_value(point,1);
   double der[1];
   point[0] = 0;
   g.get_value_deriv(point, der);
@@ -376,7 +377,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
   g.set_boundary(min, max, periodic);
 
   double point[] = {-0.01};
-  g.add_gaussian(point,1);
+  g.add_value(point,1);
   double der[1];
   point[0] = 0;
   g.get_value_deriv(point, der);
@@ -438,7 +439,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
 
   //add 1 gaussian
   double x[] = {0};
-  g.add_gaussian(x, 1);
+  g.add_value(x, 1);
 
   //now check a few points
   BOOST_REQUIRE(pow(g.get_value(x) - 1 / sqrt(2 * M_PI), 2) < EPSILON);
@@ -455,6 +456,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
  
 }
 
+
 BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
   double min[] = {2};
   double max[] = {10};
@@ -465,7 +467,7 @@ BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
 
   //add 1 gaussian
   double x[] = {2};
-  g.add_gaussian(x, 1);
+  g.add_value(x, 1);
 
   int i;
   double der[1];
@@ -476,14 +478,14 @@ BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
     dx = x[0] - 2;
     dx  -= round(dx / (min[0] - max[0])) * (min[0] - max[0]);
     value = g.get_value_deriv(x, der);
-    /*
+
     std::cout << "x = " << x[0]
 	      << " dx = " << dx 
-	      << "(" << 
+	      << "(" 
 	      << " value = " << value 
-	      << " (" << exp(-dx*dx/2.) << ")" 
+	      << " (" << exp(-dx*dx/2.) / sqrt(2 * M_PI) << ")" 
 	      << std::endl;
-    */
+
     BOOST_REQUIRE(pow(value - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
     BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
@@ -505,7 +507,7 @@ BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
   g.set_boundary(min, max, periodic);
 
   //add 1 gaussian
-  g.add_gaussian(gauss_loc, 1); //added at equivalent to 1
+  g.add_value(gauss_loc, 1); //added at equivalent to 1
 
   int i;
   double der[1];
@@ -550,7 +552,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g_integral += g.add_gaussian(x, 1.5);
+    g_integral += g.add_value(x, 1.5);
   }
 
   //now we integrate the grid
@@ -567,7 +569,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   //  std::cout << area << " " << N * 1.5 << std::endl;
   BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
 
-  //now make sure that add_gaussian returned the correct answers as well
+  //now make sure that add_value returned the correct answers as well
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
 }
 
@@ -589,12 +591,12 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
 
   //get boundaries
   x[0] = -100.0;
-  temp = g.add_gaussian(x, 1.5);
+  temp = g.add_value(x, 1.5);
   std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
   g_integral += temp;		      
 
   x[0] = 100.0;
-  temp = g.add_gaussian(x, 1.5);
+  temp = g.add_value(x, 1.5);
   std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
   g_integral += temp;		      
 
@@ -602,7 +604,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    temp = g.add_gaussian(x, 1.5);
+    temp = g.add_value(x, 1.5);
     std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
     g_integral += temp;		      
   }
@@ -621,7 +623,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
   std::cout << area / N << " " << 1.5  << std::endl;
   BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
 
-  //now make sure that add_gaussian returned the correct answers as well
+  //now make sure that add_value returned the correct answers as well
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
 }
 
@@ -644,7 +646,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g_integral += g.add_gaussian(x, 1.5);
+    g_integral += g.add_value(x, 1.5);
   }
 
   //now we calculate finite differences on the grid
@@ -687,7 +689,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g_integral += g.add_gaussian(x, 1.5);
+    g_integral += g.add_value(x, 1.5);
   }
 
   //now we calculate finite differences on the grid
@@ -740,7 +742,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   //generate a random number
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100;
-    g.add_gaussian(x, 1.0);
+    g.add_value(x, 1.0);
   }
 
   //Check if the boundaries were duplicated
@@ -790,7 +792,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
     x[0] = rand() % 20 - 10;
     x[1] = rand() % 20 - 10;
     x[2] = rand() % 20 - 10;
-    g.add_gaussian(x, 5.0);
+    g.add_value(x, 5.0);
   }
 
   //Check if the boundaries were duplicated
@@ -831,7 +833,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
   //add gaussian that was failing
   double x[] = {-3.91944};
   double h = 1.0;
-  double bias_added = g->add_gaussian(x, h);
+  double bias_added = g->add_value(x, h);
 
   //unnormalized, so a little height scaling is necessary
   //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
