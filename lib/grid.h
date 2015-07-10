@@ -700,11 +700,11 @@ class DimmedGrid : public Grid {
 
     //get partition coefficient
     for(i = 0; i < grid_size_; i++)
-      Z += exp(grid_[i] - offset);
+      Z += exp(-grid_[i] - offset);
 
     //integrate
     for(i = 0; i < grid_size_; i++)
-      avg += grid_[i]  * exp(grid_[i] - offset);
+      avg += grid_[i]  * exp(-grid_[i] - offset);
     
     return avg / Z;
   }

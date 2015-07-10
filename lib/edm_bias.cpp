@@ -544,13 +544,12 @@ void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double r
     if(hill_density_ < 0 || runiform < hill_density_ / est_hill_count) {    
 
       if(b_targeting_)
-	this_h *= exp(-target_->get_value(position)); // add target
+	this_h *= exp(target_->get_value(position) - expected_target_); // add target and compensate for expected target
       if(b_tempering_ && global_tempering_ < 0) //do tempering if local tempering (well) is being used
 	this_h *= exp(-bias_->get_value(position) / 
 		      ((bias_factor_ - 1) * boltzmann_factor_));
 
-      //compensate for targeting bias and number of hills
-      this_h *= exp(expected_target_);
+      //compensate for number of hills, if necessary
       if(hill_density_ < 0)
 	this_h /= est_hill_count;
       else
