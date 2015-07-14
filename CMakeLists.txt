@@ -10,7 +10,7 @@ set (LAMMPS_SRC "/home/whitead/Documents/lammps/src")
 
 #compilation flags
 #set (CXX_STD_VERSION "-std=c++11 -g")
-set (CXX_DEBUG "-O0 -g -Wall")
+set (CXX_DEBUG "-O0 -g -Wall -Wno-sign-compare")
 add_definitions (${CXX_DEBUG})
 
 find_package(MPI REQUIRED) 
