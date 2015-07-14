@@ -1,6 +1,6 @@
 /**
- * Example syntax:
- *   fix [ID] [group-ID] edm [temperature] [input_file] [add hill stride, integer] [write bias stride, integer] [bias file] [seed] [rdf pairs]
+* Example syntax:
+ *   fix [ID] [group-ID] edm_pair [temperature] [input_file] [add hill stride, integer] [write bias stride, integer] [bias file] [seed] [rdf pairs]
  *
  * make sure write bias is large because that takes a long time
  **/
@@ -140,6 +140,7 @@ void FixEDMPair::post_force(int vflag)
 {
   
   //  domain->pbc(); //make sure particles are with thier processors
+  //This seems important, but it crashes lammps...
 
 
   //neighbor list loop, ripped off of pair_lj_cut
