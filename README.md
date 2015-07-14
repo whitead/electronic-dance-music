@@ -1,11 +1,11 @@
-electronic-dance-music
+Electronic Dance Music
 ======================
 
 Experiment directed metadynamics plugin for lammps or someday other
 simulation engines. Experiment directed metadynamics is a method
 to morph a molecular dynamics simulation to follow a desired free
 energy surface (probability distribution). See this
-(paper)[http://pubs.acs.org/doi/abs/10.1021/acs.jctc.5b00178] This
+[paper](http://pubs.acs.org/doi/abs/10.1021/acs.jctc.5b00178) This
 plugin allows morphing pairwise interactions and coordinate
 dimensions. These two collective variables are CPU intensive and
 difficult on large systems, so electronic-dance-music uses a scalable
@@ -51,7 +51,7 @@ example to match a radial distribution function. Please see the
 a radial distribution function into a probability distribution
 function.
 
-Pairwise EDM Fix (`fix edm_pair`)
+Pairwise EDM Fix
 ----
 
 Your command should be:
@@ -71,7 +71,7 @@ With:
 
 The decision on what goes into the edm-input-file and what goes into the lammps fix were arbitrary and follows no logical reasons.
 
-Coordinate EDM Fix (`fix edm`)
+Coordinate EDM Fix
 ----
 
 Everything is the same as above, except no rdf pair keyword needs to be added.
@@ -81,7 +81,7 @@ EDM Input File
 
 Here's an example EDM input file demonstrating all options:
 
-```
+```C
 
 //logical - indicates tempering or not
 tempering		1
@@ -144,8 +144,8 @@ Boundaries
 ===
 
 Electronic-dance-music uses the McGovern-De Pablo-boundary-corrected
-and zero-force hills described in the original (EDM
-paper)[http://pubs.acs.org/doi/abs/10.1021/acs.jctc.5b00178] in 1
+and zero-force hills described in the original
+[EDM paper](http://pubs.acs.org/doi/abs/10.1021/acs.jctc.5b00178) in 1
 dimension. In more than 1, YOUR TARGET SHOULD ENCOMPASS THE WHOLE
 REGION. Electronic-dance-music doesn't check for this, but you will
 get CRAZY boundary behavior if you have a partial bias.
