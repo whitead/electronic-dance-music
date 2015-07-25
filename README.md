@@ -162,6 +162,7 @@ TODO
 
 1. Add check for bad boundaries
 2. Implement zero-force boundaries in multiple dimensions
+3. Generalize edm_bias to > 3 dimensions (update_force and create subdivide alternative commands)
 
 Citation
 ===
