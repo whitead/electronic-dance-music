@@ -58,7 +58,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 							   b_periodic_boundary_(NULL){
   
   //assign rank
-#ifndef SERIAL_TEST
+#ifndef EDM_SERIAL
   MPI_Comm_rank(MPI_COMM_WORLD,&mpi_rank_);
   MPI_Comm_size(MPI_COMM_WORLD,&mpi_size_);
 #endif
@@ -94,7 +94,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 
 //need to also pass the the box size and its periodicity so we can
 //infer if the given boundary extends across the entire system. That
-//determins the acutal b_periodic
+//determines the acutal b_periodic
 
 void EDM::EDMBias::subdivide(const double sublo[3], 
 			const double subhi[3], 
@@ -168,7 +168,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
     bias_->add(initial_bias_, 1.0, 0.0);
   
 
-#ifndef SERIAL_TEST
+#ifndef EDM_SERIAL
   infer_neighbors(b_periodic, skin);
 
   //make hill density a per-system measurement not per replica
@@ -213,7 +213,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   double vol = bias_->get_volume();
   total_volume_ = 0;
 
-  #ifndef SERIAL_TEST
+  #ifndef EDM_SERIAL
   MPI_Allreduce(&vol, &other_vol, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   #else
   other_vol = vol;
@@ -223,7 +223,7 @@ void EDM::EDMBias::subdivide(const double sublo[3],
 }
 
 void EDM::EDMBias::write_bias(const std::string& output) const {
-#ifndef SERIAL_TEST
+#ifndef EDM_SERIAL
   bias_->multi_write(output);
 #ifdef EDM_MPI_DEBUG
   std::ostringstream oss;
@@ -236,7 +236,7 @@ void EDM::EDMBias::write_bias(const std::string& output) const {
 }
 
 void EDM::EDMBias::write_histogram() const {
-#ifndef SERIAL_TEST
+#ifndef EDM_SERIAL
   cv_hist_->multi_write(hist_output_, min_, max_, b_periodic_boundary_, 0);
 #ifdef EDM_MPI_DEBUG
   std::ostringstream oss;
@@ -253,7 +253,7 @@ void EDM::EDMBias::clear_histogram() {
 }
 
 void EDM::EDMBias::write_lammps_table(const std::string& output) const {
-#ifndef SERIAL_TEST
+#ifndef EDM_SERIAL
   bias_->lammps_multi_write(output);
 #else
   bias_->write(output);
@@ -416,7 +416,7 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
   //are we active?
   if(!b_outofbounds_) {
 
-
+    est_hill_count_ = est_hill_count;
     temp_hill_prefactor_ = hill_prefactor_;
 
     //get current hill height
@@ -526,7 +526,7 @@ double EDM::EDMBias::do_add_hill(const double* position, double this_h, int comm
   return bias_added;
 }
 
-void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double runiform) {
+void EDM::EDMBias::add_hill(const double* position, double runiform) {
 
   if(temp_hill_prefactor_ < 0)
     edm_error("Must call pre_add_hill before add_hill", "edm_bias.cpp:add_hill");
@@ -541,7 +541,7 @@ void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double r
   if(!b_outofbounds_) {
 
     //actually add hills -> stochastic
-    if(hill_density_ < 0 || runiform < hill_density_ / est_hill_count) {    
+    if(hill_density_ < 0 || runiform < hill_density_ / est_hill_count_) {    
 
       if(b_targeting_)
 	this_h *= exp(target_->get_value(position) - expected_target_); // add target and compensate for expected target
@@ -551,7 +551,7 @@ void EDM::EDMBias::add_hill(int est_hill_count, const double* position, double r
 
       //compensate for number of hills, if necessary
       if(hill_density_ < 0)
-	this_h /= est_hill_count;
+	this_h /= est_hill_count_;
       else
 	this_h /= hill_density_;
 
@@ -923,7 +923,7 @@ void EDM::EDMBias::sort_neighbors() {
 
 void EDM::EDMBias::update_height(double bias_added) {
   double other_bias = 0;
-  #ifndef SERIAL_TEST
+  #ifndef EDM_SERIAL
   MPI_Allreduce(&bias_added, &other_bias, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   #else
   other_bias = bias_added;

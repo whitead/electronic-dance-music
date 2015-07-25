@@ -228,10 +228,10 @@ void FixEDMPair::post_force(int vflag)
 
       //add hill
       if(update->ntimestep % stride == 0) {
-	  bias->add_hill(last_calls, &r, random->uniform());
+	  bias->add_hill(&r, random->uniform());
 	  ncalls++;
 	if(newton_pair || j < nlocal) {
-	  bias->add_hill(last_calls, &r, random->uniform());
+	  bias->add_hill(&r, random->uniform());
 	  ncalls++;
 	}
       }

@@ -89,7 +89,7 @@ class EDMBias {
    *
    **/
   void pre_add_hill(int est_hill_count);
-  void add_hill(int est_hill_count, const double* position, double runiform);
+  void add_hill(const double* position, double runiform);
   void post_add_hill();
 
   /**
@@ -160,6 +160,7 @@ class EDMBias {
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
   double temp_hill_cum_;
   double temp_hill_prefactor_;
+  int est_hill_count_;
 
   Grid* cv_hist_;//Histogram of observed collective variables
   
