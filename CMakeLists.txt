@@ -27,6 +27,9 @@ add_subdirectory ("lib")
 #compile unit tests
 add_subdirectory ("tests")
 
+#compile python library
+add_subdirectory ("python")
+
 file(GLOB LammpsFiles ${CMAKE_SOURCE_DIR}/lib/*.cpp
                       ${CMAKE_SOURCE_DIR}/lib/*.h
                       ${CMAKE_SOURCE_DIR}/*.h
