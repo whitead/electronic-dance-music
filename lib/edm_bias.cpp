@@ -48,6 +48,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 							   buffer_i_(0),
 							   temp_hill_cum_(-1),
 							   temp_hill_prefactor_(-1),
+							   est_hill_count_(0),
 							   steps_(0),
 							   overflow_left_i_(0),
 							   overflow_right_i_(0),
@@ -405,7 +406,7 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
   pre_add_hill(nlocal);
   for(i = 0; i < nlocal; i++) {
     if(apply_mask < 0 || apply_mask & mask_[i])
-      add_hill(nlocal, &positions[i][0], runiform[i]);
+      add_hill(&positions[i][0], runiform[i]);
   }
   post_add_hill();
 
@@ -631,7 +632,6 @@ int EDM::EDMBias::check_for_flush() {
 double EDM::EDMBias::flush_buffers(int synched) {
 
   double bias_added = 0;
-  double temp;
 
   if(mpi_neighbor_count_ > 0) {
     
