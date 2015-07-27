@@ -7,7 +7,7 @@ if(Boost_FOUND AND PYTHONLIBS_FOUND)
   set(Boost_USE_STATIC_RUNTIME OFF)
 
   add_library(edm_python SHARED edm_python.cxx edm_bias_py)
-  target_link_libraries(edm_python edm_lib ${Boost_LIBRARIES} {MPI_CXX_LIBRARIES})
+  target_link_libraries(edm_python edm_lib ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
   add_custom_target(python_package)  
   set(EDM_Package edm)
