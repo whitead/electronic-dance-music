@@ -804,10 +804,14 @@ class DimmedGrid : public Grid {
 	grid_number_[i] += 1;
       }      
     }
-    if(grid_ != NULL)
+    if(grid_ != NULL) {
       free(grid_);
-    if(grid_deriv_ != NULL)
+      grid_ = NULL;
+    }
+    if(grid_deriv_ != NULL){
       free(grid_deriv_);
+      grid_deriv_ = NULL;
+    }
     
     //build arrays
     initialize();
@@ -861,7 +865,8 @@ class DimmedGrid : public Grid {
   int in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
-      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
+      //subtract dx_ here because we add that to our grid for non-periodic maxes
+      if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= max_[i] - dx_[i])){
 	return 0;
       }
     }
