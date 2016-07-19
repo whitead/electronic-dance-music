@@ -110,7 +110,7 @@ double interp(const double* dx,
       X = fabs(where[idim] / dx[idim] - x0[idim]); //switch from local spatial coordinates to local rescaled 
       X2 = X * X;
       X3 = X2 * X;
-      if(fabs(tabf[shift]) < 0.0000001)  
+      if(fabs(tabf[shift]) < 0.0000001)  //[rainier] invalid read from this line
 	qq = 0.0; //special case of 0/0
       else 
 	qq = -tabder[shift * DIM + idim] / tabf[shift];
@@ -343,6 +343,7 @@ class DimmedGrid : public Grid {
   double get_value(const double* x) const{
 
     if(!in_grid(x)) {
+//	std::cout << "THIS SHOULD BE PRINTING\n";
       /*
       std::cerr << "Bad grid value (";
       size_t i;
@@ -403,6 +404,7 @@ class DimmedGrid : public Grid {
 	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
       */
+	std::cout << "YOU SHOULD READ THIS FOR interpolation_1d\n";
       for(i = 0; i < DIM; i++)
 	der[i] = 0;
       return 0;
@@ -416,7 +418,7 @@ class DimmedGrid : public Grid {
       double where[DIM]; //local position (local meaning relative to neighbors
       int stride[DIM]; //the indexing stride, which also accounts for periodicity
       double wrapped_x;
-
+      
       stride[0] = 1; //dim 0 is fastest
       for(i = 1; i < DIM; i++)
 	stride[i] = stride[i - 1] * grid_number_[i - 1];
@@ -858,14 +860,14 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  int in_grid(const double x[DIM]) const {
+  bool in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
-      if((x[i] < min_[i] || x[i] > max_[i]) && !b_periodic_[i]){
-	return 0;
+	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= (max_[i] - dx_[i])) ){//we specifically choose ">= max_[i]-dx_[i]" here to avoid a segfault caused by trying to look past the end of the grid when calling get_value on the exact grid maximum.
+	return false;
       }
     }
-    return 1;
+    return true;
   }
 
   size_t grid_size_;//total size of grid

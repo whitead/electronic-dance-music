@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
-
+  //std::cout << "I'm in interpolation_1d test and g.grid_number_[0] is now " <<g.grid_number_[0] << ".\n";//this comes out to be 11 for both max_[0] and grid_number_[0]
   
   for(int i = 0; i < 11; i++) {
     g.grid_[i] = log(i);
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   array[0] = 0.0;
   g.get_value(array);
   array[0] = 10.0;
-  g.get_value(array);
+  g.get_value(array);//[rainier] problem with getting array value at rightmost edge, not leftmost
 
 }
 
