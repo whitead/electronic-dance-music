@@ -404,7 +404,7 @@ class DimmedGrid : public Grid {
 	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
       */
-	std::cout << "YOU SHOULD READ THIS FOR interpolation_1d\n";
+	//std::cout << "YOU SHOULD READ THIS FOR interpolation_1d\n";
       for(i = 0; i < DIM; i++)
 	der[i] = 0;
       return 0;
