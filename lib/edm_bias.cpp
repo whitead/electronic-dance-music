@@ -312,75 +312,6 @@ double EDM::EDMBias::update_force(const double* positions, double* forces) const
   return energy;
 }
 
-double EDM::EDMBias::flush_bias_buffer(double max_bias) {
-  
-  double temp;
-  double bias_added = 0, h;
-
-  //#ifdef EDM_MPI_DEBUG
-  //  std::cout << "--------PREFLUSH [" << mpi_rank_ << "]---------" << std::endl;
-  //  dump_bias_buffer();
-  //#endif
- 
-  for(; overflow_left_i_ < overflow_right_i_; overflow_left_i_++) {
-    temp = bias_->add_value(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
-			       overflow_buffer_[overflow_left_i_ * (dim_+1) + dim_]);
-
-    hills_added_++;
-    bias_added += temp;
-    output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
-		overflow_buffer_[overflow_left_i_ * (dim_+1) + dim_], 
-		temp, BUFF_HILL);
-    
-
-    if(bias_added > max_bias) {
-
-      //round-off error (bad grid size) can lead to disagreement between bias added and desired bias added
-      //correct for this, so that we don't have a negative bias that exceeds the original
-      h = fmax(max_bias - bias_added, -overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_]);
-
-      //now put the remaining part that we'll need to add 
-      overflow_buffer_[overflow_left_i_ * (dim_ + 1) + dim_] = -h;
-
-      //undo the hill
-      temp = bias_->add_value(&overflow_buffer_[overflow_left_i_ * (dim_+1)], 
-				 h);      
-      output_hill(&overflow_buffer_[overflow_left_i_ * (dim_ + 1)], 
-		  h, 
-		  temp,
-		  BUFF_UNDO_HILL);
-
-      hills_added_++;
-      bias_added += temp;
-
-      break;
-    }	    
-  }
-
-  if(overflow_left_i_ == overflow_right_i_) {
-    overflow_left_i_ = overflow_right_i_ = 0;
-  } else {
-#ifdef EDM_MPI_DEBUG
-    //output other hills
-    size_t i;
-    for(i = overflow_left_i_; i < overflow_right_i_; i++) {
-      output_hill(&overflow_buffer_[i * (dim_ + 1)], 
-		  0, 
-		  0,
-		  BUFF_ZERO_HILL);
-    }
-#endif
-  } 
-
-  //#ifdef EDM_MPI_DEBUG
-  //  std::cout << "--------POSTFLUSH [" << mpi_rank_ << "]---------" << std::endl;
-  //  dump_bias_buffer();
-  //#endif
-
-
-  return bias_added;
-}
-
 void EDM::EDMBias::dump_bias_buffer() {
   std::cout << "Left: " << overflow_left_i_ << std::endl;
   std::cout << "Right: " << overflow_right_i_ << std::endl;
@@ -430,8 +361,8 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
     temp_hill_cum_ = 0;
     hills_added_ = 0;
 
-    //do we have have left overs from last time? Deal with it
-    temp_hill_cum_ += flush_bias_buffer(bias_per_step_);    
+    //do we have have left overs from last time? we won't in this approach
+//    temp_hill_cum_ += flush_bias_buffer(bias_per_step_);    
     
     //we can only skip entire rounds, otherwise we begin to bias our sampling.
     //Are we skipping an entire round?
