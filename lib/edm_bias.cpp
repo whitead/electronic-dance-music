@@ -50,6 +50,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 							   steps_(0),		   
 							   temp_hill_prefactor_(-1),
 							   est_hill_count_(0),
+							   cv_hist_(NULL),
 							   min_(NULL),
 							   max_(NULL),
 							   bias_dx_(NULL),
@@ -62,8 +63,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
   MPI_Comm_size(MPI_COMM_WORLD,&mpi_size_);
 #endif
   //read input file
-  read_input(input_filename);  
-  
+  read_input(input_filename);
 }
   
   EDM::EDMBias::~EDMBias() {
@@ -71,10 +71,8 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
     delete target_;
   if(bias_ != NULL)
     delete bias_;
-  
-  if(bias_ != cv_hist_)
+  if(cv_hist_ != NULL)
     delete cv_hist_;
-
   if(mpi_neighbors_ != NULL)
     free(mpi_neighbors_);
   if(bias_dx_ != NULL)

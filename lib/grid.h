@@ -806,10 +806,14 @@ class DimmedGrid : public Grid {
 	grid_number_[i] += 1;
       }      
     }
-    if(grid_ != NULL)
+    if(grid_ != NULL) {
       free(grid_);
-    if(grid_deriv_ != NULL)
+      grid_ = NULL;
+    }
+    if(grid_deriv_ != NULL){
       free(grid_deriv_);
+      grid_deriv_ = NULL;
+    }
     
     //build arrays
     initialize();
