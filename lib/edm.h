@@ -1,4 +1,5 @@
 #include <iostream>
+#define EDM_GPU_MODE_NO
 
 namespace EDM{ 
 

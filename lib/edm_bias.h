@@ -11,9 +11,10 @@
 #include <map>
 
 
-#define BIAS_CLAMP 1.0
+#define BIAS_CLAMP 1000.0
+//this one's for mpi:
 #define BIAS_BUFFER_SIZE 2048
-#define BIAS_BUFFER_DBLS 8192
+#define BIAS_BUFFER_DBLS (2048 * 8)
 #define NO_COMM_PARTNER -1
 #define INTERPOLATE 1
 
@@ -125,7 +126,6 @@ class EDMBias {
   double boltzmann_factor_;
   double temperature_;
   double hill_prefactor_; //hill height prefactor
-  double bias_per_step_; //Maximum bias per step to add
   double hill_density_;// hills sampling density
   double cum_bias_;//the current average bias  
   double total_volume_;//total volume of grid
@@ -171,11 +171,20 @@ class EDMBias {
   //histogram output
   std::string hist_output_;
 
-  //buffers for bias overflow
-  double overflow_buffer_[BIAS_BUFFER_DBLS];
-  size_t overflow_left_i_;
-  size_t overflow_right_i_;
-  int b_skip_hill_add_;
+
+
+  /*
+   * This code performs the actual adding of hills in the buffer OR it 
+   * calls the GPU host method to invoke a GPU kernel to execute the hill add 
+   */
+  void do_add_hills(const double* buffer, const size_t hill_number, char hill_type);
+
+  /*
+   * This function will put the hills into our buffer of hills to 
+   * add. The buffer will be flushed either when it's full or at the end
+   * of the overall hill-add step.
+   */
+  void queue_add_hill(const double* position, double this_h);
 
     
   EDMBias(const EDMBias& that);//just disable copy constructor
@@ -202,19 +211,7 @@ class EDMBias {
   int check_for_flush();
   double flush_buffers(int snyched);
 
-  /*
-   * Add hills that are in the buffer of hills to add. These are hills
-   * that couldn't be added because the amount of bias would have been
-   * too high.
-   */
-  double flush_bias_buffer(double max_bias);
-  
   double do_add_hill(const double* position, double height, int communicate);
-
-  /*
-   * Debug method
-   */
-  void dump_bias_buffer();
 
   /*
    * Convienence method to stride whitespace from a string.

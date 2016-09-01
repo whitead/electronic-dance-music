@@ -47,11 +47,9 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 							   mpi_neighbors_(NULL),
 							   buffer_i_(0),
 							   temp_hill_cum_(-1),
+							   steps_(0),		   
 							   temp_hill_prefactor_(-1),
 							   est_hill_count_(0),
-							   steps_(0),
-							   overflow_left_i_(0),
-							   overflow_right_i_(0),
 							   min_(NULL),
 							   max_(NULL),
 							   bias_dx_(NULL),
@@ -312,20 +310,6 @@ double EDM::EDMBias::update_force(const double* positions, double* forces) const
   return energy;
 }
 
-void EDM::EDMBias::dump_bias_buffer() {
-  std::cout << "Left: " << overflow_left_i_ << std::endl;
-  std::cout << "Right: " << overflow_right_i_ << std::endl;
-  /*
-  size_t i;
-  for(i = overflow_left_i_; i < overflow_right_i_; i++) {
-    std::cout << overflow_buffer_[i * (dim_ + 1) + dim_] << " ";
-    if(i % 30 == 0)
-      std::cout << std::endl;
-      }
-  std::cout << std::endl;
-  */
-}
-
 
 void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
   add_hills(nlocal, positions, runiform, -1);
@@ -361,111 +345,42 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
     temp_hill_cum_ = 0;
     hills_added_ = 0;
 
-    //do we have have left overs from last time? we won't in this approach
-//    temp_hill_cum_ += flush_bias_buffer(bias_per_step_);    
-    
     //we can only skip entire rounds, otherwise we begin to bias our sampling.
     //Are we skipping an entire round?
-    if(overflow_left_i_ == 0 && overflow_right_i_ == 0)
-      b_skip_hill_add_ = 0;
-    else
-      b_skip_hill_add_ = 1;
   }
 
 }
 
-double EDM::EDMBias::do_add_hill(const double* position, double this_h, int communicate) {
-
-  int buffer_flag = 0;
+void EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number, char hill_type){
+#ifndef EDM_GPU_MODE
   size_t i;
-  double bias_added = 0, temp_h; 
-
-  //deal with communication
-  //pack result into buffer if necessary
-  if(mpi_neighbor_count_ > 0 && communicate) {
-    for(i = 0; i < dim_; i++)	    
-      send_buffer_[buffer_i_ * (dim_+1) + i] = position[i];
-    send_buffer_[buffer_i_ * (dim_+1) + i] = this_h;
-    
-    buffer_i_++;
-    
-    //do we need to flush?
-    if(buffer_i_ >= BIAS_BUFFER_SIZE)
-      temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
-  }      
-
-  //now add the hill
-  if(temp_hill_cum_ < bias_per_step_) {
-    bias_added = bias_->add_value(position, this_h);
-    temp_hill_cum_ += bias_added;
+  double bias_added = 0;
+  for(i = 0; i < hill_number; i++){
+    bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);
     hills_added_++;
-
-    //output hill
-    output_hill(position, this_h, bias_added, ADD_HILL);
-    
-    //check if the hill is too big.
-    if(temp_hill_cum_ > bias_per_step_) {
-      //undo the hill
-
-      //round-off error (bad grid size) can lead to disagreement between bias added and desired bias added
-      //correct for this, so that we don't have a negative bias that exceeds the original
-      temp_h = fmax(bias_per_step_ - temp_hill_cum_, -this_h);
-
-      bias_added = bias_->add_value(position, temp_h);
-      
-      hills_added_++;
-      output_hill(position, temp_h, bias_added, ADD_UNDO_HILL);
-      
-      temp_hill_cum_ += bias_added;
-      buffer_flag = 1;
-      //now if we undid that hill add, we'll put the remaining amount of bias into the overflow buffer
-      this_h = -temp_h;
-      }        
-
-  } else {
-    output_hill(position, 0, 0, ADD_HILL);
-    buffer_flag = 1;
+    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
   }
-  
-  //check if we can add this hill
-  if(buffer_flag) {
-    //no we cannot, put into buffer of hills
-    //check if buffer is full
-    if(overflow_right_i_ == BIAS_BUFFER_SIZE) {
-      //can we add left?
-      if(overflow_left_i_ == 0) {
-	dump_bias_buffer();
-	std::cout.flush();
-	edm_error("The bias overflow buffer is full. Too many hills. Either increase & recompile, lower hill_density, or lower bias",
-		  "edm_bias.cpp:add_hill");
-
-      } else {
-	//add to left
-	overflow_left_i_--;
-	for(i = 0; i < dim_; i++)
-	  overflow_buffer_[overflow_left_i_ * (dim_ + 1) + i] = position[i];
-	overflow_buffer_[overflow_left_i_ * (dim_ + 1) + i] = this_h;	  
-      }
-    } else {
-      //add to right
-      overflow_right_i_++;
-      for(i = 0; i < dim_; i++)
-	overflow_buffer_[overflow_right_i_ * (dim_ + 1) + i] = position[i];
-      overflow_buffer_[overflow_right_i_ * (dim_ + 1) + i] = this_h;	  
-    }
-  }
-
-  return bias_added;
+#endif //EDM_GPU_MODE
 }
+
+void EDM::EDMBias::queue_add_hill(const double* position, double this_h){
+  size_t i;
+  for(i = 0; i < dim_; i++)
+    send_buffer_[buffer_i_ * (dim_+ 1) + i] = position[i];
+  send_buffer_[buffer_i_ * (dim_ + 1) + i] = this_h;
+  buffer_i_++;
+  
+  //do we need to flush?
+  if(buffer_i_ >= BIAS_BUFFER_SIZE)
+    temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
+  
+}
+
 
 void EDM::EDMBias::add_hill(const double* position, double runiform) {
 
   if(temp_hill_prefactor_ < 0)
     edm_error("Must call pre_add_hill before add_hill", "edm_bias.cpp:add_hill");
-
-  //Did we decide to skip this round?
-  if(b_skip_hill_add_)
-    return;
   
   double this_h = temp_hill_prefactor_;
 
@@ -488,9 +403,9 @@ void EDM::EDMBias::add_hill(const double* position, double runiform) {
 	this_h /= hill_density_;
 
       //finally clamp bias
-      this_h = fmin(this_h, BIAS_CLAMP * bias_per_step_);
+      this_h = fmin(this_h, BIAS_CLAMP);
 
-      do_add_hill(position, this_h, 1);
+      queue_add_hill(position, this_h);
     }
   }
 }
@@ -544,7 +459,7 @@ void EDM::EDMBias::output_hill(const double* position, double height, double bia
    
  }
 
-int EDM::EDMBias::check_for_flush() {
+int EDM::EDMBias::check_for_flush() {//this is fine??
   
   if(mpi_neighbor_count_ > 0) {
     
@@ -564,6 +479,9 @@ double EDM::EDMBias::flush_buffers(int synched) {
 
   double bias_added = 0;
 
+  //flush our own buffer first
+  do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
+
   if(mpi_neighbor_count_ > 0) {
     
     //notify all that we're going to flush
@@ -573,7 +491,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
       MPI_Allreduce(&my_flush, &do_flush, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     }
     
-    size_t i,j;
+    size_t i;
     unsigned int buffer_j;
     MPI_Request srequest1, srequest2;
 
@@ -585,10 +503,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	} else {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
-	  for(j = 0; j < buffer_j; j++) {
-	    do_add_hill(&receive_buffer_[j * (dim_+1)], 
-			receive_buffer_[j * (dim_+1) + dim_],0);
-	  }
+	  do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  
 	}
       }
     } else {
@@ -616,16 +531,12 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 MPI_DOUBLE, mpi_neighbors_[i], 
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
-	for(j = 0; j < buffer_j; j++) {
-	  do_add_hill(&receive_buffer_[j * (dim_+1)], 
-		      receive_buffer_[j * (dim_+1) + dim_], 0);
-	}
+	do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  	
 
 	//Technically, I don't need to do this here but 
 	//it's more convienent than having a bunch of outstanding requests
 	MPI_Wait(&srequest1, MPI_STATUS_IGNORE);
 	MPI_Wait(&srequest2,  MPI_STATUS_IGNORE);
-
       }
     }
 
@@ -952,8 +863,6 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   
   if(!extract_double("hill_prefactor", parsed_input, 1, &hill_prefactor_))
     return 0;
-  if(!extract_double("bias_per_step", parsed_input, 0, &bias_per_step_))
-    bias_per_step_ = hill_prefactor_;
   extract_double("hill_density", parsed_input, 0, &hill_density_);
   int tmp;
   if(!extract_int("dimension", parsed_input, 1, &tmp))
