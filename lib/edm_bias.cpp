@@ -349,16 +349,19 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
 
 }
 
-void EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number, char hill_type){
+double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number, char hill_type){
+  double bias_added = 0;
+  
 #ifndef EDM_GPU_MODE
   size_t i;
-  double bias_added = 0;
   for(i = 0; i < hill_number; i++){
-    bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);
+    bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);    
     hills_added_++;
     output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
   }
 #endif //EDM_GPU_MODE
+
+  return bias_added;
 }
 
 void EDM::EDMBias::queue_add_hill(const double* position, double this_h){
@@ -476,9 +479,9 @@ int EDM::EDMBias::check_for_flush() {//this is fine??
 double EDM::EDMBias::flush_buffers(int synched) {
 
   double bias_added = 0;
-
+  
   //flush our own buffer first
-  do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
+  bias_added += do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
 
   if(mpi_neighbor_count_ > 0) {
     
@@ -501,7 +504,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 	} else {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
 	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
-	  do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  
+	  bias_added += do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  
 	}
       }
     } else {
@@ -529,7 +532,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 MPI_DOUBLE, mpi_neighbors_[i], 
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
-	do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  	
+	bias_added += do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  	
 
 	//Technically, I don't need to do this here but 
 	//it's more convienent than having a bunch of outstanding requests
@@ -538,12 +541,11 @@ double EDM::EDMBias::flush_buffers(int synched) {
       }
     }
 
-    //reset buffer
-    buffer_i_ = 0;
   }
 
+  //reset buffer, even if we don't have other MPI
+  buffer_i_ = 0;
 
-  
   return bias_added;
 }
 

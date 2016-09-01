@@ -177,7 +177,7 @@ class EDMBias {
    * This code performs the actual adding of hills in the buffer OR it 
    * calls the GPU host method to invoke a GPU kernel to execute the hill add 
    */
-  void do_add_hills(const double* buffer, const size_t hill_number, char hill_type);
+  double do_add_hills(const double* buffer, const size_t hill_number, char hill_type);
 
   /*
    * This function will put the hills into our buffer of hills to 
@@ -210,8 +210,6 @@ class EDMBias {
    */
   int check_for_flush();
   double flush_buffers(int snyched);
-
-  double do_add_hill(const double* position, double height, int communicate);
 
   /*
    * Convienence method to stride whitespace from a string.
