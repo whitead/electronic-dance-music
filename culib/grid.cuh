@@ -48,7 +48,7 @@ namespace EDM{
 // Giovanni
 
 template<int DIM> 
- __device__ double interp(const double* dx, 
+ __host__ __device__ double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
 	      const double* tabder, 
@@ -141,19 +141,19 @@ class Grid {
 
 
  public:  
-  virtual double get_value(const double* x) const = 0;
+  __host__ __device__ virtual double get_value(const double* x) const = 0;
   /**
    * Adds the given value to the grid and then returns how much was
    * actually added. The discrepancy can arise due to boundaries
    * and/or kernels.
    */
-  __host__ __device__ virtual double add_value(const double* x0, double value) = 0;
-  double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type);
+  __host__  virtual double add_value(const double* x0, double value) = 0;
+  __device__ double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type);
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
    **/
-  virtual double get_value_deriv(const double* x, double* der) const = 0;
+  __host__ __device__ virtual double get_value_deriv(const double* x, double* der) const = 0;
   /**
    * Write the grid to the given file
    **/
@@ -266,7 +266,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from a point to an array of indices
    **/ 
-  void get_index(const double* x, size_t result[DIM]) const {
+  __host__ __device__ void get_index(const double* x, size_t result[DIM]) const {
     size_t i;
     double xi;
     for(i = 0; i < DIM; i++) {
@@ -317,7 +317,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from an array of indices to a single index
    **/
-  size_t multi2one(const size_t index[DIM]) const {
+  __host__ __device__ size_t multi2one(const size_t index[DIM]) const {
     size_t result = index[DIM-1];
 
     size_t i;    
@@ -345,7 +345,7 @@ class DimmedGrid : public Grid {
   /**
    * Get the value of the grid at x
    **/ 
-  double get_value(const double* x) const{
+  __host__ __device__ double get_value(const double* x) const{
 
     if(!in_grid(x)) {
       /*
@@ -372,7 +372,7 @@ class DimmedGrid : public Grid {
   /**
    * Add a value to the grid. Only makes sense if there is no derivative
    **/
-  __host__ __device__ double add_value(const double* x0, double value) {
+  __host__ double add_value(const double* x0, double value) {
     if(b_interpolate_) {
       edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
     }
@@ -392,7 +392,7 @@ class DimmedGrid : public Grid {
   /**
    * Get value and derivatives, optionally using interpolation
    **/ 
-  double get_value_deriv(const double* x, double* der) const {
+  __host__ __device__ double get_value_deriv(const double* x, double* der) const {
     
     double value;
     size_t index[DIM];
@@ -876,7 +876,7 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  int in_grid(const double x[DIM]) const {
+  __host__ __device__ int in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
       //subtract dx_ here because we add that to our grid for non-periodic maxes

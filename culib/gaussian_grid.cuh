@@ -45,11 +45,11 @@ class GaussGrid : public Grid {
    **/
  public:
   virtual ~GaussGrid() {};
-  __host__ __device__ virtual double add_value(const double* x, double height) = 0;
+  __host__ virtual double add_value(const double* x, double height) = 0;
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
-  virtual int in_bounds(const double* x) const = 0;
+  __host__ __device__ virtual int in_bounds(const double* x) const = 0;
   virtual void multi_write(const std::string& filename) const = 0;
   /**
    *Write out the file in lammps tabular potential format.
@@ -98,7 +98,7 @@ class DimmedGaussGrid : public GaussGrid{
     //nothing
   }
 
-  double get_value(const double* x) const {
+  __host__ __device__ double get_value(const double* x) const {
 
     size_t i;
 
@@ -117,7 +117,7 @@ class DimmedGaussGrid : public GaussGrid{
     return grid_.get_value(xx);
   }
 
-  double get_value_deriv(const double* x, double* der) const{
+  __host__ __device__ double get_value_deriv(const double* x, double* der) const{
 
     size_t i;
 
@@ -177,7 +177,7 @@ class DimmedGaussGrid : public GaussGrid{
    **/
     /*to parallelize, just need to have it be device function and pass the d_grid_ x0 value (which should be the same anyway)
      */
-  __host__ __device__ double add_value(const double* x0, double height, int minisize_total_index) {
+  __host__ virtual double add_value(const double* x0, double height) {
 
     size_t i,j;
 
@@ -495,7 +495,7 @@ class DimmedGaussGrid : public GaussGrid{
     return grid_.get_grid_size();
   }
 
-  int in_bounds(const double x[DIM]) const {
+  __host__ __device__ int in_bounds(const double x[DIM]) const {
 
     size_t i;
     for(i = 0; i < DIM; i++) {
@@ -509,7 +509,7 @@ class DimmedGaussGrid : public GaussGrid{
   /**
    * Possibly wrap a value across the system boundaries to be as close as possible to the grid
    **/
-    __host__ __device__ void remap(double x[DIM]) const {//might need this to be global -Rainier
+    __host__  void remap(double x[DIM]) const {//might need this to be global -Rainier
     
     double dp[2];
     size_t i;

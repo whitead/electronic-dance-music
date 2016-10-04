@@ -1,34 +1,47 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
+
+
 
 #project info
 project (WordModel)
 set (WordModel_VERSION_MAJOR 0)
 set (WordModel_VERSION_MINOR 1)
 set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
-set (LAMMPS_SRC "/home/whitead/Documents/lammps/src")
+set (LAMMPS_SRC "/home/rainier/lammps/src")
 
 
 #compilation flags
 #set (CXX_STD_VERSION "-std=c++11 -g")
-set (CXX_DEBUG "-O0 -g -std=c++11 -Wall -Wno-sign-compare -Wno-reorder")
+set (CMAKE_VERBOSE_MAKEFILE 0) # Use 1 for debugging, 0 for release
+set(CMAKE_CXX_COMPILER g++)
+set (CXX_DEBUG "-O0 -g -m64 -std=c++11 -Wall -Wno-sign-compare -Wno-reorder")
 add_definitions (${CXX_DEBUG})
+set(CMAKE_C_FLAGS -m64)
+set(CMAKE_CXX_FLAGS -m64)
+
+#the CUDA stuff
+#set(CUDA_NVCC_FLAGS)
+find_package(CUDA QUIET REQUIRED) #this is for getting CUDA cross-compilation
+#set(CUDA_NVCC_FLAGS -m64)
+include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ )
+
 
 find_package(MPI REQUIRED) 
 include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
 
 #set-up directories
-include_directories ("${PROJECT_SOURCE_DIR}/lib")
+include_directories ("${PROJECT_SOURCE_DIR}/culib")
 
 
 #compile src
-add_subdirectory ("lib")
+add_subdirectory ("culib")
 
 #compile unit tests
 add_subdirectory ("tests")
 
 #compile python library
-add_subdirectory ("python")
+#add_subdirectory ("python")
 
 file(GLOB LammpsFiles ${CMAKE_SOURCE_DIR}/lib/*.cpp
                       ${CMAKE_SOURCE_DIR}/lib/*.h

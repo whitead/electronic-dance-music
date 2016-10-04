@@ -1,14 +1,17 @@
 #Detect boost
-find_package (Boost 1.36 COMPONENTS system filesystem unit_test_framework REQUIRED)  
+find_package (Boost 1.55 COMPONENTS system filesystem unit_test_framework REQUIRED)  
 include_directories (${Boost_INCLUDE_DIRS})
+message("The Boost include dirs are at ${Boost_INCLUDE_DIRS}")
 set (TEST_GRID_SRC grids)
 set (TEST_EDM_SRC edm)
+
+include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ ../lib/ )
 add_definitions(-DTEST_GRID_SRC=${TEST_GRID_SRC})
 add_definitions(-DTEST_EDM_SRC=${TEST_EDM_SRC})
 
 add_executable (edm_test edm_test)
 target_link_libraries (edm_test
-                       edm_lib
+                       edm_cuda_lib
                       ${Boost_FILESYSTEM_LIBRARY}
                       ${Boost_SYSTEM_LIBRARY}
                       ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}

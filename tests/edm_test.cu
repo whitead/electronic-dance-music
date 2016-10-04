@@ -1,8 +1,8 @@
-#include "grid.h"
-#include "edm_bias.h"
-#include "gaussian_grid.h"
-//#include <cuda_runtime.h>
-//#include <cuda.h>
+#include "grid.cuh"
+#include "edm_bias.cuh"
+#include "gaussian_grid.cuh"
+#include <cuda_runtime.h>
+#include <cuda.h>
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM
 #include <boost/test/unit_test.hpp>
@@ -925,7 +925,7 @@ BOOST_AUTO_TEST_CASE(edm_cpu_timer_1d){
   double bin_spacing[] = {1};
   int periodic[] = {1};
   double x[1] = {0};
-  unsigned int n_hills = 500000000;
+  unsigned int n_hills = 5000000;
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
   //now just do a generic loop, adding 10k gaussians, and time it
   iStart = cpuSecond();
