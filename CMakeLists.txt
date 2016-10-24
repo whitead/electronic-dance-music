@@ -35,7 +35,7 @@ include_directories ("${PROJECT_SOURCE_DIR}/culib")
 
 
 #compile src
-add_subdirectory ("culib")
+add_subdirectory ("lib")
 
 #compile unit tests
 add_subdirectory ("tests")

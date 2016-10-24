@@ -48,7 +48,7 @@ namespace EDM{
 // Giovanni
 
 template<int DIM> 
- __device__ double interp(const double* dx, 
+ __host__ __device__ double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
 	      const double* tabder, 
@@ -141,19 +141,19 @@ class Grid {
 
 
  public:  
-  virtual double get_value(const double* x) const = 0;
+  __host__ __device__ virtual double get_value(const double* x) const = 0;
   /**
    * Adds the given value to the grid and then returns how much was
    * actually added. The discrepancy can arise due to boundaries
    * and/or kernels.
    */
-  __host__ __device__ virtual double add_value(const double* x0, double value) = 0;
-  double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type);
+  virtual double add_value(const double* x0, double value) = 0;
+  __host__ double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type);
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
    **/
-  virtual double get_value_deriv(const double* x, double* der) const = 0;
+  __host__ __device__ virtual double get_value_deriv(const double* x, double* der) const = 0;
   /**
    * Write the grid to the given file
    **/
@@ -191,7 +191,7 @@ class DimmedGrid : public Grid {
 	    const double* bin_spacing, 
 	    const int* b_periodic, 
 	    int b_derivatives, 
-	    int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL), d_grid_(NULL), d_grid_deriv_(NULL) {
+	    int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
 
     size_t i;
 
@@ -203,7 +203,7 @@ class DimmedGrid : public Grid {
       grid_number_[i] = (int) ceil((max_[i] - min_[i]) / bin_spacing[i]);
       dx_[i] = (max_[i] - min_[i]) / grid_number_[i];
       //add one to grid points if 
-      grid_number_[i] = b_periodic_[i] ? grid_number_[i] : grid_number_[i] + 1;
+      grid_number_[i] = (b_periodic_[i] ? grid_number_[i] : grid_number_[i] + 1);
       //increment dx to compensate
       if(!b_periodic_[i])
 	max_[i] += dx_[i];
@@ -214,14 +214,14 @@ class DimmedGrid : public Grid {
   /**
    * Constructor from file, with interpolation specified
    **/
-  DimmedGrid(const std::string& input_grid, int b_interpolate): b_derivatives_(0), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL), d_grid_(NULL), d_grid_deriv_(NULL) {
+  DimmedGrid(const std::string& input_grid, int b_interpolate): b_derivatives_(0), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
 
   /**
    * Constructor from grid file
    **/
- DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL), d_grid_(NULL), d_grid_deriv_(NULL) {
+ DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL) {
     read(input_grid);
   }
 
@@ -229,7 +229,7 @@ class DimmedGrid : public Grid {
   /** 
    * Clone constructor
    **/
- DimmedGrid(const DimmedGrid<DIM>& other) : b_derivatives_(other.b_derivatives_), b_interpolate_(other.b_interpolate_), grid_(NULL), grid_deriv_(NULL), d_grid_(NULL), d_grid_deriv_(NULL) {
+ DimmedGrid(const DimmedGrid<DIM>& other) : b_derivatives_(other.b_derivatives_), b_interpolate_(other.b_interpolate_), grid_(NULL), grid_deriv_(NULL) {
     size_t i,j;
     for(i = 0; i < DIM; i++) {
       dx_[i] = other.dx_[i];
@@ -248,31 +248,32 @@ class DimmedGrid : public Grid {
       }
     }
     //now that the grid is filled on host-side, put it into the GPU
-    cudaMemcpy(grid_, d_grid_, DIM * grid_size_ * sizeof(double), cudaMemcpyHostToDevice);
+//    cudaMemcpy(grid_, d_grid_, DIM * grid_size_ * sizeof(double), cudaMemcpyHostToDevice);
   } 
 
   ~DimmedGrid() {
     if(grid_ != NULL)
       free(grid_);
-    if(d_grid_ != NULL)
-      cudaFree(d_grid_);
+    // if(d_grid_ != NULL)
+    //   cudaFree(d_grid_);
     if(grid_deriv_ != NULL)
       free(grid_deriv_);
-    if(d_grid_deriv_ != NULL)
-      cudaFree(d_grid_deriv_);
+    // if(d_grid_deriv_ != NULL)
+    //   cudaFree(d_grid_deriv_);
     
   }
   
   /**
    * Go from a point to an array of indices
    **/ 
-  void get_index(const double* x, size_t result[DIM]) const {
+  __host__ __device__ void get_index(const double* x, size_t result[DIM]) const {
     size_t i;
     double xi;
     for(i = 0; i < DIM; i++) {
       xi = x[i];
-      if(b_periodic_[i])
+      if(b_periodic_[i]){
 	xi -= (max_[i] - min_[i]) * int_floor((xi - min_[i]) / (max_[i] - min_[i]));
+      }
       result[i] = (size_t) floor((xi - min_[i]) / dx_[i]);
     }
   }
@@ -317,7 +318,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from an array of indices to a single index
    **/
-  size_t multi2one(const size_t index[DIM]) const {
+  __host__ __device__ size_t multi2one(const size_t index[DIM]) const {
     size_t result = index[DIM-1];
 
     size_t i;    
@@ -333,7 +334,7 @@ class DimmedGrid : public Grid {
    * Go from single index to array
    **/
   void one2multi(size_t index, size_t result[DIM]) const {
-    size_t i;
+    int i;
 
     for(i = 0; i < DIM-1; i++) {
       result[i] = index % grid_number_[i];
@@ -345,7 +346,7 @@ class DimmedGrid : public Grid {
   /**
    * Get the value of the grid at x
    **/ 
-  double get_value(const double* x) const{
+  __host__ __device__ double get_value(const double* x) const{
 
     if(!in_grid(x)) {
       /*
@@ -372,7 +373,7 @@ class DimmedGrid : public Grid {
   /**
    * Add a value to the grid. Only makes sense if there is no derivative
    **/
-  __host__ __device__ double add_value(const double* x0, double value) {
+  double add_value(const double* x0, double value) {
     if(b_interpolate_) {
       edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
     }
@@ -392,7 +393,7 @@ class DimmedGrid : public Grid {
   /**
    * Get value and derivatives, optionally using interpolation
    **/ 
-  double get_value_deriv(const double* x, double* der) const {
+  __host__ __device__ double get_value_deriv(const double* x, double* der) const {
     
     double value;
     size_t index[DIM];
@@ -813,18 +814,18 @@ class DimmedGrid : public Grid {
       free(grid_);
       grid_ = NULL;
     }
-    if(d_grid_ != NULL){
-      cudaFree(d_grid_);
-      d_grid_ = NULL;
-    }
+    // if(d_grid_ != NULL){
+    //   cudaFree(d_grid_);
+    //   d_grid_ = NULL;
+    // }
     if(grid_deriv_ != NULL){
       free(grid_deriv_);
       grid_deriv_ = NULL;
     }
-    if(d_grid_deriv_ != NULL){
-      cudaFree(d_grid_deriv_);
-      d_grid_deriv_ = NULL;
-    }
+    // if(d_grid_deriv_ != NULL){
+    //   cudaFree(d_grid_deriv_);
+    //   d_grid_deriv_ = NULL;
+    // }
     
     //build arrays
     initialize();
@@ -842,7 +843,7 @@ class DimmedGrid : public Grid {
 	}
       }
     }
-    cudaMemcpy(grid_, d_grid_, DIM * grid_size_ * sizeof(double), cudaMemcpyHostToDevice);
+//    cudaMemcpy(grid_, d_grid_, DIM * grid_size_ * sizeof(double), cudaMemcpyHostToDevice);
 
     //all done!
     input.close();
@@ -876,11 +877,11 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  int in_grid(const double x[DIM]) const {
+  __host__ __device__ int in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
-      //subtract dx_ here because we add that to our grid for non-periodic maxes
-      if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= max_[i] - dx_[i])){
+      //greater/equal here because we add that to our grid for non-periodic maxes
+      if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= max_[i] )){
 	return 0;
       }
     }
@@ -897,8 +898,8 @@ class DimmedGrid : public Grid {
   double max_[DIM];//maximum
   int grid_number_[DIM];//number of points on grid
   int b_periodic_[DIM];//if a dimension is periodic
-  double* d_grid_;//the GPU grid pointer
-  double* d_grid_deriv_;//the GPU derivative pointer
+//  double* d_grid_;//the GPU grid pointer
+//  double* d_grid_deriv_;//the GPU derivative pointer
 
  private:  
 
@@ -911,12 +912,12 @@ class DimmedGrid : public Grid {
     for(i = 0; i < DIM; i++)
       grid_size_ *= grid_number_[i];
     grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
-    cudaMalloc(&d_grid_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_ pointer
+//    cudaMalloc(&d_grid_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_ pointer
     if(b_derivatives_) {
       grid_deriv_ = (double *) calloc(DIM * grid_size_, sizeof(double));
-      cudaMalloc(&d_grid_deriv_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_deriv_
-      if(!grid_deriv_ or !d_grid_deriv_) {
-	edm_error("Out of memory!!", "grid.h:initialize");	
+//      cudaMalloc(&d_grid_deriv_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_deriv_
+      if(!grid_deriv_) {
+	edm_error("Out of memory!!", "grid.cuh:initialize");	
       }
     }
   }
