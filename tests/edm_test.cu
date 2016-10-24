@@ -103,6 +103,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
       for(int k = 0; k < g.grid_number_[2]; k++) {
 	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
 	array[2] = k;
+//	printf("g.get_value(point) = %f, g.multi2one(array) = %i, k = %i, j = %i, i = %i\n", g.get_value(point), g.multi2one(array), k, j, i);
 	BOOST_REQUIRE(pow(g.get_value(point) - g.multi2one(array),2) < 0.0000001);
       }
     }
@@ -576,59 +577,6 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
 }
 
-BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {10};
-  double bin_spacing[] = {1};
-  int periodic[] = {0};
-  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
-
-  //add N gaussian
-  int N = 20;
-  int i;
-  double x[1];
-  double offsets = 1. / N;
-  double g_integral = 0;
-  double temp;
-
-  //get boundaries
-  x[0] = -100.0;
-  temp = g.add_value(x, 1.5);
-  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-  g_integral += temp;		      
-
-  x[0] = 100.0;
-  temp = g.add_value(x, 1.5);
-  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-  g_integral += temp;		      
-
-
-  //generate a random number but use sequential grid point offsets
-  for(i = 0; i < N; i++) {
-    x[0] = rand() % 200 - 100 + i * offsets;
-    temp = g.add_value(x, 1.5);
-    std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-    g_integral += temp;		      
-  }
-
-  //now we integrate the grid
-  double area = 0;
-  double dx = 0.1;
-  int bins = (int) 200 / dx;
-  for(i = 0; i < bins; i++) {
-    x[0] = -100 + i * dx;
-    area += g.get_value(x) * dx;
-  }
-
-  //Make sure the integrated area is correct
-  //unnormalized, so a little height scaling is necessary
-  std::cout << area / N << " " << 1.5  << std::endl;
-  BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
-
-  //now make sure that add_value returned the correct answers as well
-   BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
-}
 
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
@@ -723,53 +671,6 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
 
 }
 
-BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {10.0};
-  double bin_spacing[] = {1};
-  int periodic[] = {1};
-  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
-  periodic[0]  = 0;
-  min[0] = -50;
-  max[0] = 50;
-  g.set_boundary(min, max, periodic);
-
-  //add N gaussian
-  int N = 20;
-  int i;
-  double x[1];
-  double der[1];
-  double v;
-
-  //generate a random number
-  for(i = 0; i < N; i++) {
-    x[0] = rand() % 200 - 100;
-    g.add_value(x, 1.0);
-  }
-
-  //Check if the boundaries were duplicated
-  BOOST_REQUIRE(pow(g.grid_.grid_[50] - g.grid_.grid_[49] ,2) < EPSILON);
-  BOOST_REQUIRE(pow(g.grid_.grid_[150] - g.grid_.grid_[151] ,2) < EPSILON);
-
-  x[0] = 50.1;
-  v = g.get_value(x);
-  x[0] = 50.0;
-  BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
-
-  //boundaries should be 0, even with interpolation
-  g.get_value_deriv(x,der);  
-  BOOST_REQUIRE(der[0] * der[0] < EPSILON);
-
-  //check other side
-  x[0] = -50.1;
-  v = g.get_value(x);
-  x[0] = -50.0;
-  BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
-  g.get_value_deriv(x,der);  
-  BOOST_REQUIRE(der[0] * der[0] < EPSILON);
-
-}
 
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
   double min[] = {-10, -10, -10};
@@ -879,6 +780,7 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   double runiform[] = {1};
   
   positions[0][0] = 5.0;
+    printf("\npositions[0] is %f, bias_->get_value = %f, hill_prefactor/sqrt(2 pi) / bias_sigma_[0] = %f, and plain hill_prefactor_ is %f\n\n", positions[0][0], bias.bias_->get_value(positions[0]), (bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0]), bias.hill_prefactor_);
   bias.add_hills(1, positions, runiform);
 
   bias.write_bias("BIAS");
@@ -886,6 +788,10 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   
   //  std::cout << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " 
   //	    << bias.bias_->get_value(positions[0]) << std::endl;
+//   #ifdef EDM_GPU_MODE
+//   printf("TRUE\n");
+// #endif //EDM_GPU_MODE
+  printf("\npositions[0] is %f, bias_->get_value = %f, hill_prefactor/sqrt(2 pi) / bias_sigma_[0] = %f, and plain hill_prefactor_ is %f\n\n", positions[0][0], bias.bias_->get_value(positions[0]), (bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0]), bias.hill_prefactor_);
   //test if the value at the point is correct
   BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
   //check if the claimed amount of bias added is correct
@@ -925,7 +831,7 @@ BOOST_AUTO_TEST_CASE(edm_cpu_timer_1d){
   double bin_spacing[] = {1};
   int periodic[] = {1};
   double x[1] = {0};
-  unsigned int n_hills = 5000000;
+  unsigned int n_hills = 5000;
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
   //now just do a generic loop, adding 10k gaussians, and time it
   iStart = cpuSecond();

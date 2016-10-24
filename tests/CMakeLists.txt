@@ -9,7 +9,7 @@ include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ 
 add_definitions(-DTEST_GRID_SRC=${TEST_GRID_SRC})
 add_definitions(-DTEST_EDM_SRC=${TEST_EDM_SRC})
 
-add_executable (edm_test edm_test)
+cuda_add_executable (edm_test edm_test.cu)
 target_link_libraries (edm_test
                        edm_cuda_lib
                       ${Boost_FILESYSTEM_LIBRARY}

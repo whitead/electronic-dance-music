@@ -31,7 +31,7 @@ namespace EDM{
 
 
   template <unsigned int blockSize>
-  __device__ void warpAddReduce(volatile int *sdata, unsigned int tid){
+  __device__ void warpAddReduce(volatile double *sdata, unsigned int tid){
     if (blockSize >= 64) sdata[tid] += sdata[tid + 32];
     if (blockSize >= 32) sdata[tid] += sdata[tid + 16];
     if (blockSize >= 16) sdata[tid] += sdata[tid + 8];
@@ -41,8 +41,8 @@ namespace EDM{
   }
 
   template <unsigned int blockSize>
-  __global__ void addReduce(int *g_idata, int *g_odata, unsigned int n){
-    extern __shared__ int sdata[];
+  __global__ void addReduce(double *g_idata, double *g_odata, unsigned int n){
+    extern __shared__ double sdata[];
     unsigned int tid= threadIdx.x;
     unsigned int i = blockIdx.x * (blockSize * 2) + tid;
     unsigned int gridSize = blockSize * 2 * gridDim.x;
@@ -57,6 +57,16 @@ namespace EDM{
 
     if(tid < 32) warpAddReduce<blockSize>(sdata, tid);
     if(tid == 0) g_odata[blockIdx.x] = sdata[0];
+  }
+
+  template <unsigned int blockSize>
+  __global__ void gpu_add_matrices(double *MatA, double *MatB, double *MatC, int nx, int ny){
+    unsigned int ix = threadIdx.x + blockIdx.x * blockDim.x;
+    unsigned int iy = threadIdx.y + blockIdx.y * blockDim.y;
+    unsigned int idx = iy*nx + ix;
+    if(ix < nx && iy < ny){
+      MatC[idx] = MatA[idx] + MatB[idx];
+      }
   }
   
 class EDMBias {
@@ -113,7 +123,9 @@ class EDMBias {
   /**
    * Add hills on  GPU
    **/
-  double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
+  __host__ double add_hills_gpu(const double* buffer, const size_t hill_number, double *grid_);
+
+  
   /**
    * A way to add hills one at a time. Call pre_add_hill first,
    * add_hill a fixed number of times, and finally post_add_hill. 

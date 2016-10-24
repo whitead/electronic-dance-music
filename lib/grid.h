@@ -266,8 +266,9 @@ class DimmedGrid : public Grid {
     double xi;
     for(i = 0; i < DIM; i++) {
       xi = x[i];
-      if(b_periodic_[i])
+      if(b_periodic_[i]){
 	xi -= (max_[i] - min_[i]) * int_floor((xi - min_[i]) / (max_[i] - min_[i]));
+      }
       result[i] = (size_t) floor((xi - min_[i]) / dx_[i]);
     }
   }

@@ -325,6 +325,14 @@ void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const d
   }
   post_add_hill();
 
+
+
+//  pre_add_hill(nlocal);
+//  do_add_hills(send_buffer_, nlocal, ADD_HILL);
+  //add_hills_gpu(send_buffer_, nlocal, ADD_HILL, bias_->get_grid());
+  //(const double* buffer, const size_t hill_number, char hill_type, double *grid_)
+//  post_add_hill();
+
 }
 
 void EDM::EDMBias::pre_add_hill(int est_hill_count) {
@@ -351,23 +359,69 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
 
 }
 
-double EDM::EDMBias::add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_){
+// void EDM::EDMBias::gpu_matrix_add(float *MatA, float *MatB, float *MatC, int nx, int ny){
+//     unsigned int ix = threadIdx.x + blockIdx.x * blockDim.x;
+//     unsigned int iy = threadIdx.y + blockIdx.y * blockDim.y;
+//     unsigned int idx = iy*nx + ix;
+//     if(ix < nx && iy < ny){
+//       MatC[idx] = MatA[idx] + MatB[idx];
+//       }
+// }
+
+double EDM::EDMBias::add_hills_gpu(const double* buffer, const size_t hill_number, double *grid_){
   double bias_added = 0;
-  double *d_grid_, *d_bias_holder_;//GPU copies of the grid and an empty dummy grid
-  //this is for keeping track of total bias added on GPU; need to initialize and transfer over
-  size_t grid_size = bias_->get_grid_size();
-  double *bias_holder =(double*) malloc(grid_size * sizeof(double));
+  double vol_element = 1;
+  int *new_buffer = new int[hill_number];//array of the reduced hill indices for adding
+  double *hill_heights = new double[hill_number];//the corresponding heights of each gaussian to add
+  int result;
+  int index[dim_];//a temp index holder for finding the reduced indices in the buffer
+  for(int i = 0; i < dim_; i++){
+    vol_element *= bias_dx_[i];//for the gaussians
+    for(int j = 0; j < dim_; j++){
+      index[j] = buffer[(dim_+1)* i + j];
+    }
+    //the multi2one
+    result = index[dim_-1];
+    for(i = dim_ - 1; i > 0; i--) {
+      result = result * bias_->grid_number_[i-1] + index[i-1];
+    }
+    new_buffer[i] = result;//now we have a reduced-index
+    hill_heights[i] = buffer[((dim_ + 1) * (i+1)) -1];//pick out the heights in the buffer
+  }
+  
+  double *d_gauss, *d_grid_, *d_bias_holder_;//GPU-held gaussian-holder, grid copy, and total-bias tracker
+  unsigned int grid_size = bias_->get_grid_size();//the length of the grid itself.
+  printf("grid size sure is %i\n", grid_size);
+  int nBytes = grid_size * sizeof(double);//need to allocate the right size
+  double *bias_holder_ =(double*) malloc(nBytes);//for receiving the bias added (need to be same size, but only first element will be the bias sum, after addreduce)
   //now we transfer everything over, including the buffer of hills to add
-  cudaMalloc(&d_grid_, grid_size);
-  cudaMalloc(&d_bias_holder_, grid_size);
-  cudaMemcpy(d_grid_, grid_, sizeof(double) * grid_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_bias_holder_, bias_holder, sizeof(double) * (*bias_).get_grid_size(), cudaMemcpyHostToDevice);
+
+  cudaMalloc(&d_grid_, nBytes);
+  cudaMalloc(&d_gauss, nBytes);
+  cudaMemset(&d_gauss, 0.0, nBytes);
+  cudaMalloc(&d_bias_holder_, nBytes);//the total size is the size of one hill (nBytes) times the number of hills
+  cudaMemcpy(d_grid_, grid_, nBytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_bias_holder_, buffer, nBytes * hill_number, cudaMemcpyHostToDevice);
   //now the grid and the bias tracker are on GPU, so we call the GPU add
+
+  const int dimx = 1024;//for now, this is the size of my test grid input...
+  const int dimy = 1;//just trying to get it running, will get faster later
+  dim3 block(dimx, dimy);
+  dim3 grid(((grid_size * hill_number)+block.x-1)/block.x);//a 1D grid
+  gpu_add_matrices<dimx><<<block, grid>>>(d_grid_, d_bias_holder_, d_grid_, 10, 10);
+  addReduce<dimx><<<block, grid>>>(d_grid_, d_bias_holder_, grid_size);
+
+  cudaMemcpy(grid_, d_grid_, nBytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(bias_holder_, d_bias_holder_, nBytes, cudaMemcpyDeviceToHost);
 
 
   //once we're done, clean up after ourselves.
   cudaFree(d_bias_holder_);
-  delete bias_holder;
+  cudaFree(d_grid_);
+  bias_added += bias_holder_[0];
+  printf("bias_holder_ contains %f in its zeroth spot\n", bias_holder_[0]);
+  printf("and of course, grid_ now has %f in its zeroth spot\n", grid_[0]);
+  delete bias_holder_;
   return(bias_added);
 }
 
@@ -385,7 +439,7 @@ double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number
 #endif //EDM_GPU_MODE
 
 #ifdef EDM_GPU_MODE
-  bias_added += add_hills_gpu(buffer, hill_number, hill_type, bias_->get_grid());
+  bias_added += add_hills_gpu(buffer, hill_number,  bias_->get_grid());
   hills_added_ += hill_number;//should have added all the hills on the GPU -- test this
 #endif //EDM_GPU_MODE
   return bias_added;
@@ -410,7 +464,7 @@ void EDM::EDMBias::queue_add_hill(const double* position, double this_h){
 void EDM::EDMBias::add_hill(const double* position, double runiform) {
 
   if(temp_hill_prefactor_ < 0)
-    edm_error("Must call pre_add_hill before add_hill", "edm_bias.cpp:add_hill");
+    edm_error("Must call pre_add_hill before add_hill", "edm_bias.cu:add_hill");
   
   double this_h = temp_hill_prefactor_;
 

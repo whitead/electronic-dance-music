@@ -15,7 +15,7 @@
 
 
 inline
-double sigmoid(double x) {
+__host__ __device__ double sigmoid(double x) {
   if(x < 0)
     return 1;
   if(x > 1)
@@ -24,7 +24,7 @@ double sigmoid(double x) {
 }
 
 inline
-double sigmoid_dx(double x) {
+__host__ __device__ double sigmoid_dx(double x) {
   if(x < 0)
     return 0;
   if(x > 1)
@@ -45,7 +45,7 @@ class GaussGrid : public Grid {
    **/
  public:
   virtual ~GaussGrid() {};
-  __host__ virtual double add_value(const double* x, double height) = 0;
+  virtual double add_value(const double* x, double height) = 0;
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
@@ -177,7 +177,7 @@ class DimmedGaussGrid : public GaussGrid{
    **/
     /*to parallelize, just need to have it be device function and pass the d_grid_ x0 value (which should be the same anyway)
      */
-  __host__ virtual double add_value(const double* x0, double height) {
+  virtual double add_value(const double* x0, double height) {
 
     size_t i,j;
 
@@ -509,7 +509,7 @@ class DimmedGaussGrid : public GaussGrid{
   /**
    * Possibly wrap a value across the system boundaries to be as close as possible to the grid
    **/
-    __host__  void remap(double x[DIM]) const {//might need this to be global -Rainier
+    __host__ __device__ void remap(double x[DIM]) const {//might need this to be global -Rainier
     
     double dp[2];
     size_t i;
@@ -538,7 +538,7 @@ class DimmedGaussGrid : public GaussGrid{
 	  (boundary_max_[i] - boundary_min_[i]);	
 	
 	//which bound is closest
-	if(fabsl(grid_.min_[i] - x[i] - dp[0]) < fabsl(grid_.max_[i] - x[i] - dp[1]))
+	if(fabs(grid_.min_[i] - x[i] - dp[0]) < fabs(grid_.max_[i] - x[i] - dp[1]))
 	  x[i] += dp[0]; //wrap to it
 	else
 	  x[i] += dp[1];
@@ -576,7 +576,7 @@ class DimmedGaussGrid : public GaussGrid{
     }
   }
 
-  void duplicate_boundary() {
+  __host__ __device__ void duplicate_boundary() {
     
     size_t i,j,k,l;
     size_t index_outter[DIM], index_bound[DIM];
@@ -596,7 +596,7 @@ class DimmedGaussGrid : public GaussGrid{
     }
 
     //we need to consider the combination of min-1, min, max, max+1 for all points
-    size_t offset_size = pow(4,DIM);
+    size_t offset_size = powf(4,DIM);
     int offset[DIM];
     size_t temp;
     for(i = 0; i < offset_size; i++) {
