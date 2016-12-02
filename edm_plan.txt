@@ -1,0 +1,17 @@
+Rainier's plan for the new class-based structure for EDM. Use inheritance for the GPU-based grids from the pre-existing Grid and GaussGrid classes. Names here are shortened so the figure looks nice.
+Make new child classes of both DimmedGrid and Grid that are GPU-able:
+
+     ____GRID____
+     ^		 ^
+    /		 \
+   is		 is
+   /		  \
+DimmedGrid--has-->GaussGrid
+    ^		    ^
+    |		    |
+    is		    is
+    |		    |
+GPUDimmed--has-->GPUGauss
+
+GPU classes will just override the old funcitons declared in the original classes so that they call a GPU sync (using unified memory?) and then invoke the method appropriately -- CPU methods (like printing to file, reading, etc) will just be called exactly as the parent class, and GPU methods will be overridden to call on the GPU side of things.
+    

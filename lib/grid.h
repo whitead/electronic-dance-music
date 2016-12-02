@@ -1,3 +1,8 @@
+#ifdef EDM_GPU_MODE
+#ifndef HOST_DEV
+#define HOST_DEV __host__ __device__
+#endif
+#endif
 #ifndef GRID_H_
 #define GRID_H_
 
@@ -10,17 +15,17 @@
 #include "mpi.h"
 
 #include "edm.h"
-
+#ifndef GRID_TYPE
 #define GRID_TYPE 32
- 
+#endif //GRID_TYPE
 
 inline
-int int_floor(double number) {
+HOST_DEV int int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
 }     
                      
 inline
-double round(double number)
+HOST_DEV double round(double number)
 {
   return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
 }
@@ -50,7 +55,7 @@ namespace EDM{
 // Giovanni
 
 template<int DIM> 
-double interp(const double* dx, 
+HOST_DEV double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
 	      const double* tabder, 
@@ -143,7 +148,7 @@ class Grid {
 
 
  public:  
-  virtual double get_value(const double* x) const = 0;
+  virtual HOST_DEV double get_value(const double* x) const = 0;
   /**
    * Adds the given value to the grid and then returns how much was
    * actually added. The discrepancy can arise due to boundaries
@@ -154,7 +159,7 @@ class Grid {
   /**
    * Get value and put derivatives into "der"
    **/
-  virtual double get_value_deriv(const double* x, double* der) const = 0;
+  virtual HOST_DEV double get_value_deriv(const double* x, double* der) const = 0;
   /**
    * Write the grid to the given file
    **/
@@ -261,7 +266,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from a point to an array of indices
    **/ 
-  void get_index(const double* x, size_t result[DIM]) const {
+  HOST_DEV void get_index(const double* x, size_t result[DIM]) const {
     size_t i;
     double xi;
     for(i = 0; i < DIM; i++) {
@@ -313,7 +318,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from an array of indices to a single index
    **/
-  size_t multi2one(const size_t index[DIM]) const {
+  HOST_DEV size_t multi2one(const size_t index[DIM]) const {
     size_t result = index[DIM-1];
 
     size_t i;    
@@ -341,7 +346,7 @@ class DimmedGrid : public Grid {
   /**
    * Get the value of the grid at x
    **/ 
-  double get_value(const double* x) const{
+  HOST_DEV double get_value(const double* x) const{
 
     if(!in_grid(x)) {
 //	std::cout << "THIS SHOULD BE PRINTING\n";
@@ -389,7 +394,7 @@ class DimmedGrid : public Grid {
   /**
    * Get value and derivatives, optionally using interpolation
    **/ 
-  double get_value_deriv(const double* x, double* der) const {
+  HOST_DEV double get_value_deriv(const double* x, double* der) const {
     
     double value;
     size_t index[DIM];
@@ -865,7 +870,7 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  bool in_grid(const double x[DIM]) const {
+  HOST_DEV bool in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
 	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= (max_[i] - dx_[i])) ){//we specifically choose ">= max_[i]-dx_[i]" here to avoid a segfault caused by trying to look past the end of the grid when calling get_value on the exact grid maximum.
@@ -891,7 +896,7 @@ class DimmedGrid : public Grid {
   /** This will actually allocate the arrays and perform any sublcass initialization
    *
    **/
-  void initialize() {
+  virtual void initialize() {//virtual to allow GPU override
     size_t i;
     grid_size_ = 1;
     for(i = 0; i < DIM; i++)

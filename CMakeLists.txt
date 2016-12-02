@@ -16,11 +16,13 @@ set (CMAKE_VERBOSE_MAKEFILE 0) # Use 1 for debugging, 0 for release
 set(CMAKE_CXX_COMPILER g++)
 set (CXX_DEBUG "-O0 -g -m64 -std=c++11 -Wall -Wno-sign-compare -Wno-reorder")
 add_definitions (${CXX_DEBUG})
-set(CMAKE_C_FLAGS -m64)
-set(CMAKE_CXX_FLAGS -m64)
+#adding coverage flags
+set(CMAKE_C_FLAGS "-m64 -fprofile-arcs -ftest-coverage" )
+set(CMAKE_CXX_FLAGS "-m64 -fprofile-arcs -ftest-coverage")
+
 
 #the CUDA stuff
-#set(CUDA_NVCC_FLAGS)
+set(CUDA_NVCC_FLAGS -I/usr/include/ -I/usr/local/include/ -I/usr/local/cuda/include/)#not sure if we need these flags, because it still yells at me when I try to compile with them...
 find_package(CUDA QUIET REQUIRED) #this is for getting CUDA cross-compilation
 #set(CUDA_NVCC_FLAGS -m64)
 include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ )

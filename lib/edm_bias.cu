@@ -2,7 +2,9 @@
 #include <cuda.h>
 #include "edm_bias.cuh"
 //#include "edm_bias.h"
+#ifndef EDM_GPU_MODE
 #define EDM_GPU_MODE
+#endif //EDM_GPU_MODE
 #include <cmath>
 #include <iterator>
 #include <sstream>
@@ -18,19 +20,6 @@
 #endif
 
 //Some stuff for reading in files quickly 
-namespace std {
-  istream& operator >> (istream& is, pair<string, string>& ps) {
-    is >> ps.first;
-    std::getline (is,ps.second);
-    return is;
-  }
-  
-  ostream& operator << (ostream& os, const pair<const string, string>& ps)
-  {
-    return os << "\"" << ps.first << "\": \"" << ps.second << "\"";
-  }
-  
-}
 
 
 EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0), 
@@ -368,13 +357,16 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
 //       }
 // }
 
-double EDM::EDMBias::add_hills_gpu(const double* buffer, const size_t hill_number, double *grid_){
+/* __host__ double EDM::EDMBias::add_hills_gpu(const double* buffer, const size_t hill_number, double *grid_){
+  //*buffer is the array full of points to add, as DIM-size tuples
+  //*hill_number is the running total of hills being added
+   
   double bias_added = 0;
   double vol_element = 1;
-  int *new_buffer = new int[hill_number];//array of the reduced hill indices for adding
-  double *hill_heights = new double[hill_number];//the corresponding heights of each gaussian to add
+  int *new_buffer = new int[hill_number];//array of the reduced (1D) hill indices for adding
+  double *hill_heights = new double[hill_number];//the heights of each gaussian to add
   int result;
-  int index[dim_];//a temp index holder for finding the reduced indices in the buffer
+  int index[grid_->dim_];//a temp index holder for finding the reduced indices in the buffer
   for(int i = 0; i < dim_; i++){
     vol_element *= bias_dx_[i];//for the gaussians
     for(int j = 0; j < dim_; j++){
@@ -423,7 +415,7 @@ double EDM::EDMBias::add_hills_gpu(const double* buffer, const size_t hill_numbe
   printf("and of course, grid_ now has %f in its zeroth spot\n", grid_[0]);
   delete bias_holder_;
   return(bias_added);
-}
+}*/
 
 double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number, char hill_type){
   double bias_added = 0;
@@ -910,7 +902,7 @@ void EDM::EDMBias::set_mask(const int* mask) {
   mask_ = mask;
 }
 
-int EDM::EDMBias::read_input(const std::string& input_filename){ 
+/*int EDM::EDMBias::read_input(const std::string& input_filename){ 
 
   //parse file into a map
   using namespace std;
@@ -1034,3 +1026,4 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
     return result;
 
 }
+*/

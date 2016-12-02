@@ -1,11 +1,14 @@
 #ifndef EDM_BIAS_H_
 #define EDM_BIAS_H_
+
+#ifndef EDM_GPU_MODE
 #define EDM_GPU_MODE
+#endif
 #include <cuda_runtime.h>
 #include <cuda.h>
-#include "gaussian_grid.cuh"
+#include "gpu_gaussian_grid.cuh"
 #include "grid.cuh"
-#include "edm.cuh"
+#include "edm.h"
 #include <string>
 #include <iterator>
 #include <sstream>

@@ -1,5 +1,10 @@
 #ifndef GAUSS_GRID_H_
 #define GAUSS_GRID_H_
+#ifdef EDM_GPU_MODE
+#ifndef HOST_DEV
+#define HOST_DEV __host__ __device__
+#endif
+#endif
 
 #include "grid.h"
 #include "edm.h"
@@ -14,7 +19,7 @@
 
 
 inline
-double sigmoid(double x) {
+HOST_DEV double sigmoid(double x) {
   if(x < 0)
     return 1;
   if(x > 1)
@@ -23,7 +28,7 @@ double sigmoid(double x) {
 }
 
 inline
-double sigmoid_dx(double x) {
+HOST_DEV double sigmoid_dx(double x) {
   if(x < 0)
     return 0;
   if(x > 1)
@@ -47,7 +52,7 @@ class GaussGrid : public Grid {
   virtual double add_value(const double* x, double height) = 0;
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
-  virtual int in_bounds(const double* x) const = 0;
+  virtual HOST_DEV int in_bounds(const double* x) const = 0;
   virtual void multi_write(const std::string& filename) const = 0;
   /**
    *Write out the file in lammps tabular potential format.
@@ -96,7 +101,7 @@ class DimmedGaussGrid : public GaussGrid{
     //nothing
   }
 
-  double get_value(const double* x) const {
+  HOST_DEV double get_value(const double* x) const {
 
     size_t i;
 
@@ -115,7 +120,7 @@ class DimmedGaussGrid : public GaussGrid{
     return grid_.get_value(xx);
   }
 
-  double get_value_deriv(const double* x, double* der) const{
+  HOST_DEV double get_value_deriv(const double* x, double* der) const{
 
     size_t i;
 
@@ -487,7 +492,7 @@ class DimmedGaussGrid : public GaussGrid{
     return grid_.get_grid_size();
   }
 
-  int in_bounds(const double x[DIM]) const {
+  HOST_DEV int in_bounds(const double x[DIM]) const {
 
     size_t i;
     for(i = 0; i < DIM; i++) {

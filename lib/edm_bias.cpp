@@ -1,4 +1,5 @@
 #include <cuda_runtime.h>
+#include <cuda.h>
 #include "edm_bias.h"
 //#include "edm_bias.h"
 
@@ -366,12 +367,12 @@ double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number
 #ifdef EDM_GPU_MODE
   double *d_grid_, *d_bias_holder_;//GPU copies of the grid and an empty dummy grid
   //this is for keeping track of total bias added on GPU; need to initialize and transfer over
-  double bias_holder[bias_->grid_size_] = {0};
+  double bias_holder[bias_->get_grid_size()] = {0};
   //now we transfer everything over, including the buffer of hills to add
-  cudaMalloc(&d_grid_, bias_->grid_size_);
-  cudaMalloc(&d_bias_holder_, bias_->grid_size_);
-  cudaMemCpy(d_grid_, bias_->grid_, sizeof(double) * bias_.grid_size_, cudaMemcpyHostToDevice);
-  cudaMemCpy(d_bias_holder_, bias_holder, sizeof(double) * bias_->grid_size_, cudaMemCpyHostToDevice);
+  cudaMalloc(&d_grid_, bias_->get_grid_size());
+  cudaMalloc(&d_bias_holder_, bias_->get_grid_size());
+  cudaMemCpy(d_grid_, bias_->get_grid(), sizeof(double) * bias_->get_grid_size(), cudaMemcpyHostToDevice);
+  cudaMemCpy(d_bias_holder_, bias_holder, sizeof(double) * bias_->get_grid_size(), cudaMemCpyHostToDevice);
   //now the grid and the bias tracker are on GPU, so we call the GPU add
 #endif //EDM_GPU_MODE
   return bias_added;
