@@ -1,8 +1,3 @@
-#ifdef EDM_GPU_MODE
-#ifndef HOST_DEV
-#define HOST_DEV __host__ __device__
-#endif
-#endif
 #ifndef GRID_H_
 #define GRID_H_
 

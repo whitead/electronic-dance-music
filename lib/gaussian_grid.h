@@ -1,10 +1,5 @@
 #ifndef GAUSS_GRID_H_
 #define GAUSS_GRID_H_
-#ifdef EDM_GPU_MODE
-#ifndef HOST_DEV
-#define HOST_DEV __host__ __device__
-#endif
-#endif
 
 #include "grid.h"
 #include "edm.h"
