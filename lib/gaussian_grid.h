@@ -44,11 +44,16 @@ class GaussGrid : public Grid {
    **/
  public:
   virtual ~GaussGrid() {};
-  virtual double add_value(const double* x, double height) = 0;
+  virtual HOST_DEV double add_value(const double* x, double height) = 0;
   virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
   virtual double get_volume() const = 0;
   virtual HOST_DEV int in_bounds(const double* x) const = 0;
-  virtual void multi_write(const std::string& filename) const = 0;
+  virtual void multi_write (const std::string& filename) const = 0;
+  virtual void multi_write(const std::string& filename, 
+		   const double* box_low, 
+		   const double* box_high, 
+		   const int* b_periodic,
+		   int b_lammps_format) const = 0;
   /**
    *Write out the file in lammps tabular potential format.
    **/
@@ -78,6 +83,8 @@ class DimmedGaussGrid : public GaussGrid{
     set_boundary(min, max, b_periodic);
     update_minigrid();
   }
+
+  DimmedGaussGrid() = delete;
 
   /**
    * Rebuild from a file. Files don't store sigma, so it must be set again.
@@ -173,7 +180,7 @@ class DimmedGaussGrid : public GaussGrid{
   /**
    * The workhorse method of the program. The source is very well-documented
    **/
-  double add_value(const double* x0, double height) {
+  double HOST_DEV add_value(const double* x0, double height) {
 
     size_t i,j;
 

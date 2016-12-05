@@ -149,7 +149,7 @@ class Grid {
    * actually added. The discrepancy can arise due to boundaries
    * and/or kernels.
    */
-  virtual double add_value(const double* x0, double value) = 0;
+  virtual HOST_DEV double add_value(const double* x0, double value) = 0;
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
@@ -212,6 +212,10 @@ class DimmedGrid : public Grid {
     initialize();
   }
 
+  /**Disallow default constructor
+   *
+   **/
+  DimmedGrid() = delete;
   /**
    * Constructor from file, with interpolation specified
    **/
@@ -329,7 +333,7 @@ class DimmedGrid : public Grid {
    * Go from single index to array
    **/
   void one2multi(size_t index, size_t result[DIM]) const {
-    size_t i;
+    int i;
 
     for(i = 0; i < DIM-1; i++) {
       result[i] = index % grid_number_[i];
@@ -369,7 +373,7 @@ class DimmedGrid : public Grid {
   /**
    * Add a value to the grid. Only makes sense if there is no derivative
    **/
-  double add_value(const double* x0, double value) {
+  HOST_DEV double add_value(const double* x0, double value) {
     if(b_interpolate_) {
       edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
     }
@@ -520,7 +524,7 @@ class DimmedGrid : public Grid {
       edm_error("Lammps format only valid for 1D grids", "grid.h:multi_write");
     }
         
-    size_t i, j;
+    unsigned int i, j;
     int myrank, otherrank, size;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);

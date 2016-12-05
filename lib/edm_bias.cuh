@@ -6,7 +6,7 @@
 #endif
 #include <cuda_runtime.h>
 #include <cuda.h>
-#include "gpu_gaussian_grid.cuh"
+#include "gaussian_grid.cuh"
 #include "grid.cuh"
 #include "edm.h"
 #include <string>

@@ -34,20 +34,12 @@ namespace EDM{
      **/
   public:
     virtual ~GPUGaussGrid() {};
-    virtual double add_value(const double* x, double height) = 0;
+    __host__ __device__ double add_value(const double* x, double height) = 0;
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
-    virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
-    virtual double get_volume() const = 0;
-    __host__ __device__ virtual int in_bounds(const double* x) const = 0;
-    virtual void multi_write(const std::string& filename) const = 0;
-    /**
-     *Write out the file in lammps tabular potential format.
-     **/
-    virtual void lammps_multi_write(const std::string& filename) const = 0;
   };
 
   template<int DIM>
-  class GPUDimmedGaussGrid : public GPUGaussGrid{
+  class GPUDimmedGaussGrid : public DimmedGaussGrid<DIM>{
     /** A class for treating grids that have gaussians on it 
      *
      *
@@ -58,30 +50,12 @@ namespace EDM{
 		       const double* bin_spacing, 
 		       const int* b_periodic, 
 		       int b_interpolate,
-		       const double* sigma) : grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate), b_dirty_bounds(0){
-      //the 1 means we always use derivatives for a gaussian grid
-    
-      size_t i;
-      for(i = 0; i < DIM; i++) {
-	sigma_[i] = sigma[i] * sqrt(2.);
-      }
-    
-      set_boundary(min, max, b_periodic);
-      update_minigrid();
-    }
+		       const double* sigma) : DimmedGaussGrid<DIM>(min, max, bin_spacing, b_periodic, b_interpolate, sigma){}
 
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
      **/
-    GPUDimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename), b_dirty_bounds(0) {
-      size_t i;
-      for(i = 0; i < DIM; i++) {
-	sigma_[i] = sigma[i] * sqrt(2.);
-      }
-
-      set_boundary(grid_.min_, grid_.max_, grid_.b_periodic_);    
-      update_minigrid();
-    }
+    GPUDimmedGaussGrid(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma){}
 
     ~GPUDimmedGaussGrid() {
       //nothing
@@ -128,45 +102,17 @@ namespace EDM{
       return grid_.get_value_deriv(xx, der);
     }
 
-    void read(const std::string& filename) {
-      grid_.read(filename);
-    }
-
-    void write(const std::string& filename) const {
-      grid_.write(filename);
-    }
-
     /**
      * Uses its known boundaries to handle assembling all grids
      **/
-    void multi_write(const std::string& filename) const {
-      grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 0);
-    }
 
-    void lammps_multi_write(const std::string& filename) const {
-      grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 1);
-    }
-
-
-    void multi_write(const std::string& filename, 
-		     const double* box_low, 
-		     const double* box_high, 
-		     const int* b_periodic,
-		     int b_lammps_format) const {
-      grid_.multi_write(filename, box_low, box_high, b_periodic, 0);
-    }
-
-  
-    void set_interpolation(int b_interpolate) {
-      grid_.b_interpolate_ = b_interpolate;
-    }
 
     /**
      * The workhorse method of the program. The source is very well-documented
      **/
     /*to parallelize, just need to have it be device function and pass the d_grid_ x0 value (which should be the same anyway)
      */
-    virtual double add_value(const double* x0, double height) {
+    virtual __host__ __device__  double add_value(const double* x0, double height) {
 
       size_t i,j;
 
@@ -630,7 +576,7 @@ namespace EDM{
 /**
  * Used to avoid template constructors
  **/
-  GPUGaussGrid* make_gpu_gauss_grid(unsigned int dim, 
+  GaussGrid* make_gpu_gauss_grid(unsigned int dim, 
 			     const double* min, 
 			     const double* max, 
 			     const double* bin_spacing, 
@@ -641,7 +587,7 @@ namespace EDM{
 /**
    p * Used to avoid template constructors
 **/
-  GPUGaussGrid* read_gpu_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
+  GaussGrid* read_gpu_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
 
 }
 #endif //GPU_GAUSS_GRID_H_
