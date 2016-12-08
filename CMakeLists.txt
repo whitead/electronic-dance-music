@@ -9,9 +9,8 @@ set (WordModel_VERSION_MINOR 1)
 set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
 set (LAMMPS_SRC "/home/rainier/lammps/src")
 
-
 #compilation flags
-#set (CXX_STD_VERSION "-std=c++11 -g")
+set (CXX_STD_VERSION "-std=c++11 -g")
 set (CMAKE_VERBOSE_MAKEFILE 0) # Use 1 for debugging, 0 for release
 set(CMAKE_CXX_COMPILER g++)
 set (CXX_DEBUG "-O0 -g -m64 -std=c++11 -Wall -Wno-sign-compare -Wno-reorder")

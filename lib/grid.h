@@ -15,16 +15,10 @@
 #endif //GRID_TYPE
 
 inline
-HOST_DEV int int_floor(double number) {
+ int int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
 }     
                      
-inline
-HOST_DEV double round(double number)
-{
-  return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
-}
-
 namespace EDM{
 
 /**
@@ -49,8 +43,8 @@ namespace EDM{
 // Maybe one day I will learn the proper way to do splines...
 // Giovanni
 
-template<int DIM> 
-HOST_DEV double interp(const double* dx, 
+template<unsigned int DIM> 
+ double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
 	      const double* tabder, 
@@ -143,18 +137,18 @@ class Grid {
 
 
  public:  
-  virtual HOST_DEV double get_value(const double* x) const = 0;
+  virtual  double get_value(const double* x) const = 0;
   /**
    * Adds the given value to the grid and then returns how much was
    * actually added. The discrepancy can arise due to boundaries
    * and/or kernels.
    */
-  virtual HOST_DEV double add_value(const double* x0, double value) = 0;
+  virtual  double add_value(const double* x0, double value) = 0;
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
    **/
-  virtual HOST_DEV double get_value_deriv(const double* x, double* der) const = 0;
+  virtual  double get_value_deriv(const double* x, double* der) const = 0;
   /**
    * Write the grid to the given file
    **/
@@ -212,10 +206,6 @@ class DimmedGrid : public Grid {
     initialize();
   }
 
-  /**Disallow default constructor
-   *
-   **/
-  DimmedGrid() = delete;
   /**
    * Constructor from file, with interpolation specified
    **/
@@ -265,7 +255,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from a point to an array of indices
    **/ 
-  HOST_DEV void get_index(const double* x, size_t result[DIM]) const {
+   void get_index(const double* x, size_t result[DIM]) const {
     size_t i;
     double xi;
     for(i = 0; i < DIM; i++) {
@@ -317,7 +307,7 @@ class DimmedGrid : public Grid {
   /**
    * Go from an array of indices to a single index
    **/
-  HOST_DEV size_t multi2one(const size_t index[DIM]) const {
+   size_t multi2one(const size_t index[DIM]) const {
     size_t result = index[DIM-1];
 
     size_t i;    
@@ -345,7 +335,7 @@ class DimmedGrid : public Grid {
   /**
    * Get the value of the grid at x
    **/ 
-  HOST_DEV double get_value(const double* x) const{
+   double get_value(const double* x) const{
 
     if(!in_grid(x)) {
 //	std::cout << "THIS SHOULD BE PRINTING\n";
@@ -373,7 +363,7 @@ class DimmedGrid : public Grid {
   /**
    * Add a value to the grid. Only makes sense if there is no derivative
    **/
-  HOST_DEV double add_value(const double* x0, double value) {
+   double add_value(const double* x0, double value) {
     if(b_interpolate_) {
       edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
     }
@@ -393,7 +383,7 @@ class DimmedGrid : public Grid {
   /**
    * Get value and derivatives, optionally using interpolation
    **/ 
-  HOST_DEV double get_value_deriv(const double* x, double* der) const {
+   double get_value_deriv(const double* x, double* der) const {
     
     double value;
     size_t index[DIM];
@@ -612,7 +602,7 @@ class DimmedGrid : public Grid {
 
       //one2multi
       temp = i;
-      for(j = 0; j < DIM-1; j++) {
+      for(j = 0; DIM > 1 && j < DIM-1; j++) {
 	super_index[j] = temp % reduced_counts[j];
 	temp = (temp - super_index[j]) / reduced_counts[j];
 	x[j] = super_index[j] * dx_[j] +  box_min[j];
@@ -869,7 +859,7 @@ class DimmedGrid : public Grid {
   /**
    * Check if a point is in bounds
    **/
-  HOST_DEV bool in_grid(const double x[DIM]) const {
+   bool in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
 	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= (max_[i] - dx_[i])) ){//we specifically choose ">= max_[i]-dx_[i]" here to avoid a segfault caused by trying to look past the end of the grid when calling get_value on the exact grid maximum.

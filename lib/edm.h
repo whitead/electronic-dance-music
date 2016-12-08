@@ -1,5 +1,8 @@
+#ifndef EDM_H_
+#define EDM_H_
+
 #include <iostream>
-#define EDM_GPU_MODE_NO
+
 
 #ifdef __CUDACC__
 #ifndef HOST_DEV
@@ -16,3 +19,5 @@ namespace EDM{
   void edm_error(const char* error, const char* location);
 
 }
+
+#endif //EDM_H_
