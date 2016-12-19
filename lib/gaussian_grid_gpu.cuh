@@ -28,24 +28,24 @@ namespace EDM{
  * This class uses a compositional ("has-a") relationship with Grid. This is the 
  * interface and DimmedGaussGrid has the dimension template parameter
  **/
-  class GPUGaussGrid : public GaussGrid {
+  class GaussGridGPU : public GaussGrid {
     /**
      * Retruns the integrated amount of bias added to the system
      **/
   public:
-    virtual ~GPUGaussGrid() {};
+    virtual ~GaussGridGPU() {};
     double add_value(const double* x, double height) = 0;
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   };
 
   template<unsigned int DIM>
-  class GPUDimmedGaussGrid : public DimmedGaussGrid<DIM>{
+  class DimmedGaussGridGPU : public DimmedGaussGrid<DIM>{
     /** A class for treating grids that have gaussians on it 
      *
      *
      **/
   public:
-    GPUDimmedGaussGrid(const double* min, 
+    DimmedGaussGridGPU(const double* min, 
 		       const double* max, 
 		       const double* bin_spacing, 
 		       const int* b_periodic, 
@@ -55,9 +55,9 @@ namespace EDM{
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
      **/
-    GPUDimmedGaussGrid(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma) {}
+    DimmedGaussGridGPU(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma) {}
   
-    ~GPUDimmedGaussGrid() {
+    ~DimmedGaussGridGPU() {
       //nothing
     }
 
@@ -66,7 +66,7 @@ namespace EDM{
 /**
  * Used to avoid template constructors
  **/
-  GaussGrid* make_gpu_gauss_grid(unsigned int dim, 
+  GaussGrid* make_gauss_grid_gpu(unsigned int dim, 
 			     const double* min, 
 			     const double* max, 
 			     const double* bin_spacing, 
@@ -77,7 +77,7 @@ namespace EDM{
 /**
    p * Used to avoid template constructors
 **/
-  GaussGrid* read_gpu_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
+  GaussGrid* read_gauss_grid_gpu(unsigned int dim, const std::string& filename, const double* sigma);
 
 }
 #endif //GPU_GAUSS_GRID_H_

@@ -18,11 +18,11 @@
 
 namespace EDM{
   template<unsigned int DIM>
-  class GPUDimmedGrid : public DimmedGrid<DIM> {
+  class DimmedGridGPU : public DimmedGrid<DIM> {
     /** A DIM-dimensional grid for GPU use. Stores on 1D column-ordered array
      **/
   public:
-    GPUDimmedGrid(const double* min, 
+    DimmedGridGPU(const double* min, 
 	       const double* max, 
 	       const double* bin_spacing, 
 	       const int* b_periodic, 
