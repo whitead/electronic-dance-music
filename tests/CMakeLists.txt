@@ -1,5 +1,5 @@
 #Detect boost
-find_package (Boost 1.55 COMPONENTS system filesystem unit_test_framework REQUIRED)  
+find_package (Boost 1.55 COMPONENTS system timer filesystem unit_test_framework REQUIRED)  
 include_directories (${Boost_INCLUDE_DIRS})
 message("The Boost include dirs are at ${Boost_INCLUDE_DIRS}")
 set (TEST_GRID_SRC grids)

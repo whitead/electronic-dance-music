@@ -6,7 +6,6 @@
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM
 #include <boost/test/unit_test.hpp>
-#include <boost/timer.hpp>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -907,35 +906,6 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
 
   free(positions[0]);
   free(positions);
-}
-
-double cpuSecond(){
-    struct timeval tp;
-    gettimeofday(&tp, NULL);
-    return ((double)tp.tv_sec + (double)tp.tv_usec*1.e-6);
-  }
-
-//This test will simply run several thousand timesteps and time how long it takes.
-BOOST_AUTO_TEST_CASE(edm_cpu_timer_1d){
-  
-  double iStart, iElapsed;
-  double min[] = {-10};
-  double max[] = {10};
-  double sigma[] = {1};
-  double bin_spacing[] = {1};
-  int periodic[] = {1};
-  double x[1] = {0};
-  unsigned int n_hills = 500000000;
-  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
-  //now just do a generic loop, adding 10k gaussians, and time it
-  iStart = cpuSecond();
-  for( unsigned int i = 0; i < n_hills; i++){
-    int rand_num = rand() % 20 - 10;
-    x[0] = rand_num;
-    g.add_value(x,1);
-  }
-  iElapsed = cpuSecond() - iStart;
-  printf("Time elapsed for adding %u hills: %f sec\n", n_hills, iElapsed);
 }
 
 

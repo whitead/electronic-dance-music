@@ -21,7 +21,7 @@ set(CMAKE_CXX_FLAGS "-m64 -fprofile-arcs -ftest-coverage")
 
 
 #the CUDA stuff
-set(CUDA_NVCC_FLAGS -I/usr/include/ -I/usr/local/include/ -I/usr/local/cuda/include/)#not sure if we need these flags, because it still yells at me when I try to compile with them...
+set(CUDA_NVCC_FLAGS --std=c++11 -I/usr/include/ -I/usr/local/include/ -I/usr/local/cuda/include/)#not sure if we need these flags, because it still yells at me when I try to compile with them...
 find_package(CUDA QUIET REQUIRED) #this is for getting CUDA cross-compilation
 #set(CUDA_NVCC_FLAGS -m64)
 include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ )
