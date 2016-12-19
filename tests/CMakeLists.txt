@@ -9,14 +9,24 @@ include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ 
 add_definitions(-DTEST_GRID_SRC=${TEST_GRID_SRC})
 add_definitions(-DTEST_EDM_SRC=${TEST_EDM_SRC})
 
-cuda_add_executable (edm_test edm_test.cu)
+cuda_add_executable (edm_gpu_test edm_gpu_test.cu)
+add_executable (edm_test edm_test.cpp)
 target_link_libraries (edm_test
-                       edm_cuda_lib
+                       edm_lib
                       ${Boost_FILESYSTEM_LIBRARY}
                       ${Boost_SYSTEM_LIBRARY}
                       ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
 		      ${Boost_LIBRARIES}
 		      ${MPI_CXX_LIBRARIES})
+
+target_link_libraries (edm_gpu_test
+                       edm_lib
+                      ${Boost_FILESYSTEM_LIBRARY}
+                      ${Boost_SYSTEM_LIBRARY}
+                      ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
+		      ${Boost_LIBRARIES}
+		      ${MPI_CXX_LIBRARIES})
+
 
 
 file (COPY 1.grid DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/${TEST_GRID_SRC}")

@@ -4,14 +4,15 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <stdlib.h>
+//These must be declared here.
+#define BOOST_TEST_DYN_LINK 
+#define BOOST_TEST_MODULE EDM_GPU
+
 #include <boost/timer/timer.hpp>
 #include <boost/chrono.hpp>
 #include <boost/test/unit_test.hpp>
 
 #define TIMING_BOUND_edm_cpu_timer_1d 10000
-
-#define BOOST_TEST_DYN_LINK 
-#define BOOST_TEST_MODULE EDM_GPU
 
 using namespace boost;
 using namespace EDM;

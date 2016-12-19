@@ -1,8 +1,6 @@
 #include "grid.h"
 #include "edm_bias.h"
 #include "gaussian_grid.h"
-//#include <cuda_runtime.h>
-//#include <cuda.h>
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM
 #include <boost/test/unit_test.hpp>
