@@ -1,5 +1,5 @@
-#ifndef GPU_GAUSS_GRID_H_
-#define GPU_GAUSS_GRID_H_
+#ifndef GPU_GAUSS_GRID_CH_
+#define GPU_GAUSS_GRID_CH_
 
 #include "gaussian_grid.h"
 #include "grid_gpu.cuh"
@@ -80,4 +80,4 @@ namespace EDM{
   GaussGrid* read_gauss_grid_gpu(unsigned int dim, const std::string& filename, const double* sigma);
 
 }
-#endif //GPU_GAUSS_GRID_H_
+#endif //GPU_GAUSS_GRID_CH_
