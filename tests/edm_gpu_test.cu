@@ -1,6 +1,6 @@
-#include "grid.cuh"
-#include "edm_bias.cuh"
-#include "gaussian_grid.cuh"
+#include "grid_gpu.cuh"
+#include "edm_bias_gpu.cuh"
+#include "gaussian_grid_gpu.cuh"
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <stdlib.h>

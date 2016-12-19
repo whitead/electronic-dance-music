@@ -1,4 +1,4 @@
-#include "gaussian_grid.cuh"
+#include "gaussian_grid_gpu.cuh"
 
 EDM::GaussGrid* EDM::make_gauss_grid_gpu(unsigned int dim, 
 			   const double* min, 

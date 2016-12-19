@@ -2,7 +2,7 @@
 #define GPU_GAUSS_GRID_H_
 
 #include "gaussian_grid.h"
-#include "grid.cuh"
+#include "grid_gpu.cuh"
 #include "edm.h"
 #include <string>
 #include <iostream>
