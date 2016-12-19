@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   array[0] = 0.0;
   g.get_value(array);
   array[0] = 10.0;
-  g.get_value(array);//[rainier] problem with getting array value at rightmost edge, not leftmost
+  g.get_value(array);
 
 }
 
@@ -608,6 +608,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   double dx = 0.1;
   int bins = (int) 200 / dx;
   for(i = 0; i < bins; i++) {
+    printf("Made it to i = %i\n", i);
     x[0] = -100 + i * dx;
     v = g.get_value_deriv(x,der);
     if(i > 1) {

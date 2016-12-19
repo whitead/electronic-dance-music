@@ -56,7 +56,7 @@ template<unsigned int DIM>
 // tabf:   table with function, already pointed at the floor grid point
 // tabder: table with POSITIVE gradients (the fastest running index is the dimension index), already pointed at the floor grid point
 // stride: strides to the next point on the tabf array.
-//         note that, in case of PBC, this stride should corrispond to a backward jump of (N-1) points,
+//         note that, in case of PBC, this stride should correspond to a backward jump of (N-1) points,
 //         where N is the number of points in the domain. 
 //         also note that the corrisponding strides for tabder can be obtained multipling times DIM
 // der:    in output, the POSITIVE gradient.
@@ -104,10 +104,10 @@ template<unsigned int DIM>
       X = fabs(where[idim] / dx[idim] - x0[idim]); //switch from local spatial coordinates to local rescaled 
       X2 = X * X;
       X3 = X2 * X;
-      if(fabs(tabf[shift]) < 0.0000001)  //[rainier] invalid read from this line
+      if(fabs(tabf[shift]) < 0.0000001)  
 	qq = 0.0; //special case of 0/0
       else 
-	qq = -tabder[shift * DIM + idim] / tabf[shift];
+	qq = -tabder[shift * DIM + idim] / tabf[shift];//[rainier] invalid read from this line
       
       //The sign change is in case we want a backwards or fowrards derivative
       //dx comes back in via chain rule
