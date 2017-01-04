@@ -60,7 +60,7 @@ class GaussGrid : public Grid {
   virtual void lammps_multi_write(const std::string& filename) const = 0;
 };
 
-template<unsigned int DIM>
+template< int DIM>
 class DimmedGaussGrid : public GaussGrid{
   /** A class for treating grids that have gaussians on it 
    *
@@ -638,7 +638,7 @@ class DimmedGaussGrid : public GaussGrid{
 /**
  * Used to avoid template constructors
  **/
-GaussGrid* make_gauss_grid(unsigned int dim, 
+GaussGrid* make_gauss_grid( int dim, 
 			   const double* min, 
 			   const double* max, 
 			   const double* bin_spacing, 
@@ -649,7 +649,7 @@ GaussGrid* make_gauss_grid(unsigned int dim,
 /**
 p * Used to avoid template constructors
  **/
-GaussGrid* read_gauss_grid(unsigned int dim, const std::string& filename, const double* sigma);
+GaussGrid* read_gauss_grid( int dim, const std::string& filename, const double* sigma);
 
 }
 #endif //GAUSS_GRID_H_

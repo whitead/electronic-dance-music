@@ -1,6 +1,6 @@
 #include "gaussian_grid_gpu.cuh"
 
-EDM::GaussGrid* EDM::make_gauss_grid_gpu(unsigned int dim, 
+EDM::GaussGrid* EDM::make_gauss_grid_gpu( int dim, 
 			   const double* min, 
 			   const double* max, 
 			   const double* bin_spacing, 
@@ -20,7 +20,7 @@ EDM::GaussGrid* EDM::make_gauss_grid_gpu(unsigned int dim,
 }
 
 
-EDM::GaussGrid* EDM::read_gauss_grid_gpu(unsigned int dim, const std::string& filename, const double* sigma) {
+EDM::GaussGrid* EDM::read_gauss_grid_gpu( int dim, const std::string& filename, const double* sigma) {
   switch(dim) {
   case 1:
     return new DimmedGaussGridGPU<1>(filename, sigma);

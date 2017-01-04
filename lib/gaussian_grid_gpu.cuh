@@ -38,7 +38,7 @@ namespace EDM{
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   };
 
-  template<unsigned int DIM>
+  template< int DIM>
   class DimmedGaussGridGPU : public DimmedGaussGrid<DIM>{
     /** A class for treating grids that have gaussians on it 
      *
@@ -66,7 +66,7 @@ namespace EDM{
 /**
  * Used to avoid template constructors
  **/
-  GaussGrid* make_gauss_grid_gpu(unsigned int dim, 
+  GaussGrid* make_gauss_grid_gpu( int dim, 
 			     const double* min, 
 			     const double* max, 
 			     const double* bin_spacing, 
@@ -77,7 +77,7 @@ namespace EDM{
 /**
    p * Used to avoid template constructors
 **/
-  GaussGrid* read_gauss_grid_gpu(unsigned int dim, const std::string& filename, const double* sigma);
+  GaussGrid* read_gauss_grid_gpu( int dim, const std::string& filename, const double* sigma);
 
 }
 #endif //GPU_GAUSS_GRID_CH_

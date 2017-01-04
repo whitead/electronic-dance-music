@@ -17,7 +17,7 @@
 #endif //GRID_TYPE
 
 namespace EDM{
-  template<unsigned int DIM>
+  template< int DIM>
   class DimmedGridGPU : public DimmedGrid<DIM> {
     /** A DIM-dimensional grid for GPU use. Stores on 1D column-ordered array
      **/

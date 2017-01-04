@@ -120,7 +120,7 @@ class EDMBias {
   int b_targeting_;// boolean, do targeting  
   int mpi_rank_; //my MPI rank
   int mpi_size_; //my MPI size
-  unsigned int dim_;//the dimension
+   int dim_;//the dimension
   double global_tempering_;// global tempering threshold
   double bias_factor_;
   double boltzmann_factor_;

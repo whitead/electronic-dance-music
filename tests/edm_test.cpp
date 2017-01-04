@@ -646,7 +646,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    g_integral += g.add_value(x, 1.5);
+    g_integral +=  g.add_value(x, 1.5);
   }
 
   //now we calculate finite differences on the grid
@@ -658,7 +658,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   int bins = (int) 200 / dx;
   for(i = 0; i < bins; i++) {
     x[0] = -100 + i * dx;
-    v = g.get_value_deriv(x,der);
+    v = g.get_value_deriv(x,der);//this is where we die, at i = 1990...
     if(i > 1) {
       approx_der = (v - vlastlast) / (2*dx);
       BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.01);

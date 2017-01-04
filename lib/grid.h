@@ -43,7 +43,7 @@ namespace EDM{
 // Maybe one day I will learn the proper way to do splines...
 // Giovanni
 
-template<unsigned int DIM> 
+template<int DIM> 
  double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
@@ -87,7 +87,7 @@ template<unsigned int DIM>
   
   // looping over neighbour points:
   for(ipoint = 0; ipoint < npoints; ipoint++){
-    
+//    printf("made it to ipoint = %i\n", ipoint);
     // find the local grid offset of neighbour point (x0) [0 or 1] and its corresponding change in collapsed index in order to use the given potential and forces
     tmp = ipoint;
     shift = 0;
@@ -175,7 +175,7 @@ class Grid {
 
 };
 
-template<unsigned int DIM>
+template< int DIM>
 class DimmedGrid : public Grid {
   /** A DIM-dimensional grid for storing things. Stores on 1D column-ordered array
    *
@@ -410,7 +410,7 @@ class DimmedGrid : public Grid {
 
     if(b_interpolate_) {
       
-      double where[DIM]; //local position (local meaning relative to neighbors
+      double where[DIM]; //local position (local meaning relative to neighbors)
       int stride[DIM]; //the indexing stride, which also accounts for periodicity
       double wrapped_x;
       
@@ -426,8 +426,11 @@ class DimmedGrid : public Grid {
 	//get position relative to neighbors
 	where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	//treat possible stride wrap
-	if(b_periodic_[i] && index[i] == grid_number_[i] - 1)
+	if(b_periodic_[i] && index[i] == grid_number_[i] - 1){
+//	  printf("adjusting for being at the right edge\n");
 	  stride[i] *= (1 - grid_number_[i]);
+	}
+	  
       }
       
       value = interp<DIM>(dx_, where, &grid_[index1], &grid_deriv_[index1 * DIM], stride, der);
@@ -904,7 +907,7 @@ class DimmedGrid : public Grid {
 /**
  * This is a non-template constructor which dispatches to the appropiate template
  **/
-Grid* make_grid(unsigned int dim, 
+Grid* make_grid( int dim, 
 		const double* min, 
 		const double* max, 
 		const double* bin_spacing, 
@@ -916,12 +919,12 @@ Grid* make_grid(unsigned int dim,
  * This is a non-template constructor which dispatches to the appropiate template
  **/
 
-Grid* read_grid(unsigned int dim, const std::string& filename, int b_interpolate);
+Grid* read_grid( int dim, const std::string& filename, int b_interpolate);
 
 /**
  * This is a non-template constructor which dispatches to the appropiate template
  **/
-Grid* read_grid(unsigned int dim, const std::string& filename);
+Grid* read_grid( int dim, const std::string& filename);
 
 
 }

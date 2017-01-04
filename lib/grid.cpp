@@ -1,6 +1,6 @@
 #include "grid.h"
 
-EDM::Grid* EDM::make_grid(unsigned int dim, 
+EDM::Grid* EDM::make_grid( int dim, 
 		const double* min, 
 		const double* max, 
 		const double* bin_spacing, 
@@ -19,7 +19,7 @@ EDM::Grid* EDM::make_grid(unsigned int dim,
   return NULL;
 }
 
-EDM::Grid* EDM::read_grid(unsigned int dim, const std::string& filename, int b_interpolate) {
+EDM::Grid* EDM::read_grid( int dim, const std::string& filename, int b_interpolate) {
   switch(dim) {
   case 1:
     return new DimmedGrid<1>(filename, b_interpolate);
@@ -32,7 +32,7 @@ EDM::Grid* EDM::read_grid(unsigned int dim, const std::string& filename, int b_i
 }
 
 
-EDM::Grid* EDM::read_grid(unsigned int dim, const std::string& filename) {
+EDM::Grid* EDM::read_grid( int dim, const std::string& filename) {
   switch(dim) {
   case 1:
     return new DimmedGrid<1>(filename);
