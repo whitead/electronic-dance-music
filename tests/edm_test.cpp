@@ -882,8 +882,7 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   bias.write_bias("BIAS");
 
   
-  //  std::cout << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " 
-  //	    << bias.bias_->get_value(positions[0]) << std::endl;
+  std::cout << "prefactor is " << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " << " and get_value yields " << bias.bias_->get_value(positions[0]) << std::endl;
   //test if the value at the point is correct
   BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
   //check if the claimed amount of bias added is correct
