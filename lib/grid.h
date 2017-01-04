@@ -865,7 +865,7 @@ class DimmedGrid : public Grid {
    bool in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
-	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] >= (max_[i] - dx_[i])) ){//we specifically choose ">= max_[i]-dx_[i]" here to avoid a segfault caused by trying to look past the end of the grid when calling get_value on the exact grid maximum.
+	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] > (max_[i])) ){
 	return false;
       }
     }

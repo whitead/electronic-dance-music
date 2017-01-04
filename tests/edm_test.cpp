@@ -100,7 +100,8 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
       for(int k = 0; k < g.grid_number_[2]; k++) {
 	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
 	array[2] = k;
-	BOOST_REQUIRE(pow(g.get_value(point) - g.multi2one(array),2) < 0.0000001);
+
+	BOOST_REQUIRE(pow(g.get_value(point) - g.grid_[g.multi2one(array)],2) < 0.0000001);
       }
     }
   }  
