@@ -542,7 +542,6 @@ class DimmedGaussGrid : public GaussGrid{
 	}
       }
     }
-
   }
 
 

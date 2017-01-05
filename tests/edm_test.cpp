@@ -751,8 +751,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   BOOST_REQUIRE(pow(g.grid_.grid_[150] - g.grid_.grid_[151] ,2) < EPSILON);
 
   x[0] = 50.1;
-  v = g.get_value(x);
+  v = g.get_value(x);//as-written, this should fail, since non-periodic bounds and also this is above the bounds, so naturally these won't be close values...
   x[0] = 50.0;
+  printf("\n g.get_value(50.1) was %f and g.get_value(50.0) is %f\n\n", v, g.get_value(x));
   BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
 
   //boundaries should be 0, even with interpolation
@@ -881,8 +882,6 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
 
   bias.write_bias("BIAS");
 
-  
-  std::cout << "prefactor is " << bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0] << " " << " and get_value yields " << bias.bias_->get_value(positions[0]) << std::endl;
   //test if the value at the point is correct
   BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
   //check if the claimed amount of bias added is correct
