@@ -52,6 +52,14 @@ namespace EDM{
       initialize();
     }
 
+    ~DimmedGridGPU() {
+      if(grid_ != NULL)
+	cudaFree(grid_);
+      if(grid_deriv_ != NULL)
+	cudaFree(grid_deriv_);
+    }
+
+
     size_t grid_size_;//total size of grid
     int b_derivatives_;//if derivatives are going to be used
     int b_interpolate_;//if interpolation should be used on the grid
@@ -73,11 +81,9 @@ namespace EDM{
       grid_size_ = 1;
       for(i = 0; i < DIM; i++)
 	grid_size_ *= grid_number_[i];
-      grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
-//    cudaMalloc(&d_grid_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_ pointer
+      cudaMalloc(&grid_, DIM * grid_size_ * sizeof(double));
       if(b_derivatives_) {
-	grid_deriv_ = (double *) calloc(DIM * grid_size_, sizeof(double));
-//      cudaMalloc(&d_grid_deriv_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_deriv_
+	cudaMalloc(&grid_deriv_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_deriv_
 	if(!grid_deriv_) {
 	  edm_error("Out of memory!!", "grid.cuh:initialize");	
 	}
