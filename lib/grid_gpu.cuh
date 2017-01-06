@@ -27,7 +27,12 @@ namespace EDM{
 	       const double* bin_spacing, 
 	       const int* b_periodic, 
 	       int b_derivatives, 
-	       int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
+		  int b_interpolate) : DimmedGrid<DIM> ( min, 
+	        max, 
+	        bin_spacing, 
+	        b_periodic, 
+	        b_derivatives, 
+		b_interpolate){
 
       size_t i;
 

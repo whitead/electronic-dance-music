@@ -19,7 +19,18 @@ using namespace EDM;
 
 typedef chrono::duration<double> sec; // seconds, stored with a double
 
-BOOST_AUTO_TEST_SUITE( edm_gpu )
+//Many of these test are the same as the serial ones, just to make sure we preserve behavior
+BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
+  double min[] = {0};
+  double max[] = {10};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGridGPU<1> g (min, max, bin_spacing, periodic, 0, 0);
+
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
+  BOOST_REQUIRE_EQUAL(g.grid_size_, 11);
+  
+}
 
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
@@ -45,5 +56,5 @@ BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
   BOOST_REQUIRE(seconds.count() < TIMING_BOUND_edm_cpu_timer_1d);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+//BOOST_AUTO_TEST_SUITE_END()
 
