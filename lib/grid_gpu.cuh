@@ -59,7 +59,6 @@ namespace EDM{
 	cudaFree(grid_deriv_);
     }
 
-
     size_t grid_size_;//total size of grid
     int b_derivatives_;//if derivatives are going to be used
     int b_interpolate_;//if interpolation should be used on the grid
@@ -76,14 +75,14 @@ namespace EDM{
     /** This will actually allocate the arrays and perform any sublcass initialization
      *
      **/
-    void initialize() {//this mallocs/cudamallocs our host/device grid_ & grid_deriv_ pointers
+    void initialize() {//this cudamallocs our device grid_ & grid_deriv_ pointers
       size_t i;
       grid_size_ = 1;
       for(i = 0; i < DIM; i++)
 	grid_size_ *= grid_number_[i];
-      cudaMalloc(&grid_, DIM * grid_size_ * sizeof(double));
+      cudaMallocManaged(&grid_, grid_size_ * sizeof(double));
       if(b_derivatives_) {
-	cudaMalloc(&grid_deriv_, DIM * grid_size_ * sizeof(double));//need to make a d_grid_deriv_
+	cudaMallocManaged(&grid_deriv_, DIM * grid_size_ * sizeof(double));
 	if(!grid_deriv_) {
 	  edm_error("Out of memory!!", "grid.cuh:initialize");	
 	}

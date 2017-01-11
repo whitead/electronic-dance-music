@@ -29,6 +29,24 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
 
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
   BOOST_REQUIRE_EQUAL(g.grid_size_, 11);
+
+  size_t array[] = {5};
+  size_t temp[1];
+  g.one2multi(g.multi2one(array), temp);
+  BOOST_REQUIRE_EQUAL(array[0], temp[0]);
+
+  for(int i = 0; i < 10; i++)
+    g.grid_[i] = i;
+
+  double x[] = {3.5};
+  //check reading off of GPU
+  BOOST_REQUIRE(g.in_grid(x));
+  size_t index[1];
+  g.get_index(x, index);
+  BOOST_REQUIRE(index[0] - 3 < 0.000001);
+  BOOST_REQUIRE(pow(g.get_value(x) -3, 2) < 0.000001);
+
+  
   
 }
 

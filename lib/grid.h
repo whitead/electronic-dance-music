@@ -893,9 +893,9 @@ class DimmedGrid : public Grid {
     grid_size_ = 1;
     for(i = 0; i < DIM; i++)
       grid_size_ *= grid_number_[i];
-    grid_ = (double *) calloc(DIM * grid_size_, sizeof(double));
+    grid_ = (double *) calloc( grid_size_, sizeof(double));
     if(b_derivatives_) {
-      grid_deriv_ = (double *) calloc(DIM * DIM * grid_size_, sizeof(double));
+      grid_deriv_ = (double *) calloc( DIM * grid_size_, sizeof(double));
       if(!grid_deriv_) {
 	edm_error("Out of memory!!", "grid.h:initialize");	
       }

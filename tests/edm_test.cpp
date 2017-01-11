@@ -574,60 +574,6 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
 }
 
-BOOST_AUTO_TEST_CASE( gauss_grid_integral_test_mcgdp ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {10};
-  double bin_spacing[] = {1};
-  int periodic[] = {0};
-  DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
-
-  //add N gaussian
-  int N = 20;
-  int i;
-  double x[1];
-  double offsets = 1. / N;
-  double g_integral = 0;
-  double temp;
-
-  //get boundaries
-  x[0] = -100.0;
-  temp = g.add_value(x, 1.5);
-  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-  g_integral += temp;		      
-
-  x[0] = 100.0;
-  temp = g.add_value(x, 1.5);
-  std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-  g_integral += temp;		      
-
-
-  //generate a random number but use sequential grid point offsets
-  for(i = 0; i < N; i++) {
-    x[0] = rand() % 200 - 100 + i * offsets;
-    temp = g.add_value(x, 1.5);
-    std::cout << x[0] << ": " << temp  << " == " << 1.5 << std::endl;
-    g_integral += temp;		      
-  }
-
-  //now we integrate the grid
-  double area = 0;
-  double dx = 0.1;
-  int bins = (int) 200 / dx;
-  for(i = 0; i < bins; i++) {
-    x[0] = -100 + i * dx;
-    area += g.get_value(x) * dx;
-  }
-
-  //Make sure the integrated area is correct
-  //unnormalized, so a little height scaling is necessary
-  std::cout << area / N << " " << 1.5  << std::endl;
-  BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
-
-  //now make sure that add_value returned the correct answers as well
-   BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
-}
-
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   double min[] = {-100};
@@ -753,8 +699,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   x[0] = 50.1;
   v = g.get_value(x);//as-written, this should fail, since non-periodic bounds and also this is above the bounds, so naturally these won't be close values...
   x[0] = 50.0;
-  printf("\n g.get_value(50.1) was %f and g.get_value(50.0) is %f\n\n", v, g.get_value(x));
-  BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
+  //printf("\n g.get_value(50.1) was %f and g.get_value(50.0) is %f\n\n", v, g.get_value(x));
+  //BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
+  //this requirement was based on an erroneous assumption
 
   //boundaries should be 0, even with interpolation
   g.get_value_deriv(x,der);  
@@ -764,7 +711,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   x[0] = -50.1;
   v = g.get_value(x);
   x[0] = -50.0;
-  BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
+  //BOOST_REQUIRE(pow(v - g.get_value(x),2) < EPSILON);
+  //same here
   g.get_value_deriv(x,der);  
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
