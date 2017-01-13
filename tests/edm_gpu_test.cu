@@ -7,6 +7,7 @@
 //These must be declared here.
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM_GPU
+#define EPSILON 1e-10
 
 #include <boost/timer/timer.hpp>
 #include <boost/chrono.hpp>
@@ -35,19 +36,24 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   g.one2multi(g.multi2one(array), temp);
   BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 
-  for(int i = 0; i < 10; i++)
+  for(int i = 0; i < 11; i++)
     g.grid_[i] = i;
-
   double x[] = {3.5};
   //check reading off of GPU
   BOOST_REQUIRE(g.in_grid(x));
   size_t index[1];
   g.get_index(x, index);
   BOOST_REQUIRE(index[0] - 3 < 0.000001);
+
   BOOST_REQUIRE(pow(g.get_value(x) -3, 2) < 0.000001);
 
-  
-  
+  //try to break it
+  x[0] = 0;
+  g.get_value(x);
+
+  x[0] = 10;
+  g.get_value(x);
+
 }
 
 //This test will simply run several thousand timesteps and time how long it takes.

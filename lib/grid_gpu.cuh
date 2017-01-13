@@ -59,6 +59,21 @@ namespace EDM{
 	cudaFree(grid_deriv_);
     }
 
+    double get_value(const double* x) const{
+      cudaDeviceSynchronize();
+      if(!(this->in_grid(x))){
+	return 0;
+      }
+      if(b_interpolate_ && b_derivatives_) {
+	double temp[DIM];
+	return this->get_value_deriv(x, temp);
+      }
+
+      size_t index[DIM];
+      this->get_index(x, index);
+      return grid_[this->multi2one(index)];
+    }
+
     size_t grid_size_;//total size of grid
     int b_derivatives_;//if derivatives are going to be used
     int b_interpolate_;//if interpolation should be used on the grid
