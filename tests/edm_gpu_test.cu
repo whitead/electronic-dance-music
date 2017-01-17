@@ -7,7 +7,11 @@
 //These must be declared here.
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM_GPU
+
 #define EPSILON 1e-10
+#define QUOTE(name) #name
+#define STR(macro) QUOTE(macro)
+#define GRID_SRC std::string(STR(TEST_GRID_SRC))
 
 #include <boost/timer/timer.hpp>
 #include <boost/chrono.hpp>
@@ -99,10 +103,18 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
 	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
 	array[2] = k;
 
-	BOOST_REQUIRE(pow(g.get_value(point) - g.multi2one(array),2) < 0.0000001);
+	BOOST_REQUIRE(pow(g.get_value(point) - g.grid_[g.multi2one(array)],2) < 0.0000001);
       }
     }
   }
+}
+
+BOOST_AUTO_TEST_CASE( grid_1d_read ) {
+  DimmedGrid<1> g(GRID_SRC + "/1.grid");
+  BOOST_REQUIRE_EQUAL(g.min_[0], 0);
+  BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
 
 //This test will simply run several thousand timesteps and time how long it takes.
