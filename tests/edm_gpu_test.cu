@@ -56,6 +56,55 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
 
 }
 
+BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
+{
+  double min[] = {-2, -5, -3};
+  double max[] = {125, 63, 78};
+  double bin_spacing[] = {1.27, 1.36, 0.643};
+  int periodic[] = {0, 1, 1};
+  DimmedGridGPU<3> g (min, max, bin_spacing, periodic, 0, 0);
+
+  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[1], 50);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[2], 126);
+
+  size_t array[3];
+  size_t temp[3];
+  for(int i = 0; i < g.grid_number_[0]; i++) {
+    array[0] = i;
+    for(int j = 0; j < g.grid_number_[1]; j++) {
+      array[1] = j;
+      for(int k = 0; k < g.grid_number_[2]; k++) {
+	array[2] = k;
+
+	//check to make sure the index conversion is correct
+	g.one2multi(g.multi2one(array), temp);
+	BOOST_REQUIRE_EQUAL(array[0], temp[0]);
+	BOOST_REQUIRE_EQUAL(array[1], temp[1]);
+	BOOST_REQUIRE_EQUAL(array[2], temp[2]);
+
+	g.grid_[g.multi2one(array)] = g.multi2one(array);
+      }
+    }
+  }
+  
+  double point[3];
+  for(int i = 0; i < g.grid_number_[0]; i++) {
+    point[0] = i * g.dx_[0] + g.min_[0] + EPSILON;
+    array[0] = i;
+    for(int j = 0; j < g.grid_number_[1]; j++) {
+      point[1] = j * g.dx_[1] + g.min_[1] + EPSILON;
+      array[1] = j;
+      for(int k = 0; k < g.grid_number_[2]; k++) {
+	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
+	array[2] = k;
+
+	BOOST_REQUIRE(pow(g.get_value(point) - g.multi2one(array),2) < 0.0000001);
+      }
+    }
+  }
+}
+
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
   

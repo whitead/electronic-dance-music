@@ -35,6 +35,9 @@ namespace EDM{
 		b_interpolate){
 
       size_t i;
+      //need to set these explicitly due to some inheritance issue I don't understand--Rainier
+      b_derivatives_ = b_derivatives;
+      b_interpolate_ = b_interpolate;
 
       for(i = 0; i < DIM; i++) {
 	min_[i] = min[i];
