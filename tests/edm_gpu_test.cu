@@ -110,12 +110,23 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
 }
 
 BOOST_AUTO_TEST_CASE( grid_1d_read ) {
-  DimmedGrid<1> g(GRID_SRC + "/1.grid");
+  DimmedGridGPU<1> g(GRID_SRC + "/1.grid");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
   BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
+
+BOOST_AUTO_TEST_CASE( grid_3d_read ) {
+  DimmedGridGPU<3> g(GRID_SRC + "/3.grid");
+  BOOST_REQUIRE_EQUAL(g.min_[2], 0);
+  BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
+  BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
+  double temp[] = {0.75, 0, 1.00};
+  BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
+  
+}
+
 
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){

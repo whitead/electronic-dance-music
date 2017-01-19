@@ -55,6 +55,20 @@ namespace EDM{
       initialize();
     }
 
+    /**
+     * Constructor from file, with interpolation specified
+     **/
+    DimmedGridGPU(const std::string& input_grid, int b_interpolate):DimmedGrid<DIM> (input_grid, b_interpolate){
+      read(input_grid);
+    }
+
+    /**
+     * Constructor from grid file
+     **/
+    DimmedGridGPU(const std::string& input_grid):DimmedGrid<DIM> (input_grid){
+      read(input_grid);
+    }
+
     ~DimmedGridGPU() {
       if(grid_ != NULL)
 	cudaFree(grid_);
@@ -75,6 +89,132 @@ namespace EDM{
       size_t index[DIM];
       this->get_index(x, index);
       return grid_[this->multi2one(index)];
+    }
+
+    void read(const std::string& filename){
+      
+      using namespace std;
+      ifstream input;
+      size_t i, j;
+      input.open(filename.c_str());
+
+      if(!input.is_open()) {      
+	cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
+	edm_error("", "grid.h:read");
+      }
+
+      // read plumed-style header
+      string word;
+      input >> word >> word;
+      if(word.compare("FORCE") != 0) {
+	cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	input >> b_derivatives_;
+      }
+    
+      input >> word >> word;
+      if(word.compare("NVAR") != 0) {
+	cerr << "Mangled grid file: " << filename << " No NVAR found" << endl;
+	//edm_error
+      } else {
+	input >> i;
+	if(i != DIM) {
+	  cerr << "Dimension of this grid does not match the one found in the file" << endl;
+	  edm_error("", "grid.h:read");
+
+	}
+      }
+
+      input >> word >> word;
+      if(word.compare("TYPE") != 0) {
+	cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  input >> j;
+	  if(j != GRID_TYPE) {
+	    cerr << "WARNING: Read grid type is the incorrect type" << endl;
+	  }
+	}
+      }
+
+      input >> word >> word;
+      if(word.compare("BIN") != 0) {
+	cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  input >> grid_number_[i];
+	}
+      }
+
+      input >> word >> word;
+      if(word.compare("MIN") != 0) {
+	cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  input >> min_[i];
+	}
+      }
+
+      input >> word >> word;
+      if(word.compare("MAX") != 0) {
+	cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  input >> max_[i];
+	}
+      }
+
+      input >> word >> word;
+      if(word.compare("PBC") != 0) {
+	cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
+	edm_error("", "grid.h:read");
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  input >> b_periodic_[i];
+	}
+      }
+
+      //now set-up grid number and spacing and preallocate     
+      for(i = 0; i < DIM; i++) {
+	dx_[i] = (max_[i] - min_[i]) / grid_number_[i];
+	if(!b_periodic_[i]) {
+	  max_[i] += dx_[i];
+	  grid_number_[i] += 1;
+	}      
+      }
+      if(grid_ != NULL) {
+	cudaFree(grid_);
+	grid_ = NULL;
+      }
+      if(grid_deriv_ != NULL){
+	cudaFree(grid_deriv_);
+	grid_deriv_ = NULL;
+      }
+    
+      //build arrays
+      this->initialize();
+    
+      //now we read grid!    
+      for(i = 0; i < grid_size_; i++) {
+	//skip dimensions
+	for(j = 0; j < DIM; j++)
+	  input >> word;
+	input >> grid_[i];      
+	if(b_derivatives_) {
+	  for(j = 0; j < DIM; j++) {
+	    input >> grid_deriv_[i * DIM + j];
+	    grid_deriv_[i * DIM + j] *= -1;
+	  }
+	}
+      }    
+
+      //all done!
+      input.close();
     }
 
     size_t grid_size_;//total size of grid
