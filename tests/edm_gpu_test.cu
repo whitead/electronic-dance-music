@@ -114,7 +114,6 @@ BOOST_AUTO_TEST_CASE( grid_1d_read ) {
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
   BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
-  BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
 
 BOOST_AUTO_TEST_CASE( grid_3d_read ) {
@@ -124,8 +123,21 @@ BOOST_AUTO_TEST_CASE( grid_3d_read ) {
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
   double temp[] = {0.75, 0, 1.00};
   BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
+}
+
+BOOST_AUTO_TEST_CASE( derivative_direction ) {
+  DimmedGridGPU<3> g(GRID_SRC + "/3.grid");
+  g.b_interpolate_ = 1;
+
+  double temp[] = {0.75, 0, 1.00};
+  double temp2[] = {0.76, 0, 1.00};
+  BOOST_REQUIRE(g.get_value(temp2)> g.get_value(temp));
+  temp2[0] = 0.75;
+  temp2[2] = 0.99;
+  BOOST_REQUIRE(g.get_value(temp2) < g.get_value(temp));
   
 }
+
 
 
 //This test will simply run several thousand timesteps and time how long it takes.

@@ -206,6 +206,11 @@ class DimmedGrid : public Grid {
     initialize();
   }
 
+
+  /*
+   *Default constructor
+   */
+DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL){}
   /**
    * Constructor from file, with interpolation specified
    **/
@@ -709,7 +714,7 @@ class DimmedGrid : public Grid {
     return avg / Z;
   }
   
-  void read(const std::string& filename) {
+  virtual void read(const std::string& filename) {
     using namespace std;
     ifstream input;
     size_t i, j;
