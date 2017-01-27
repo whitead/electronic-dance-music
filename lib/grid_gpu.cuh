@@ -65,6 +65,23 @@ namespace EDM{
 	
     }
 
+    /**
+     * Dispatches cudaFree() on grid_
+     **/
+    virtual void scrub_grid(){
+      cudaFree(grid_);
+      grid_ = NULL;
+    }
+
+    /**
+     * Same principle as scrub_deriv_
+     **/
+    virtual void scrub_deriv(){
+      cudaFree(grid_deriv_);
+      grid_deriv_ = NULL;
+    }
+
+
     virtual double get_value(const double* x) const{
       cudaDeviceSynchronize();
       if(!(this->in_grid(x))){

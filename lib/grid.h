@@ -8,6 +8,7 @@
 #include <string>
 #include <iomanip>
 #include "mpi.h"
+#include <cuda_runtime.h>
 
 #include "edm.h"
 #ifndef GRID_TYPE
@@ -172,6 +173,9 @@ class Grid {
   virtual double expected_bias() const = 0;
   //clear all values and derivatives
   virtual void clear() = 0;
+  //deals with free() and cudaFree() delegation elegantly
+  virtual void scrub_grid() = 0;
+  virtual void scrub_deriv() = 0;
 
 };
 
@@ -251,9 +255,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 
   ~DimmedGrid() {
     if(grid_ != NULL)
-      free(grid_);
+      scrub_grid();
     if(grid_deriv_ != NULL)
-      free(grid_deriv_);
+      scrub_deriv();
     
   }
   
@@ -692,6 +696,21 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     
   }
 
+  /**
+   * Dispatches free() on grid_. Exists so DimmedGridGPU can instead use cudaFree() when needed.
+   **/
+  virtual void scrub_grid(){
+    free(grid_);
+    grid_ = NULL;
+  }
+
+  /**
+   * Same principle as scrub_grid(), this time for grid_deriv_
+   **/
+  virtual void scrub_deriv(){
+    free(grid_deriv_);
+    grid_deriv_ = NULL;
+  }
   //calculate the expected bias assuming the grid is made 
   //up of unormalized -ln(p)
   double expected_bias() const {
@@ -810,12 +829,10 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
       }      
     }
     if(grid_ != NULL) {
-      free(grid_);
-      grid_ = NULL;
+      scrub_grid();
     }
     if(grid_deriv_ != NULL){
-      free(grid_deriv_);
-      grid_deriv_ = NULL;
+      scrub_deriv();
     }
     
     //build arrays

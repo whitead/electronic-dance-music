@@ -488,6 +488,14 @@ class DimmedGaussGrid : public GaussGrid{
     grid_.clear();
   }
 
+  void scrub_grid(){
+    grid_.scrub_grid();
+  }
+
+  void scrub_deriv(){
+    grid_.scrub_deriv();
+  }
+
   size_t get_grid_size() const{
     return grid_.get_grid_size();
   }

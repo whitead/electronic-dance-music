@@ -109,14 +109,14 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
   }
 }
 
-BOOST_AUTO_TEST_CASE( grid_1d_read ) {
+BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {
   DimmedGridGPU<1> g(GRID_SRC + "/1.grid");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
   BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
 
-BOOST_AUTO_TEST_CASE( grid_3d_read ) {
+BOOST_AUTO_TEST_CASE( grid_gpu_3d_read ) {
   DimmedGridGPU<3> g(GRID_SRC + "/3.grid");
   BOOST_REQUIRE_EQUAL(g.min_[2], 0);
   BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
@@ -125,17 +125,91 @@ BOOST_AUTO_TEST_CASE( grid_3d_read ) {
   BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
 }
 
-BOOST_AUTO_TEST_CASE( derivative_direction ) {
-  DimmedGridGPU<3> g(GRID_SRC + "/3.grid");
-  g.b_interpolate_ = 1;
-
+BOOST_AUTO_TEST_CASE( gpu_derivative_direction ) {
+  DimmedGridGPU<3> g(GRID_SRC + "/3.grid", 1);
   double temp[] = {0.75, 0, 1.00};
   double temp2[] = {0.76, 0, 1.00};
   BOOST_REQUIRE(g.get_value(temp2)> g.get_value(temp));
   temp2[0] = 0.75;
   temp2[2] = 0.99;
   BOOST_REQUIRE(g.get_value(temp2) < g.get_value(temp));
+}
+
+BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
+
+  size_t i, j;
+  std::string input;
+  std::string output;
+  for(i = 1; i <= 3; i++) {
+    std::stringstream filename;
+    filename << i << ".grid";
+    input = GRID_SRC + "/" + filename.str();
+    output = filename.str() + ".test";
+    Grid* g;
+    switch(i) {
+    case 1:
+      g = new DimmedGridGPU<1>(input);
+      break;
+    case 2:
+      g = new DimmedGridGPU<2>(input);
+      break;
+    case 3:
+      g = new DimmedGridGPU<3>(input);
+      break;
+    }
+    g->write(output);
+    //grab the grid for comparison
+    size_t ref_length = g->get_grid_size();
+    double ref_grid[ref_length];
+    for(j = 0; j < ref_length; j++)
+      ref_grid[j] = g->get_grid()[j];
+    //re-read
+    g->read(output);
+    //now compare
+    BOOST_REQUIRE_EQUAL(g->get_grid_size(), ref_length);
+
+    for(j = 0; j < ref_length; j++)
+      BOOST_REQUIRE(pow(ref_grid[j] - g->get_grid()[j], 2) < EPSILON);
+
+  }
   
+}
+
+BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
+  
+  double min[] = {0};
+  double max[] = {10};
+  double bin_spacing[] = {1};
+  int periodic[] = {0};
+  DimmedGridGPU<1> g (min, max, bin_spacing, periodic, 1, 1);
+  
+  for(int i = 0; i < 11; i++) {
+    g.grid_[i] = log(i);
+    g.grid_deriv_[i] = 1. / i;
+  }
+
+  double array[] = {5.3};
+  double der[1];
+  double fhat = g.get_value_deriv(array,der);
+
+  //make sure it's at least in the ballpark
+  BOOST_REQUIRE(fhat > log(5) && fhat < log(6));
+  BOOST_REQUIRE(der[0] < 1. / 5 && der[0] > 1. / 6.);
+
+  //Make sure it's reasonably accurate
+  BOOST_REQUIRE(pow(fhat - log(5.3), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0]- 1. / 5.3, 2) < 0.1);
+
+  //try edge cases
+  array[0] = 5.0;
+  g.get_value(array);
+  array[0] = 5.5;
+  g.get_value(array);
+  array[0] = 0.0;
+  g.get_value(array);
+  array[0] = 10.0;
+  g.get_value(array);
+
 }
 
 
