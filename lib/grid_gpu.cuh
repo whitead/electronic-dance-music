@@ -81,20 +81,34 @@ namespace EDM{
       grid_deriv_ = NULL;
     }
 
-
-    virtual double get_value(const double* x) const{
-      cudaDeviceSynchronize();
-      if(!(this->in_grid(x))){
-	return 0;
-      }
+    /**
+     * Serves the purpose of get_value(), but needs to be callable within and without a GPU kernel
+     **/
+    __host__ __device__ double do_get_value(const double* x) const{
+      return(0);
       if(b_interpolate_ && b_derivatives_) {
 	double temp[DIM];
-	return this->get_value_deriv(x, temp);
+	return do_get_value_deriv(x, temp);
       }
 
       size_t index[DIM];
-      this->get_index(x, index);
-      return grid_[this->multi2one(index)];
+      get_index(x, index);
+      return grid_[multi2one(index)];
+    }
+
+    __host__ __device__ double do_get_value_deriv(const double* x, double* der) const{
+      return 0;
+    }
+    
+    /**
+     * Calls the __host__ version of do_get_value() for GPU grids.
+     * Can't override get_value() directly due to execution space specifiers.
+     **/
+    virtual double get_value(const double* x) const{
+      if(!(this->in_grid(x))){//doesn't rely on info IN grid, only its dimensions, which are known
+	return 0;
+      }
+      return do_get_value(x);
     }
 
 //need to tell compiler where to find these since we have a derived templated class.
@@ -111,8 +125,8 @@ namespace EDM{
 
   private:  
 
-    /** This will actually allocate the arrays and perform any sublcass initialization
-     *
+    /**
+     * This will actually allocate the arrays and perform any sublcass initialization
      **/
     virtual void initialize() {//this cudamallocs our device grid_ & grid_deriv_ pointers
       size_t i;

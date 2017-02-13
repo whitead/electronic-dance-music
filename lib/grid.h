@@ -8,7 +8,6 @@
 #include <string>
 #include <iomanip>
 #include "mpi.h"
-#include <cuda_runtime.h>
 
 #include "edm.h"
 #ifndef GRID_TYPE
@@ -344,7 +343,7 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Get the value of the grid at x
    **/ 
-   double get_value(const double* x) const{
+  double get_value(const double* x) const{
 
     if(!in_grid(x)) {
 //	std::cout << "THIS SHOULD BE PRINTING\n";
