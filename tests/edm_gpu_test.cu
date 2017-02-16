@@ -46,6 +46,8 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   //check reading off of GPU
   BOOST_REQUIRE(g.in_grid(x));
   size_t index[1];
+
+  //Need to update this test so it launches a kernel emulating the "real" one we'll use
   g.get_index(x, index);
   BOOST_REQUIRE(index[0] - 3 < 0.000001);
 
