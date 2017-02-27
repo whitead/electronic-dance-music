@@ -172,9 +172,6 @@ class Grid {
   virtual double expected_bias() const = 0;
   //clear all values and derivatives
   virtual void clear() = 0;
-  //deals with free() and cudaFree() delegation elegantly
-  virtual void scrub_grid() = 0;
-  virtual void scrub_deriv() = 0;
 
 };
 

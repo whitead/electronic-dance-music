@@ -16,7 +16,7 @@
 #define GRID_TYPE 32
 #endif //GRID_TYPE
 
-__host__ __device__  int gpu_int_floor(double number) {
+HOST_DEV  int gpu_int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);
 }
 
@@ -38,6 +38,11 @@ namespace EDM{
 	        b_periodic, 
 	        b_derivatives, 
 		b_interpolate){
+      cudaMalloc(&d_b_interpolate, sizeof(int));
+      cudaMemcpy(&d_b_interpolate, &b_interpolate, sizeof(int), cudaMemcpyHostToDevice);
+      cudaMalloc(&d_b_derivatives, sizeof(int));
+      cudaMemcpy(&d_b_derivatives, &b_derivatives, sizeof(int), cudaMemcpyHostToDevice);
+
 
     }
 
@@ -71,30 +76,21 @@ namespace EDM{
     }
 
     /**
-     * Dispatches cudaFree() on grid_
-     **/
-    virtual void scrub_grid(){
-      cudaFree(grid_);
-      grid_ = NULL;
-    }
-
-    /**
-     * Same principle as scrub_deriv_
-     **/
-    virtual void scrub_deriv(){
-      cudaFree(grid_deriv_);
-      grid_deriv_ = NULL;
-    }
-
-    /**
      * Serves the purpose of get_value(), but needs to be callable within and without a GPU kernel
      **/
-    __host__ __device__ double do_get_value(const double* x) const{
+    HOST_DEV double do_get_value(const double* x) const{
       return(0);
+#ifdef __CUDACC__
+      if(d_b_interpolate[0] && d_b_derivatives[0]) {//get "statement is unreachable. Need to fix passing data members"
+	double temp[DIM];
+	return do_get_value_deriv(x, temp);
+      }
+      #else
       if(b_interpolate_ && b_derivatives_) {//get "statement is unreachable. Need to fix passing data members"
 	double temp[DIM];
 	return do_get_value_deriv(x, temp);
       }
+#endif //CUDACC
 
       size_t index[DIM];
       get_index(x, index);
@@ -105,7 +101,7 @@ namespace EDM{
      * Have to re-declare a lot of these so we can use on GPU, 
      * unless we want to mess with the parent classes...
      */
-    __host__ __device__ void get_index(const double* x, size_t result[DIM]) const {
+    HOST_DEV void get_index(const double* x, size_t result[DIM]) const {
       size_t i;
       double xi;
       for(i = 0; i < DIM; i++) {
@@ -117,7 +113,7 @@ namespace EDM{
       }
     }
 
-    __host__ __device__ size_t multi2one(const size_t index[DIM]) const {
+    HOST_DEV size_t multi2one(const size_t index[DIM]) const {
       size_t result = index[DIM-1];
 
       size_t i;    
@@ -129,7 +125,7 @@ namespace EDM{
     
     }
 
-    __host__ __device__ double do_get_value_deriv(const double* x, double* der) const{
+    HOST_DEV double do_get_value_deriv(const double* x, double* der) const{
       return 0;
     }
     
@@ -143,6 +139,10 @@ namespace EDM{
       }
       return do_get_value(x);
     }
+
+    __shared__ int* d_b_derivatives;//need to be pointer to go on GPU, but will always be size of 1 int
+    __shared__ int* d_b_interpolate;
+
 
 //need to tell compiler where to find these since we have a derived templated class.
     using DimmedGrid<DIM>::grid_size_;
