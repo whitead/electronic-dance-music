@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <stdlib.h>
+#include <stdio.h>
 //These must be declared here.
 #define BOOST_TEST_DYN_LINK 
 #define BOOST_TEST_MODULE EDM_GPU
@@ -24,6 +25,14 @@ using namespace EDM;
 
 typedef chrono::duration<double> sec; // seconds, stored with a double
 
+/**
+ * This is a wrapper to call do_get_value() within an actual kernel when testing.
+ * Needs to be global scope because of CUDA's API.
+ **/
+  //global functions have to be global scope...
+
+
+
 //Many of these test are the same as the serial ones, just to make sure we preserve behavior
 BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   double min[] = {0};
@@ -31,7 +40,6 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGridGPU<1> g (min, max, bin_spacing, periodic, 0, 0);
-
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
   BOOST_REQUIRE_EQUAL(g.grid_size_, 11);
 
@@ -43,15 +51,22 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   for(int i = 0; i < 11; i++)
     g.grid_[i] = i;
   double x[] = {3.5};
-  //check reading off of GPU
   BOOST_REQUIRE(g.in_grid(x));
   size_t index[1];
-
   //Need to update this test so it launches a kernel emulating the "real" one we'll use
   g.get_index(x, index);
   BOOST_REQUIRE(index[0] - 3 < 0.000001);
 
-  BOOST_REQUIRE(pow(g.get_value(x) -3, 2) < 0.000001);
+  const double* d_x;
+  cudaMalloc((void**)&d_x, sizeof(double));
+  cudaMemcpy((void**)d_x, x, sizeof(double), cudaMemcpyHostToDevice);
+  double target[] = {0};
+  double* d_target;
+  cudaMalloc((void**)&d_target, sizeof(double));
+  get_value_kernel<1><<<1,1>>>(d_x, d_target, g);
+  cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost);
+  printf("target[0] is now %f\n", target[0]);
+  BOOST_REQUIRE(pow(target[0] -3, 2) < 0.000001);
 
   //try to break it
   x[0] = 0;

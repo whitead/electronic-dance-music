@@ -20,8 +20,8 @@ HOST_DEV  int gpu_int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);
 }
 
-
 namespace EDM{
+  
   template< int DIM>
   class DimmedGridGPU : public DimmedGrid<DIM> {
     /** A DIM-dimensional grid for GPU use. Stores on 1D column-ordered array
@@ -38,11 +38,10 @@ namespace EDM{
 	        b_periodic, 
 	        b_derivatives, 
 		b_interpolate){
-      cudaMalloc(&d_b_interpolate, sizeof(int));
-      cudaMemcpy(&d_b_interpolate, &b_interpolate, sizeof(int), cudaMemcpyHostToDevice);
-      cudaMalloc(&d_b_derivatives, sizeof(int));
-      cudaMemcpy(&d_b_derivatives, &b_derivatives, sizeof(int), cudaMemcpyHostToDevice);
-
+      cudaMalloc((void**)&d_b_interpolate_, sizeof(int));
+      cudaMemcpy(d_b_interpolate_, &b_interpolate, sizeof(int), cudaMemcpyHostToDevice);
+      cudaMalloc((void**)&d_b_derivatives_, sizeof(int));
+      cudaMemcpy(d_b_derivatives_, &b_derivatives, sizeof(int), cudaMemcpyHostToDevice);
 
     }
 
@@ -50,9 +49,7 @@ namespace EDM{
     /**
      * Constructor from file, with interpolation specified
      **/
-    DimmedGridGPU(const std::string& input_grid, int b_interpolate) {
-      b_interpolate_ = b_interpolate;
-      this->read(input_grid);
+    DimmedGridGPU(const std::string& input_grid, int b_interpolate): DimmedGrid<DIM> (input_grid, b_interpolate) {
     }
 
     /**
@@ -72,29 +69,28 @@ namespace EDM{
 	cudaFree(grid_deriv_);
 	grid_deriv_ = NULL;
       }
-	
+      
+      cudaDeviceReset();
     }
+
 
     /**
      * Serves the purpose of get_value(), but needs to be callable within and without a GPU kernel
      **/
     HOST_DEV double do_get_value(const double* x) const{
-      return(0);
-#ifdef __CUDACC__
-      if(d_b_interpolate[0] && d_b_derivatives[0]) {//get "statement is unreachable. Need to fix passing data members"
+      #ifdef __CUDACC__ //device version
+      if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
 	double temp[DIM];
 	return do_get_value_deriv(x, temp);
       }
-      #else
-      if(b_interpolate_ && b_derivatives_) {//get "statement is unreachable. Need to fix passing data members"
-	double temp[DIM];
-	return do_get_value_deriv(x, temp);
-      }
-#endif //CUDACC
-
+      
       size_t index[DIM];
       get_index(x, index);
       return grid_[multi2one(index)];
+
+      #else//host version
+      return get_value(x);
+      #endif// CUDACC
     }
 
     /*
@@ -126,7 +122,7 @@ namespace EDM{
     }
 
     HOST_DEV double do_get_value_deriv(const double* x, double* der) const{
-      return 0;
+      return 1.0;
     }
     
     /**
@@ -134,14 +130,22 @@ namespace EDM{
      * Can't override get_value() directly due to execution space specifiers.
      **/
     virtual double get_value(const double* x) const{
-      if(!(this->in_grid(x))){//doesn't rely on info IN grid, only its dimensions, which are known
+      if(!(this->in_grid(x))){
 	return 0;
       }
-      return do_get_value(x);
+            
+      if(b_interpolate_ && b_derivatives_) {
+	double temp[DIM];
+	return this->get_value_deriv(x, temp);
+      }
+
+      size_t index[DIM];
+      get_index(x, index);
+      return grid_[multi2one(index)];
     }
 
-    __shared__ int* d_b_derivatives;//need to be pointer to go on GPU, but will always be size of 1 int
-    __shared__ int* d_b_interpolate;
+    int* d_b_interpolate_;
+    int* d_b_derivatives_;
 
 
 //need to tell compiler where to find these since we have a derived templated class.
@@ -178,6 +182,24 @@ namespace EDM{
 
   
   };
+
+  /*
+   *    HOST_DEV double do_get_value(const double* x) const{
+ *     #ifdef __CUDACC__
+ *     if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
+ *	double temp[DIM];
+ *	return do_get_value_deriv(x, temp);
+ *    }
+ */
+
+  //global functions need global scope...
+  template <int DIM>
+  __global__ void get_value_kernel(const double* x, double* target, DimmedGridGPU<DIM> g){
+    printf("Hello from the GPU land! g.d_b_derivatives_[0] is %d\n", g.d_b_derivatives_[0]);
+      target[0] = g.do_get_value(x);
+  }
+
+
 }
 
 #endif //GRID_CUH_
