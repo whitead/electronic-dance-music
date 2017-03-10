@@ -22,14 +22,10 @@
 
 using namespace boost;
 using namespace EDM;
+using namespace EDM_Kernels;
 
 typedef chrono::duration<double> sec; // seconds, stored with a double
 
-/**
- * This is a wrapper to call do_get_value() within an actual kernel when testing.
- * Needs to be global scope because of CUDA's API.
- **/
-  //global functions have to be global scope...
 
 
 
@@ -48,8 +44,11 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   g.one2multi(g.multi2one(array), temp);
   BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 
-  for(int i = 0; i < 11; i++)
+  for(int i = 0; i < 11; i++){
     g.grid_[i] = i;
+    printf("g.grid_[%d] is now %f\n", i, g.grid_[i]);
+  }
+  cudaDeviceSynchronize();
   double x[] = {3.5};
   BOOST_REQUIRE(g.in_grid(x));
   size_t index[1];
@@ -57,14 +56,14 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   g.get_index(x, index);
   BOOST_REQUIRE(index[0] - 3 < 0.000001);
 
-  const double* d_x;
-  cudaMalloc((void**)&d_x, sizeof(double));
-  cudaMemcpy((void**)d_x, x, sizeof(double), cudaMemcpyHostToDevice);
-  double target[] = {0};
+  double* d_x;
+  cudaMalloc(&d_x, sizeof(double));
+  cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice);
+  double target[1] = {5.0};
   double* d_target;
-  cudaMalloc((void**)&d_target, sizeof(double));
-  get_value_kernel<1><<<1,1>>>(d_x, d_target, g);
-  cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost);
+  gpuErrchk(cudaMalloc(&d_target, sizeof(double)));
+  get_value_kernel<1><<<1,1>>>(d_x, d_target, g, g.grid_);
+  gpuErrchk(cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost));
   printf("target[0] is now %f\n", target[0]);
   BOOST_REQUIRE(pow(target[0] -3, 2) < 0.000001);
 

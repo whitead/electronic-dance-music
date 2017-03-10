@@ -20,6 +20,17 @@ HOST_DEV  int gpu_int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);
 }
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+
 namespace EDM{
   
   template< int DIM>
@@ -42,7 +53,7 @@ namespace EDM{
       cudaMemcpy(d_b_interpolate_, &b_interpolate, sizeof(int), cudaMemcpyHostToDevice);
       cudaMalloc((void**)&d_b_derivatives_, sizeof(int));
       cudaMemcpy(d_b_derivatives_, &b_derivatives, sizeof(int), cudaMemcpyHostToDevice);
-
+      initialize();
     }
 
 
@@ -50,6 +61,7 @@ namespace EDM{
      * Constructor from file, with interpolation specified
      **/
     DimmedGridGPU(const std::string& input_grid, int b_interpolate): DimmedGrid<DIM> (input_grid, b_interpolate) {
+      this->read(input_grid);
     }
 
     /**
@@ -77,16 +89,20 @@ namespace EDM{
     /**
      * Serves the purpose of get_value(), but needs to be callable within and without a GPU kernel
      **/
-    HOST_DEV double do_get_value(const double* x) const{
+    HOST_DEV double do_get_value( double* x, double* grid_) {
       #ifdef __CUDACC__ //device version
       if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
 	double temp[DIM];
 	return do_get_value_deriv(x, temp);
       }
-      
+
       size_t index[DIM];
       get_index(x, index);
-      return grid_[multi2one(index)];
+      printf("do_get_value was called on the GPU!, and index[0] is now %d\n", index[0]);
+      printf("but multi2one(index) gives us %d\n", multi2one(index));
+      double value = grid_[multi2one(index)];
+      printf("and value to be returned is %f\n", value);
+      return(value);
 
       #else//host version
       return get_value(x);
@@ -192,14 +208,31 @@ namespace EDM{
  *    }
  */
 
+
+
+
+}
+
+ namespace EDM_Kernels{
   //global functions need global scope...
+  using namespace EDM;
+  
+  /*
+   * Kernel wrapper for get_value() on the GPU. Takes in an instance of DimmedGridGPU
+   * as well as the address of the coordinate (x) to get the value for, and the target
+   * address to store the value, which must be copied to host side if it is to be used there.
+   */
   template <int DIM>
-  __global__ void get_value_kernel(const double* x, double* target, DimmedGridGPU<DIM> g){
-    printf("Hello from the GPU land! g.d_b_derivatives_[0] is %d\n", g.d_b_derivatives_[0]);
-      target[0] = g.do_get_value(x);
+  __global__ void get_value_kernel(double* x, double* target, EDM::DimmedGridGPU<DIM> g, double* g_grid){
+    printf("Hello from get_value_kernel! g.grid_[3] is %f\n", g_grid[3]);//WHY CAN'T I ACCESS THIS IN 2 LINES???
+//    printf("g.grid_[3] is equal to %f\n", g.grid_[3]);//this line causes kernel exit; can't access class members?
+    double value = g.do_get_value(x, g_grid);//doesn't work...
+    printf("value is now %f\n", value);
+    target[0] = value;
+    printf("get_value_kernel has set target[0] to be %f\n", target[0]);
+    return;
   }
-
-
+  
 }
 
 #endif //GRID_CUH_

@@ -251,9 +251,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 
   ~DimmedGrid() {
     if(grid_ != NULL)
-      scrub_grid();
+      free(grid_);
     if(grid_deriv_ != NULL)
-      scrub_deriv();
+      free(grid_deriv_);
     
   }
   
@@ -692,21 +692,6 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     
   }
 
-  /**
-   * Dispatches free() on grid_. Exists so DimmedGridGPU can instead use cudaFree() when needed.
-   **/
-  virtual void scrub_grid(){
-    free(grid_);
-    grid_ = NULL;
-  }
-
-  /**
-   * Same principle as scrub_grid(), this time for grid_deriv_
-   **/
-  virtual void scrub_deriv(){
-    free(grid_deriv_);
-    grid_deriv_ = NULL;
-  }
   //calculate the expected bias assuming the grid is made 
   //up of unormalized -ln(p)
   double expected_bias() const {
@@ -825,10 +810,10 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
       }      
     }
     if(grid_ != NULL) {
-      scrub_grid();
+      free(grid_);
     }
     if(grid_deriv_ != NULL){
-      scrub_deriv();
+      free(grid_deriv_);
     }
     
     //build arrays
