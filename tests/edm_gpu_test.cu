@@ -36,8 +36,10 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
   double bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGridGPU<1> g (min, max, bin_spacing, periodic, 0, 0);
+  DimmedGridGPU<1>* d_g;
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 11);
   BOOST_REQUIRE_EQUAL(g.grid_size_, 11);
+  gpuErrchk(cudaMalloc((void**) &d_g, sizeof(DimmedGridGPU<1>)));
 
   size_t array[] = {5};
   size_t temp[1];
@@ -46,25 +48,27 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
 
   for(int i = 0; i < 11; i++){
     g.grid_[i] = i;
-    printf("g.grid_[%d] is now %f\n", i, g.grid_[i]);
   }
-  cudaDeviceSynchronize();
+  gpuErrchk(cudaDeviceSynchronize());
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<1>), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaDeviceSynchronize());
   double x[] = {3.5};
   BOOST_REQUIRE(g.in_grid(x));
   size_t index[1];
-  //Need to update this test so it launches a kernel emulating the "real" one we'll use
   g.get_index(x, index);
   BOOST_REQUIRE(index[0] - 3 < 0.000001);
 
   double* d_x;
-  cudaMalloc(&d_x, sizeof(double));
-  cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice);
-  double target[1] = {5.0};
+  gpuErrchk(cudaMalloc(&d_x, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+  double target[1] = {0.0};
   double* d_target;
-  gpuErrchk(cudaMalloc(&d_target, sizeof(double)));
-  get_value_kernel<1><<<1,1>>>(d_x, d_target, g, g.grid_);
+  gpuErrchk(cudaMalloc((void**) &d_target, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_target, target, sizeof(double), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaDeviceSynchronize());
+  get_value_kernel<1><<<1,1>>>(d_x, d_target, d_g);
+  gpuErrchk(cudaThreadSynchronize());
   gpuErrchk(cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost));
-  printf("target[0] is now %f\n", target[0]);
   BOOST_REQUIRE(pow(target[0] -3, 2) < 0.000001);
 
   //try to break it
@@ -73,32 +77,44 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_sanity ){
 
   x[0] = 10;
   g.get_value(x);
-
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_target));
+  gpuErrchk(cudaFree(d_x));
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
-{
+{//must now refactor this test to use kernels.
   double min[] = {-2, -5, -3};
   double max[] = {125, 63, 78};
   double bin_spacing[] = {1.27, 1.36, 0.643};
   int periodic[] = {0, 1, 1};
   DimmedGridGPU<3> g (min, max, bin_spacing, periodic, 0, 0);
-
+  DimmedGridGPU<3>* d_g;
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
   BOOST_REQUIRE_EQUAL(g.grid_number_[1], 50);
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 126);
+  gpuErrchk(cudaMalloc((void**) &d_g, sizeof(DimmedGridGPU<3>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<3>), cudaMemcpyHostToDevice));
 
   size_t array[3];
   size_t temp[3];
+  size_t* d_array;
+  size_t d_temp[3];
+  gpuErrchk(cudaMalloc((void**)&d_array, 3*sizeof(size_t)));
+  gpuErrchk(cudaMalloc((void**)&d_temp, 3*sizeof(size_t)));
   for(int i = 0; i < g.grid_number_[0]; i++) {
     array[0] = i;
     for(int j = 0; j < g.grid_number_[1]; j++) {
       array[1] = j;
       for(int k = 0; k < g.grid_number_[2]; k++) {
 	array[2] = k;
-
-	//check to make sure the index conversion is correct
-	g.one2multi(g.multi2one(array), temp);
+	gpuErrchk(cudaMemcpy(d_array, array, 3*sizeof(size_t), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaDeviceSynchronize());
+	//g.one2multi(g.multi2one(array), temp);
+	multi2one_kernel<3><<<1,1>>>(d_g, d_array, d_temp);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaMemcpy(array, d_array, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
+//	gpuErrchk(cudaDeviceSynchronize());
 	BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 	BOOST_REQUIRE_EQUAL(array[1], temp[1]);
 	BOOST_REQUIRE_EQUAL(array[2], temp[2]);
@@ -123,6 +139,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
       }
     }
   }
+  gpuErrchk(cudaFree(d_g));
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {

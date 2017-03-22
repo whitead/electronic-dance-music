@@ -168,7 +168,7 @@ class Grid {
   virtual double min_value() const = 0;
   virtual void add(const Grid* other, double scale, double offset) = 0;
   virtual size_t get_grid_size() const = 0;
-  virtual void one2multi(size_t index, size_t* result) const = 0;
+//  virtual void one2multi(size_t index, size_t* result) const = 0;
   virtual double expected_bias() const = 0;
   //clear all values and derivatives
   virtual void clear() = 0;
