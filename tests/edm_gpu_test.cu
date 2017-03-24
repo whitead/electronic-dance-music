@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
   size_t array[3];
   size_t temp[3];
   size_t* d_array;
-  size_t d_temp[3];
+  size_t* d_temp;
   gpuErrchk(cudaMalloc((void**)&d_array, 3*sizeof(size_t)));
   gpuErrchk(cudaMalloc((void**)&d_temp, 3*sizeof(size_t)));
   for(int i = 0; i < g.grid_number_[0]; i++) {
@@ -108,18 +108,20 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
       array[1] = j;
       for(int k = 0; k < g.grid_number_[2]; k++) {
 	array[2] = k;
-	gpuErrchk(cudaMemcpy(d_array, array, 3*sizeof(size_t), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaMemcpy(d_array, array, 3*sizeof(size_t), cudaMemcpyHostToDevice));
+
 	//g.one2multi(g.multi2one(array), temp);
 	multi2one_kernel<3><<<1,1>>>(d_g, d_array, d_temp);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaMemcpy(array, d_array, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
+	gpuErrchk(cudaMemcpy(temp, d_temp, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
 //	gpuErrchk(cudaDeviceSynchronize());
 	BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 	BOOST_REQUIRE_EQUAL(array[1], temp[1]);
 	BOOST_REQUIRE_EQUAL(array[2], temp[2]);
 
-	g.grid_[g.multi2one(array)] = g.multi2one(array);
+//	g.grid_[g.multi2one(array)] = g.multi2one(array);
       }
     }
   }

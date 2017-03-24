@@ -227,9 +227,8 @@ namespace EDM{
       get_index(x, index);
       printf("do_get_value was called on the GPU with x = %f, and index[0] is now %d\n", x[0], index[0]);
       printf("gpu version of multi2one(index) gives us %d\n", multi2one(index));
-      double value = grid_[multi2one(index)];
-      printf("and value to be returned is %f\n", value);
-      return(value);
+      printf("and value to be returned is %f\n", grid_[multi2one(index)]);
+      return(grid_[multi2one(index)]);
 
       #else//host version
       return get_value(x);
@@ -252,16 +251,21 @@ namespace EDM{
       }
     }
 
+    //takes in 1D index, modifies result to be full of the DIM-D coordinates
     HOST_DEV void one2multi(size_t index, size_t result[DIM]) const {
-      printf("this is a test. one2multi was called?!?\n");
       int i;
+      #ifdef __CUDACC__
       printf("one2multi was called on GPU with index of %lu\n", index);
+      #endif
       for(i = 0; i < DIM-1; i++) {
-	result[i] = index % grid_number_[i];
-	index = (index - result[i]) / grid_number_[i];
+	result[i] = index % d_grid_number_[i];
+	printf("one2multi set result[%d] to be %lu\n", i, result[i]);
+	printf("d_grid_number_[%d] is %d\n", i, d_grid_number_[i]);
+	index = (index - result[i]) / d_grid_number_[i];
       }
+      printf("one2multi: i is now %d, and DIM is %d\n", i, DIM);
       result[i] = index;
-      printf("made it to the end of one2multi, and index was %lu\n",index);
+      printf("one2multi finished, and set result[%d] to be %lu\n", i, result[i]);
     }
 
     HOST_DEV size_t multi2one(const size_t index[DIM]) const {
@@ -269,9 +273,8 @@ namespace EDM{
 
       size_t i;    
       for(i = DIM - 1; i > 0; i--) {
-	result = result * grid_number_[i-1] + index[i-1];
+	result = result * d_grid_number_[i-1] + index[i-1];
       }
-      printf("returning result=%lu\n", result);
       return result;
     
     }
@@ -301,6 +304,7 @@ namespace EDM{
 
     double* grid_;
     double* grid_deriv_;
+    int* d_grid_number_;//device grid number arr
 
 //need to tell compiler where to find these since we have a derived templated class.
     using DimmedGrid<DIM>::grid_size_;
@@ -320,8 +324,11 @@ namespace EDM{
     virtual void initialize() {//this cudamallocs our device grid_ & grid_deriv_ pointers
       size_t i;
       grid_size_ = 1;
-      for(i = 0; i < DIM; i++)
+      gpuErrchk(cudaMallocManaged(&d_grid_number_, DIM*sizeof(int)));
+      for(i = 0; i < DIM; i++){
 	grid_size_ *= grid_number_[i];
+	d_grid_number_[i] = grid_number_[i];
+      }
       gpuErrchk(cudaMallocManaged(&grid_, grid_size_ * sizeof(double)));
       if(b_derivatives_) {
 	gpuErrchk(cudaMallocManaged(&grid_deriv_, DIM * grid_size_ * sizeof(double)));
@@ -376,7 +383,7 @@ namespace EDM_Kernels{
    * Takes in target array and temp array to fill as arguments. Validate host-side.
    */
   template <int DIM>
-  __global__ void multi2one_kernel(const DimmedGridGPU<DIM>* g, size_t* array, size_t temp[DIM]){
+  __global__ void multi2one_kernel(const DimmedGridGPU<DIM>* g, size_t* array, size_t* temp){
 //    int i = threadIdx.x + blockIdx.x * blockDim.x;
 //    int j = threadIdx.y + blockIdx.y * blockDim.y;
 //    int k = threadIdx.z + blockIdx.z * blockDim.z;
@@ -385,6 +392,10 @@ namespace EDM_Kernels{
 //      array[1] = j;
 //      array[2] = k;
     printf("multi2one_kernel was called!\n");
+    for(int i = 0; i < DIM; i++){
+      printf("d_grid_number_[%d] is %d\n", i,g->d_grid_number_[i]);
+    }
+
     g->one2multi(g->multi2one(array), temp);
     printf("made it to the end of multi2one_kernel!\n");
 //    }
