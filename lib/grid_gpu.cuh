@@ -21,14 +21,18 @@ HOST_DEV  int gpu_int_floor(double number) {
 }
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true, bool print=true)
 {
    if (code != cudaSuccess) 
    {
-     fprintf(stderr,"GPUassert: \"%s\": %s %s %d\n", cudaGetErrorName(code), cudaGetErrorString(code), file, line);
+     if(print){
+            fprintf(stderr,"GPUassert: \"%s\": %s %s %d\n", cudaGetErrorName(code), cudaGetErrorString(code), file, line);
+     }
       if (abort) exit(code);
    }
 }
+
+#define gpuErrchkNoQuit(ans) { gpuAssert((ans), __FILE__, __LINE__, false, false);}
 
 
 namespace EDM{
@@ -65,18 +69,40 @@ namespace EDM{
      **/
     DimmedGridGPU(const std::string& input_grid){
       //these are here because of inheritance
+      gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
-	cudaFree(grid_);
+	#ifdef __CUDACC__
+	cudaPointerAttributes* attributes = new cudaPointerAttributes;
+	try{
+	  gpuErrchkNoQuit(cudaPointerGetAttributes(attributes, grid_));
+	}
+	catch(const std::exception&){
+	  free(grid_);
+	}
+	#else
+	free(grid_);
+        #endif //CUDACC
 	grid_ = NULL;
       }
       if(grid_deriv_ != NULL){
-	cudaFree(grid_deriv_);
+        #ifdef __CUDACC__
+	cudaPointerAttributes* attributes = new cudaPointerAttributes;
+	try{
+	  gpuErrchkNoQuit(cudaPointerGetAttributes(attributes, grid_deriv_));
+	}
+	catch(const std::exception&){
+	  free(grid_deriv_);
+	}
+	#else
+	free(grid_deriv_);
+        #endif //CUDACC
 	grid_deriv_ = NULL;
       }
       read(input_grid);
     }
 
     ~DimmedGridGPU() {
+      printf("the grid destructor was called! DIM = %u\n", DIM);
       gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
 	gpuErrchk(cudaFree(grid_));
@@ -97,7 +123,7 @@ namespace EDM{
 
       if(!input.is_open()) {      
 	cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       }
 
       // read plumed-style header
@@ -105,7 +131,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("FORCE") != 0) {
 	cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	input >> b_derivatives_;
       }
@@ -118,7 +144,7 @@ namespace EDM{
 	input >> i;
 	if(i != DIM) {
 	  cerr << "Dimension of this grid does not match the one found in the file" << endl;
-	  edm_error("", "grid.h:read");
+	  edm_error("", "grid_gpu.cuh:read");
 
 	}
       }
@@ -126,7 +152,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("TYPE") != 0) {
 	cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> j;
@@ -139,7 +165,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("BIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> grid_number_[i];
@@ -149,7 +175,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("MIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> min_[i];
@@ -159,7 +185,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("MAX") != 0) {
 	cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> max_[i];
@@ -169,7 +195,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("PBC") != 0) {
 	cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> b_periodic_[i];
@@ -225,9 +251,6 @@ namespace EDM{
       }
       size_t index[DIM];
       get_index(x, index);
-      printf("do_get_value was called on the GPU with x = %f, and index[0] is now %d\n", x[0], index[0]);
-      printf("gpu version of multi2one(index) gives us %d\n", multi2one(index));
-      printf("and value to be returned is %f\n", grid_[multi2one(index)]);
       return(grid_[multi2one(index)]);
 
       #else//host version
@@ -254,18 +277,11 @@ namespace EDM{
     //takes in 1D index, modifies result to be full of the DIM-D coordinates
     HOST_DEV void one2multi(size_t index, size_t result[DIM]) const {
       int i;
-      #ifdef __CUDACC__
-      printf("one2multi was called on GPU with index of %lu\n", index);
-      #endif
       for(i = 0; i < DIM-1; i++) {
 	result[i] = index % d_grid_number_[i];
-	printf("one2multi set result[%d] to be %lu\n", i, result[i]);
-	printf("d_grid_number_[%d] is %d\n", i, d_grid_number_[i]);
 	index = (index - result[i]) / d_grid_number_[i];
       }
-      printf("one2multi: i is now %d, and DIM is %d\n", i, DIM);
       result[i] = index;
-      printf("one2multi finished, and set result[%d] to be %lu\n", i, result[i]);
     }
 
     HOST_DEV size_t multi2one(const size_t index[DIM]) const {
@@ -291,7 +307,7 @@ namespace EDM{
       if(!(this->in_grid(x))){
 	return 0;
       }
-            
+      printf("get_value() was called on the host!\n");
       if(b_interpolate_ && b_derivatives_) {
 	double temp[DIM];
 	return this->get_value_deriv(x, temp);
@@ -374,7 +390,6 @@ namespace EDM_Kernels{
   template <int DIM>
   __global__ void get_value_kernel(const double* x, double* target, const DimmedGridGPU<DIM>* g){
     target[0] = g->do_get_value(x);
-    printf("get_value_kernel has set target[0] to be %f\n", target[0]);
     return;
   }
 
@@ -391,13 +406,8 @@ namespace EDM_Kernels{
 //      array[0] = i;
 //      array[1] = j;
 //      array[2] = k;
-    printf("multi2one_kernel was called!\n");
-    for(int i = 0; i < DIM; i++){
-      printf("d_grid_number_[%d] is %d\n", i,g->d_grid_number_[i]);
-    }
 
     g->one2multi(g->multi2one(array), temp);
-    printf("made it to the end of multi2one_kernel!\n");
 //    }
   }
   
