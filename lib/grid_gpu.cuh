@@ -67,7 +67,7 @@ namespace EDM{
     /**
      * Constructor from grid file
      **/
-    DimmedGridGPU(const std::string& input_grid){
+    DimmedGridGPU(const std::string& input_grid): DimmedGrid<DIM>(input_grid){
       //these are here because of inheritance
       gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
@@ -115,128 +115,7 @@ namespace EDM{
       }
     }
 
-    virtual void read(const std::string& filename) {
-      using namespace std;
-      ifstream input;
-      size_t i, j;
-      input.open(filename.c_str());
 
-      if(!input.is_open()) {      
-	cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
-	edm_error("", "grid_gpu.cuh:read");
-      }
-
-      // read plumed-style header
-      string word;
-      input >> word >> word;
-      if(word.compare("FORCE") != 0) {
-	cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	input >> b_derivatives_;
-      }
-    
-      input >> word >> word;
-      if(word.compare("NVAR") != 0) {
-	cerr << "Mangled grid file: " << filename << " No NVAR found" << endl;
-	//edm_error
-      } else {
-	input >> i;
-	if(i != DIM) {
-	  cerr << "Dimension of this grid does not match the one found in the file" << endl;
-	  edm_error("", "grid_gpu.cuh:read");
-
-	}
-      }
-
-      input >> word >> word;
-      if(word.compare("TYPE") != 0) {
-	cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	for(i = 0; i < DIM; i++) {
-	  input >> j;
-	  if(j != GRID_TYPE) {
-	    cerr << "WARNING: Read grid type is the incorrect type" << endl;
-	  }
-	}
-      }
-
-      input >> word >> word;
-      if(word.compare("BIN") != 0) {
-	cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	for(i = 0; i < DIM; i++) {
-	  input >> grid_number_[i];
-	}
-      }
-
-      input >> word >> word;
-      if(word.compare("MIN") != 0) {
-	cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	for(i = 0; i < DIM; i++) {
-	  input >> min_[i];
-	}
-      }
-
-      input >> word >> word;
-      if(word.compare("MAX") != 0) {
-	cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	for(i = 0; i < DIM; i++) {
-	  input >> max_[i];
-	}
-      }
-
-      input >> word >> word;
-      if(word.compare("PBC") != 0) {
-	cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
-	edm_error("", "grid_gpu.cuh:read");
-      } else {
-	for(i = 0; i < DIM; i++) {
-	  input >> b_periodic_[i];
-	}
-      }
-
-      //now set-up grid number and spacing and preallocate     
-      for(i = 0; i < DIM; i++) {
-	dx_[i] = (max_[i] - min_[i]) / grid_number_[i];
-	if(!b_periodic_[i]) {
-	  max_[i] += dx_[i];
-	  grid_number_[i] += 1;
-	}      
-      }
-      if(grid_ != NULL) {
-	gpuErrchk(cudaFree(grid_));
-      }
-      if(grid_deriv_ != NULL){
-	gpuErrchk(cudaFree(grid_deriv_));
-      }
-    
-      //build arrays
-      initialize();
-    
-      //now we read grid!    
-      for(i = 0; i < grid_size_; i++) {
-	//skip dimensions
-	for(j = 0; j < DIM; j++)
-	  input >> word;
-	input >> grid_[i];      
-	if(b_derivatives_) {
-	  for(j = 0; j < DIM; j++) {
-	    input >> grid_deriv_[i * DIM + j];
-	    grid_deriv_[i * DIM + j] *= -1;
-	  }
-	}
-      }    
-
-      //all done!
-      input.close();
-    }
 
     /**
      * Serves the purpose of get_value(), but needs to be callable within and without a GPU kernel
@@ -296,7 +175,7 @@ namespace EDM{
     }
 
     HOST_DEV double do_get_value_deriv(const double* x, double* der) const{
-      return 1.0;
+      return 3.1415926535897932;
     }
     
     /**
@@ -318,19 +197,22 @@ namespace EDM{
       return grid_[multi2one(index)];
     }
 
-    double* grid_;
-    double* grid_deriv_;
+//    double* grid_;
+//    double* grid_deriv_;
     int* d_grid_number_;//device grid number arr
 
 //need to tell compiler where to find these since we have a derived templated class.
     using DimmedGrid<DIM>::grid_size_;
     using DimmedGrid<DIM>::b_derivatives_;
     using DimmedGrid<DIM>::b_interpolate_;
+    using DimmedGrid<DIM>::grid_;
+    using DimmedGrid<DIM>::grid_deriv_;
     using DimmedGrid<DIM>::dx_;
     using DimmedGrid<DIM>::min_;
     using DimmedGrid<DIM>::max_;
     using DimmedGrid<DIM>::grid_number_;
     using DimmedGrid<DIM>::b_periodic_;
+    using DimmedGrid<DIM>::read;
 
   private:  
 
@@ -355,6 +237,7 @@ namespace EDM{
       else{
 	grid_deriv_ = NULL;
       }
+      gpuErrchk(cudaDeviceSynchronize());
     }
     
   };

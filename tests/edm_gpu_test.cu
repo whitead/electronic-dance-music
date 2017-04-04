@@ -150,13 +150,10 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {
-  printf("test. did I make it into 1d_read?\n");
   DimmedGridGPU<1> g(GRID_SRC + "/1.grid");
-  printf("test. did I make it past reading in 1d_read?\n");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
   BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
-  printf("test. did I make it to the end of 1d_read?\n");
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_3d_read ) {
@@ -168,6 +165,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_read ) {
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
   double temp[] = {0.75, 0, 1.00};
   gpuErrchk(cudaDeviceSynchronize());
+  printf("g.do_get_value(temp) gives us %f...\n", g.do_get_value(temp));
   BOOST_REQUIRE(pow(g.do_get_value(temp) - 1.260095, 2) < EPSILON);
   printf("test. did I make it to the end of 3d_read?\n");
 }
