@@ -35,8 +35,8 @@ It only works with lammps right now. To install:
 1. Create a build directory from the EDM source dir
 2. cd into build and run `cmake ..`
 3. `sudo make install` to install the EDM library locally
-4. (Optional) edit the CMakeLists.txt and set the `LAMMPS_SRC` variable to the LAMMPS src dir on your machine
-5. `make patch` to move the EDM LAMMPS files. If you did not perform step 4, you must instead use `make patch -DLAMMPS_SRC="path/to/your/LAMMPS/install"`
+4. (Optional) manuall edit the CMakeLists.txt and set the `LAMMPS_SRC` variable to the LAMMPS src dir on your machine
+5. `make patch` to move the EDM LAMMPS files. If you did not perform step 4, you must instead use `make patch -DLAMMPS_SRC="path/to/your/LAMMPS/src"`
 6. Now go to your LAMMPS src dir and run `make yes-user-edm` and `make-<machine>` as normal.
 
 Ignore all the CMake files floating aruond in the source, they're just

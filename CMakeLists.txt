@@ -5,7 +5,7 @@ project (WordModel)
 set (WordModel_VERSION_MAJOR 0)
 set (WordModel_VERSION_MINOR 1)
 set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
-set (LAMMPS_SRC "/home/rainier/lammps/src")
+#set (LAMMPS_SRC "/home/rainier/lammps/src")
 
 
 #compilation flags
