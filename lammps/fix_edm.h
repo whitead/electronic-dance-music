@@ -8,7 +8,7 @@ FixStyle(edm,FixEDM)
 #define LMP_FIX_EDM_H
 
 #include "fix.h"
-#include "edm_bias.h"
+#include <edm/edm_bias.h>
 #include "random_mars.h"
 
 namespace LAMMPS_NS {

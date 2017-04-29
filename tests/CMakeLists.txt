@@ -8,7 +8,7 @@ add_definitions(-DTEST_EDM_SRC=${TEST_EDM_SRC})
 
 add_executable (edm_test edm_test)
 target_link_libraries (edm_test
-                       edm_lib
+                       edm
                       ${Boost_FILESYSTEM_LIBRARY}
                       ${Boost_SYSTEM_LIBRARY}
                       ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}

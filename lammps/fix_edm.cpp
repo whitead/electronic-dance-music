@@ -20,7 +20,7 @@
 #include "fix_edm.h"
 #include "neighbor.h"
 
-#include "edm_bias.h"
+#include <edm/edm_bias.h>
 
 using namespace LAMMPS_NS;
 

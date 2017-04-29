@@ -8,7 +8,7 @@ FixStyle(edm_pair,FixEDMPair)
 #define LMP_FIX_EDM_PAIR_H
 
 #include "fix.h"
-#include "edm_bias.h"
+#include <edm/edm_bias.h>
 #include "random_mars.h"
 #include "neigh_list.h"
 #include "math.h"

@@ -12,7 +12,7 @@ if(Boost_FOUND AND PYTHONLIBS_FOUND)
   
   add_library(edm_python SHARED ${EDM_PACKAGE}/edm_python.cxx ${EDM_PACKAGE}/edm_bias_py)
   set_target_properties(edm_python PROPERTIES PREFIX "${EDM_PACKAGE}/lib")
-  target_link_libraries(edm_python edm_lib ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(edm_python edm ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
   
 elseif(NOT Boost_FOUND)
   message(FATAL_ERROR "Unable to find correct Boost version and Python Lib")

@@ -1,2 +1,13 @@
 add_definitions(-DEDM_SERIAL)
-add_library (edm_lib SHARED edm_bias grid gaussian_grid edm)
+
+add_library (edm SHARED edm_bias grid gaussian_grid edm)
+
+
+install (TARGETS edm DESTINATION lib)
+install (FILES edm_bias.h DESTINATION include/edm)
+
+
+
+
+
+
