@@ -157,9 +157,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_3d_read ) {
-  printf("test. did I make it into 3d_read?\n");
-  DimmedGridGPU<3> g(GRID_SRC + "/3.grid");
-  printf("test. did I make it past reading in 3d_read?\n");
+  DimmedGridGPU<3> g(GRID_SRC + "/3.grid");//derivatives is true here
   BOOST_REQUIRE_EQUAL(g.min_[2], 0);
   BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);

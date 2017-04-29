@@ -36,6 +36,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 
 namespace EDM{
+
+  
   
   template< int DIM>
   class DimmedGridGPU : public DimmedGrid<DIM> {
@@ -102,7 +104,6 @@ namespace EDM{
     }
 
     ~DimmedGridGPU() {
-      printf("the grid destructor was called! DIM = %u\n", DIM);
       gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
 	gpuErrchk(cudaFree(grid_));
@@ -124,7 +125,7 @@ namespace EDM{
     HOST_DEV double do_get_value( const double* x) const {
       #ifdef __CUDACC__ //device version
 
-      if(b_interpolate_ && b_derivatives_) {//these are pointers
+      if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
 	double temp[DIM];
 	return do_get_value_deriv(x, temp);
       }
@@ -174,19 +175,80 @@ namespace EDM{
     
     }
 
+    HOST_DEV bool in_grid(const double x[DIM]) const {
+      size_t i;
+      for(i = 0; i < DIM; i++) {
+	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] > (max_[i])) ){
+	  return false;
+	}
+      }
+      return true;
+    }
+
+
     HOST_DEV double do_get_value_deriv(const double* x, double* der) const{
-      return 3.1415926535897932;
+      if(d_b_derivatives_[0]){
+	printf("I GUESS DERIVATIVES WAS TRUE ON GPU\n");
+      }
+      printf("should be doing get_value_deriv right now...\n");
+      size_t i;
+      if(!in_grid(x)) {
+	for(i = 0; i < DIM; i++)
+	  der[i] = 0;
+	return 0;
+      }
+      double value;
+      size_t index1;
+      size_t index[DIM];
+      get_index(x, index);
+      index1 = multi2one(index);
+      if(b_interpolate_) {
+      
+	double where[DIM]; //local position (local meaning relative to neighbors)
+	int stride[DIM]; //the indexing stride, which also accounts for periodicity
+	double wrapped_x;
+      
+	stride[0] = 1; //dim 0 is fastest
+	for(i = 1; i < DIM; i++)
+	  stride[i] = stride[i - 1] * grid_number_[i - 1];
+
+	for(i = 0; i < DIM; i++) {
+	  //wrap x, if needed
+	  wrapped_x = x[i];
+	  if(b_periodic_[i])
+	    wrapped_x -= (max_[i] - min_[i]) * gpu_int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
+	  //get position relative to neighbors
+	  where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
+	  //treat possible stride wrap
+	  if(b_periodic_[i] && index[i] == grid_number_[i] - 1){
+//	  printf("adjusting for being at the right edge\n");
+	    stride[i] *= (1 - grid_number_[i]);
+	  }
+	  
+	}
+      
+	value = interp<DIM>(dx_, where, &grid_[index1], &grid_deriv_[index1 * DIM], stride, der);
+      
+      } else {
+	for(i = 0; i < DIM; i++) {
+	  der[i] = grid_deriv_[index1 * DIM + i];
+	}
+	value = grid_[index1];
+      }
+
+      return value;
+
+
+//      return 3.1415926535897932;
     }
     
     /**
-     * Calls the __host__ version of do_get_value() for GPU grids.
-     * Can't override get_value() directly due to execution space specifiers.
+     * Called by the __host__ version of do_get_value() for GPU grids.
      **/
     virtual double get_value(const double* x) const{
       if(!(this->in_grid(x))){
 	return 0;
       }
-      printf("get_value() was called on the host!\n");
       if(b_interpolate_ && b_derivatives_) {
 	double temp[DIM];
 	return this->get_value_deriv(x, temp);
@@ -200,6 +262,8 @@ namespace EDM{
 //    double* grid_;
 //    double* grid_deriv_;
     int* d_grid_number_;//device grid number arr
+    int* d_b_derivatives_;//device 'bool' for whether we're using derivatives
+    int* d_b_interpolate_;//device 'bool' for whether we're interpolating
 
 //need to tell compiler where to find these since we have a derived templated class.
     using DimmedGrid<DIM>::grid_size_;
@@ -223,6 +287,11 @@ namespace EDM{
       size_t i;
       grid_size_ = 1;
       gpuErrchk(cudaMallocManaged(&d_grid_number_, DIM*sizeof(int)));
+      gpuErrchk(cudaMallocManaged(&d_b_derivatives_, sizeof(int)));
+      gpuErrchk(cudaMallocManaged(&d_b_interpolate_, sizeof(int)));
+      d_b_derivatives_[0] = b_derivatives_;//need these for device do_get_value function
+      d_b_interpolate_[0] = b_interpolate_;//need these for device do_get_value function
+      
       for(i = 0; i < DIM; i++){
 	grid_size_ *= grid_number_[i];
 	d_grid_number_[i] = grid_number_[i];

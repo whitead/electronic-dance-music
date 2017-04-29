@@ -44,7 +44,7 @@ namespace EDM{
 // Giovanni
 
 template<int DIM> 
- double interp(const double* dx, 
+ HOST_DEV double interp(const double* dx, 
 	      const double* where, 
 	      const double* tabf, 
 	      const double* tabder, 
@@ -404,7 +404,6 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 	std::cerr << x[i]  << " (" << min_[i]  << "," << max_[i] << ")" << ", ";
       std::cerr << ")" << std::endl;
       */
-	//std::cout << "YOU SHOULD READ THIS FOR interpolation_1d\n";
       for(i = 0; i < DIM; i++)
 	der[i] = 0;
       return 0;
@@ -865,10 +864,10 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Check if a point is in bounds
    **/
-   bool in_grid(const double x[DIM]) const {
+  bool in_grid(const double x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
-	if(!b_periodic_[i] && (x[i] < min_[i] || x[i] > (max_[i])) ){
+      if(!b_periodic_[i] && (x[i] < min_[i] || x[i] > (max_[i])) ){
 	return false;
       }
     }
