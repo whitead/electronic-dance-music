@@ -5,7 +5,7 @@ project (WordModel)
 set (WordModel_VERSION_MAJOR 0)
 set (WordModel_VERSION_MINOR 1)
 set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
-set (LAMMPS_SRC "/home/whitead/Documents/lammps/src")
+set (LAMMPS_SRC "/home/rainier/lammps/src")
 
 
 #compilation flags
@@ -30,14 +30,15 @@ add_subdirectory ("tests")
 #compile python library
 add_subdirectory ("python")
 
-file(GLOB LammpsFiles ${CMAKE_SOURCE_DIR}/lib/*.cpp
-                      ${CMAKE_SOURCE_DIR}/lib/*.h
-                      ${CMAKE_SOURCE_DIR}/*.h
-                      ${CMAKE_SOURCE_DIR}/*.cpp)
 
-add_custom_target(patch)
+file(GLOB LammpsFiles ${CMAKE_SOURCE_DIR}/lammps/*.cpp
+  ${CMAKE_SOURCE_DIR}/lammps/*.h
+  ${CMAKE_SOURCE_DIR}/lammps/Install.sh)
+
+
+add_custom_target(patch COMMAND ${CMAKE_COMMAND} -E make_directory "${LAMMPS_SRC}/USER-EDM")
 foreach(f ${LammpsFiles})
   add_custom_command(TARGET patch PRE_BUILD
                      COMMAND ${CMAKE_COMMAND} -E
-                         copy ${f} ${LAMMPS_SRC})
+                         copy ${f} "${LAMMPS_SRC}/USER-EDM")
 endforeach()
