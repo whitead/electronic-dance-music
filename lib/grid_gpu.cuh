@@ -187,9 +187,9 @@ namespace EDM{
 
 
     HOST_DEV double do_get_value_deriv(const double* x, double* der) const{
-      if(d_b_derivatives_[0]){
-	printf("I GUESS DERIVATIVES WAS TRUE ON GPU\n");
-      }
+      // if(d_b_derivatives_[0]){
+      // 	printf("I GUESS DERIVATIVES WAS TRUE ON GPU\n");
+      // }
       printf("should be doing get_value_deriv right now...\n");
       size_t i;
       if(!in_grid(x)) {
@@ -226,7 +226,7 @@ namespace EDM{
 	  }
 	  
 	}
-      
+	
 	value = interp<DIM>(dx_, where, &grid_[index1], &grid_deriv_[index1 * DIM], stride, der);
       
       } else {
@@ -241,6 +241,161 @@ namespace EDM{
 
 //      return 3.1415926535897932;
     }
+    /*
+     * Must override the read function or else include CUDA code in the base
+     * grid.h file... =/
+     */
+    virtual void read(const std::string& filename) {
+    using namespace std;
+    ifstream input;
+    size_t i, j;
+    input.open(filename.c_str());
+
+    if(!input.is_open()) {      
+      cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
+      edm_error("", "grid.h:read");
+    }
+
+    // read plumed-style header
+    string word;
+    input >> word >> word;
+    if(word.compare("FORCE") != 0) {
+      cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      input >> b_derivatives_;
+    }
+    
+    input >> word >> word;
+    if(word.compare("NVAR") != 0) {
+      cerr << "Mangled grid file: " << filename << " No NVAR found" << endl;
+      //edm_error
+    } else {
+      input >> i;
+      if(i != DIM) {
+	cerr << "Dimension of this grid does not match the one found in the file" << endl;
+	edm_error("", "grid.h:read");
+
+      }
+    }
+
+    input >> word >> word;
+    if(word.compare("TYPE") != 0) {
+      cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      for(i = 0; i < DIM; i++) {
+	input >> j;
+	if(j != GRID_TYPE) {
+	  cerr << "WARNING: Read grid type is the incorrect type" << endl;
+	}
+      }
+    }
+
+    input >> word >> word;
+    if(word.compare("BIN") != 0) {
+      cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      for(i = 0; i < DIM; i++) {
+	input >> grid_number_[i];
+      }
+    }
+
+    input >> word >> word;
+    if(word.compare("MIN") != 0) {
+      cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      for(i = 0; i < DIM; i++) {
+	input >> min_[i];
+      }
+    }
+
+    input >> word >> word;
+    if(word.compare("MAX") != 0) {
+      cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      for(i = 0; i < DIM; i++) {
+	input >> max_[i];
+      }
+    }
+
+    input >> word >> word;
+    if(word.compare("PBC") != 0) {
+      cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
+      edm_error("", "grid.h:read");
+    } else {
+      for(i = 0; i < DIM; i++) {
+	input >> b_periodic_[i];
+      }
+    }
+
+    //now set-up grid number and spacing and preallocate     
+    for(i = 0; i < DIM; i++) {
+      dx_[i] = (max_[i] - min_[i]) / grid_number_[i];
+      if(!b_periodic_[i]) {
+	max_[i] += dx_[i];
+	grid_number_[i] += 1;
+      }      
+    }
+    printf("freeing grids in the read() function of Grid class\n");
+    if(grid_ != NULL){
+      #ifdef __CUDACC__
+      cudaPointerAttributes* attributes = new cudaPointerAttributes;
+      try{
+	gpuErrchkNoQuit(cudaPointerGetAttributes(attributes, grid_));
+      }
+      catch(const std::exception&){
+	free(grid_);
+      }
+      #else
+      free(grid_);
+      #endif //CUDACC
+      grid_ = NULL;
+    }
+    if(grid_deriv_ != NULL){
+      #ifdef __CUDACC__
+      cudaPointerAttributes* attributes = new cudaPointerAttributes;
+      try{
+	gpuErrchkNoQuit(cudaPointerGetAttributes(attributes, grid_deriv_));
+      }
+      catch(const std::exception&){
+	free(grid_deriv_);
+      }
+      #else
+      free(grid_deriv_);
+      #endif //CUDACC
+      grid_deriv_ = NULL;
+    }
+    // if(grid_ != NULL) {
+    //   free(grid_);
+    // }
+    // if(grid_deriv_ != NULL){
+    //   free(grid_deriv_);
+    // }
+    
+    //build arrays
+    initialize();
+    
+    //now we read grid!    
+    for(i = 0; i < grid_size_; i++) {
+      //skip dimensions
+      for(j = 0; j < DIM; j++)
+	input >> word;
+      input >> grid_[i];      
+      if(b_derivatives_) {
+	for(j = 0; j < DIM; j++) {
+	  input >> grid_deriv_[i * DIM + j];
+	  grid_deriv_[i * DIM + j] *= -1;
+	}
+      }
+    }    
+
+    //all done!
+    input.close();
+  }
     
     /**
      * Called by the __host__ version of do_get_value() for GPU grids.
@@ -284,6 +439,7 @@ namespace EDM{
      * This will actually allocate the arrays and perform any sublcass initialization
      **/
     virtual void initialize() {//this cudamallocs our device grid_ & grid_deriv_ pointers
+      printf("initialize was called for the DimmedGridGPU class!\n");
       size_t i;
       grid_size_ = 1;
       gpuErrchk(cudaMallocManaged(&d_grid_number_, DIM*sizeof(int)));
@@ -310,25 +466,12 @@ namespace EDM{
     }
     
   };
-
-  /*
-   *    HOST_DEV double do_get_value(const double* x) const{
- *     #ifdef __CUDACC__
- *     if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
- *	double temp[DIM];
- *	return do_get_value_deriv(x, temp);
- *    }
- */
-
-
-
-
 }
 /*
  * This namespace is used for invoking the GPU functions in the DimmedGridGPU class.
  * Must use a namespace to contain globally-scoped kernel functions.
  * The specific kernels like get_value_kernel are used for unit testing.
- * You MUST cudaMemcpy a DimmedGridGPU object onto the GPU before invoking these kernels.
+ * MUST cudaMemcpy a DimmedGridGPU object onto the GPU before invoking these kernels.
  */
 namespace EDM_Kernels{
   

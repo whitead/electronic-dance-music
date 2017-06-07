@@ -146,7 +146,6 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
   gpuErrchk(cudaFree(d_g));
   gpuErrchk(cudaFree(d_temp));
   gpuErrchk(cudaFree(d_array));
-//  printf("Guess we passed the grid_gpu_3d_sanity!\n");
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {
@@ -179,7 +178,6 @@ BOOST_AUTO_TEST_CASE( gpu_derivative_direction ) {
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
-
   size_t i, j;
   std::string input;
   std::string output;
@@ -207,6 +205,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
     for(j = 0; j < ref_length; j++)
       ref_grid[j] = g->get_grid()[j];
     //re-read
+    gpuErrchk(cudaDeviceSynchronize());
     g->read(output);
     //now compare
     BOOST_REQUIRE_EQUAL(g->get_grid_size(), ref_length);
@@ -215,7 +214,6 @@ BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
       BOOST_REQUIRE(pow(ref_grid[j] - g->get_grid()[j], 2) < EPSILON);
 
   }
-  
 }
 
 BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
