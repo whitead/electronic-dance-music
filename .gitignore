@@ -39,5 +39,9 @@ build/*
 *.aux
 *.log
 
-Images
+#Images
 *.png
+
+#My workaround files
+.rebuild
+.remake

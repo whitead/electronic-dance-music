@@ -190,7 +190,6 @@ namespace EDM{
       // if(d_b_derivatives_[0]){
       // 	printf("I GUESS DERIVATIVES WAS TRUE ON GPU\n");
       // }
-      printf("should be doing get_value_deriv right now...\n");
       size_t i;
       if(!in_grid(x)) {
 	for(i = 0; i < DIM; i++)
@@ -340,7 +339,6 @@ namespace EDM{
 	grid_number_[i] += 1;
       }      
     }
-    printf("freeing grids in the read() function of Grid class\n");
     if(grid_ != NULL){
       #ifdef __CUDACC__
       cudaPointerAttributes* attributes = new cudaPointerAttributes;
@@ -439,7 +437,6 @@ namespace EDM{
      * This will actually allocate the arrays and perform any sublcass initialization
      **/
     virtual void initialize() {//this cudamallocs our device grid_ & grid_deriv_ pointers
-      printf("initialize was called for the DimmedGridGPU class!\n");
       size_t i;
       grid_size_ = 1;
       gpuErrchk(cudaMallocManaged(&d_grid_number_, DIM*sizeof(int)));
