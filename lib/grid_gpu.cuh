@@ -480,8 +480,16 @@ namespace EDM_Kernels{
    * address to store the value, which must be copied to host side if it is to be used there.
    */
   template <int DIM>
-  __global__ void get_value_kernel(const double* x, double* target, const DimmedGridGPU<DIM>* g){
+  __global__ void get_value_kernel(const double* x, double* target,
+				   const DimmedGridGPU<DIM>* g){
     target[0] = g->do_get_value(x);
+    return;
+  }
+
+  template <int DIM>
+  __global__ void get_value_deriv_kernel(const double* x, double* der, double* target,
+					 const DimmedGridGPU<DIM>* g){
+    target[0] = g->do_get_value_deriv(x, der);
     return;
   }
 

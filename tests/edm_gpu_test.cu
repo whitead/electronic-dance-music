@@ -255,6 +255,11 @@ BOOST_AUTO_TEST_CASE( gpu_derivative_direction ) {
   gpuErrchk(cudaMemcpy(target2, d_target2, sizeof(double), cudaMemcpyDeviceToHost));
   
   BOOST_REQUIRE(target2[0] < target[0]);
+  gpuErrchk(cudaFree(d_temp));
+  gpuErrchk(cudaFree(d_target));
+  gpuErrchk(cudaFree(d_temp2));
+  gpuErrchk(cudaFree(d_target2));
+  gpuErrchk(cudaFree(d_g));
 }
 
 BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
@@ -309,29 +314,130 @@ BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
     g.grid_deriv_[i] = 1. / i;
   }
 
+  DimmedGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**) &d_g, sizeof(DimmedGridGPU<3>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<1>), cudaMemcpyHostToDevice));
+
   double array[] = {5.3};
   double der[1];
-  double fhat = g.get_value_deriv(array,der);
+  double fhat[1] = {0.0};//g.get_value_deriv(array,der);
+  double* d_array;
+  double* d_der;
+  double* d_fhat;
+  gpuErrchk(cudaMalloc((void**)&d_array, sizeof(double)));
+  gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
+  gpuErrchk(cudaMalloc((void**)&d_fhat, sizeof(double)));
 
+  gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  gpuErrchk(cudaMemcpy(d_der, der, sizeof(double), cudaMemcpyHostToDevice ));
+  gpuErrchk(cudaMemcpy(d_fhat, fhat, sizeof(double), cudaMemcpyHostToDevice ));
+
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+
+  gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
+
+  
   //make sure it's at least in the ballpark
-  BOOST_REQUIRE(fhat > log(5) && fhat < log(6));
+  BOOST_REQUIRE(fhat[0] > log(5) && fhat[0] < log(6));
   BOOST_REQUIRE(der[0] < 1. / 5 && der[0] > 1. / 6.);
 
   //Make sure it's reasonably accurate
-  BOOST_REQUIRE(pow(fhat - log(5.3), 2) < 0.1);
+  BOOST_REQUIRE(pow(fhat[0] - log(5.3), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0]- 1. / 5.3, 2) < 0.1);
 
   //try edge cases
   array[0] = 5.0;
-  g.get_value(array);
+  gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+
+  gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
+
   array[0] = 5.5;
-  g.get_value(array);
+  gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+
+  gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
+
   array[0] = 0.0;
-  g.get_value(array);
+  gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+
+  gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
+
   array[0] = 10.0;
-  g.get_value(array);
+  gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+
+  gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
+
 
 }
+
+BOOST_AUTO_TEST_CASE( gpu_interp_1d_periodic ) {
+  double min[] = {-M_PI};
+  double max[] = {M_PI};
+  double bin_spacing[] = {M_PI / 100};
+  int periodic[] = {1};
+  DimmedGridGPU<1> g (min, max, bin_spacing, periodic, 1, 1);
+
+  for(int i = 0; i < g.grid_number_[0]; i++) {
+    g.grid_[i] = sin(g.min_[0] + i * g.dx_[0]);
+    g.grid_deriv_[i] = cos(g.min_[0] + i * g.dx_[0]);
+  }
+  DimmedGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**) &d_g, sizeof(DimmedGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<1>), cudaMemcpyHostToDevice));
+
+
+  double array[] = {M_PI / 4};
+  double der[1];
+  double fhat[1] = {0.0};//g.get_value_deriv(array,der);
+
+  double* d_array;
+  double* d_der;
+  double* d_fhat;
+  gpuErrchk(cudaMalloc((void**)&d_array, sizeof(double)));
+  gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
+  gpuErrchk(cudaMalloc((void**)&d_fhat, sizeof(double)));
+
+  gpuErrchk(cudaMemcpy((void**)d_array, array, sizeof(double), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy((void**)d_fhat, fhat, sizeof(double), cudaMemcpyHostToDevice));
+
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+  
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
+  
+  //Make sure it's reasonably accurate
+  BOOST_REQUIRE(pow(fhat[0] - sin(array[0]), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
+
+  //test periodic
+  array[0] = 5 * M_PI / 4;
+  gpuErrchk(cudaMemcpy((void**)d_array, array, sizeof(double), cudaMemcpyHostToDevice));
+  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
+  
+  //fhat = g.get_value_deriv(array,der);
+
+  g.write("grid.test");
+  
+  BOOST_REQUIRE(pow(fhat[0] - sin(array[0]), 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
+
+}
+
 
 
 
