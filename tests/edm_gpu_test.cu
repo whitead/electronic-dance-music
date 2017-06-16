@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<3>), cudaMemcpyHostToDevice));
 
   size_t array[3];
-  size_t temp[3];
+//  size_t temp[3];
   size_t* d_array;
   size_t* d_temp;
   gpuErrchk(cudaMalloc((void**)&d_array, 3*sizeof(size_t)));
@@ -380,7 +380,10 @@ BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
   gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
 
-
+  gpuErrchk(cudaFree(d_array));
+  gpuErrchk(cudaFree(d_der));
+  gpuErrchk(cudaFree(d_fhat));
+  gpuErrchk(cudaFree(d_g));
 }
 
 BOOST_AUTO_TEST_CASE( gpu_interp_1d_periodic ) {
@@ -436,9 +439,69 @@ BOOST_AUTO_TEST_CASE( gpu_interp_1d_periodic ) {
   BOOST_REQUIRE(pow(fhat[0] - sin(array[0]), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
 
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_array));
+  gpuErrchk(cudaFree(d_der));
+  gpuErrchk(cudaFree(d_fhat));
 }
 
+BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
 
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {0, 0};
+  double max[] = {10, 5};
+  double bin_spacing[] = {1, 1};
+  int periodic[] = {1, 0};
+  double sigma[] = {0.1, 0.1};
+  DimmedGaussGridGPU<2> g (min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<2>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<2>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<2>), cudaMemcpyHostToDevice));
+  
+  max[1] = 10;
+  double* d_max;
+  gpuErrchk(cudaMalloc((void**)&d_max, 2*sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_max, max, 2*sizeof(double), cudaMemcpyHostToDevice));
+  periodic[1] = 1;
+  double* d_periodic;
+  gpuErrchk(cudaMalloc((void**)&d_periodic, 2*sizeof(int)));
+  g.set_boundary(min, max, periodic);
+
+  double test_point[] = {0,1}; //should not remap
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[0] = -1;//on grid, at 9
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[1] = 6;//closest point is 6
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 6, 2) < 0.1);
+
+  test_point[1] = 11;//actually in grid at 1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
+
+  test_point[1] = 9; //closest point is -1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
+
+  test_point[1] = -1; //closest point is -1
+  g.remap(test_point);
+  BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
+  BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
+
+  gpuErrchk(cudaFree(d_g));
+
+}
 
 
 //This test will simply run several thousand timesteps and time how long it takes.
