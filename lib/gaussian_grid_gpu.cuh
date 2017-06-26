@@ -35,6 +35,7 @@ namespace EDM{
   public:
     virtual ~GaussGridGPU() {};
     double add_value(const double* x, double height) = 0;
+
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   };
 
@@ -50,29 +51,114 @@ namespace EDM{
 		       const double* bin_spacing, 
 		       const int* b_periodic, 
 		       int b_interpolate,
-		       const double* sigma) : DimmedGaussGrid<DIM>(min, max, bin_spacing, b_periodic, b_interpolate, sigma) {}
+		       const double* sigma) : DimmedGaussGrid<DIM>(min, max, bin_spacing, b_periodic, b_interpolate, sigma), grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate) {
+      
+      size_t i;
+      for(i = 0; i < DIM; i++) {
+	sigma_[i] = sigma[i] * sqrt(2.);
+      }
+    
+      set_boundary(min, max, b_periodic);
+      update_minigrid();
+    
+    }
 
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
      **/
-    DimmedGaussGridGPU(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma) {}
+    DimmedGaussGridGPU(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma), grid_(filename) {}
   
     ~DimmedGaussGridGPU() {
       //nothing
     }
 
+    /**
+     * Specifying the period here means that we can wrap points along
+     * the boundary, not necessarily along the grid bounds
+     **/
+    void set_boundary(const double* min, const double* max, const int* b_periodic) {
+      size_t i,j;
+      double s;
+      double tmp1,tmp2,tmp3;
+
+      b_dirty_bounds = 0;
+
+      for(i = 0; i < DIM; i++) {
+	boundary_min_[i] = min[i];
+	boundary_max_[i] = max[i];
+	b_periodic_boundary_[i] = b_periodic[i];
+      }
+
+      //pre-compute bc boundaries if necessary
+      for(i = 0; i < DIM; i++) {
+	if(!b_periodic_boundary_[i]) {
+	  for(j = 0; j < BC_TABLE_SIZE; j++) {
+	    s = j * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1) + boundary_min_[i];
+
+	    //mcgovern-de pablo contribution
+	    tmp1 = sqrt(M_PI) * sigma_[i] / 2.  * 
+	      ( erf((s - boundary_min_[i]) / sigma_[i]) + 
+		erf((boundary_max_[i] - s) / sigma_[i]));
+
+	    bc_denom_table_[i][j] = tmp1;
+#ifdef BC_CORRECTION
+	    tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
+
+	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
+	      sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
+	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
+	      sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
+#endif
+	    //mcgovern-de pablo contribution derivative
+	    tmp3 = 1. * 
+	      (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
+	       exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
+
+	    bc_denom_deriv_table_[i][j] = tmp3;
+#ifdef BC_CORRECTION
+	    bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
+	      sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
+	      tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
+	    bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
+	      sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
+	      tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
+#endif
+	    if(j > 2) {
+	      //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
+	    }
+	    //	  	  bc_denom_table_[i][j] = 1;
+	    //	  bc_denom_deriv_table_[i][j] = 0;
+
+	  }
+	}
+      }
+    
+    }
+
+
+
+    //need to tell compiler where to find these since we have a derived templated class
+    using DimmedGaussGrid<DIM>::sigma_;
+    using DimmedGaussGrid<DIM>::update_minigrid;
+    using DimmedGaussGrid<DIM>::b_dirty_bounds;
+    using DimmedGaussGrid<DIM>::boundary_min_;
+    using DimmedGaussGrid<DIM>::boundary_max_;
+    using DimmedGaussGrid<DIM>::b_periodic_boundary_;
+    using DimmedGaussGrid<DIM>::bc_denom_table_;
+    using DimmedGaussGrid<DIM>::bc_denom_deriv_table_;
+    DimmedGridGPU<DIM> grid_;//the underlying grid is a GPU-able grid
   };
   
 /**
  * Used to avoid template constructors
  **/
   GaussGrid* make_gauss_grid_gpu( int dim, 
-			     const double* min, 
-			     const double* max, 
-			     const double* bin_spacing, 
-			     const int* b_periodic, 
-			     int b_interpolate,
-			     const double* sigma);
+				  const double* min, 
+				  const double* max, 
+				  const double* bin_spacing, 
+				  const int* b_periodic, 
+				  int b_interpolate,
+				  const double* sigma);
 
 /**
    p * Used to avoid template constructors
@@ -80,4 +166,28 @@ namespace EDM{
   GaussGrid* read_gauss_grid_gpu( int dim, const std::string& filename, const double* sigma);
 
 }
+
+namespace EDM_Kernels{
+  
+  using namespace EDM;
+  
+  /*
+   * Kernel wrapper for set_boundary() on the GPU. Takes in an instance of DimmedGaussGridGPU
+   */
+  template <int DIM>
+  __global__ void set_boundary_kernel(const double* min, const double* max,
+				      const int* periodic, DimmedGaussGridGPU<DIM>* g){
+    g->do_set_boundary(min, max, periodic);
+    return;
+  }
+
+  template <int DIM>
+  __global__ void remap_kernel(double* point, DimmedGaussGridGPU<DIM>* g){
+    //g->do_remap(point);
+    return;
+  }
+
+  
+}
+
 #endif //GPU_GAUSS_GRID_CH_

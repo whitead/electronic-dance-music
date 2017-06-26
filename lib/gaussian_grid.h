@@ -72,7 +72,8 @@ namespace EDM{
 		  const double* bin_spacing, 
 		  const int* b_periodic, 
 		  int b_interpolate,
-		  const double* sigma) : grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate), b_dirty_bounds(0){
+		  const double* sigma) : grid_(min, max, bin_spacing, b_periodic,
+					       1, b_interpolate), b_dirty_bounds(0){
       //the 1 means we always use derivatives for a gaussian grid
     
       size_t i;
@@ -83,6 +84,12 @@ namespace EDM{
       set_boundary(min, max, b_periodic);
       update_minigrid();
     }
+
+    /*
+     *Default constructor
+     */
+//  DimmedGaussGrid(): b_interpolate_(1), grid_(NULL), grid_deriv_(NULL){}
+
 
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
@@ -487,15 +494,7 @@ namespace EDM{
     void clear() {
       grid_.clear();
     }
-
-    void scrub_grid(){
-      grid_.scrub_grid();
-    }
-
-    void scrub_deriv(){
-      grid_.scrub_deriv();
-    }
-
+    
     size_t get_grid_size() const{
       return grid_.get_grid_size();
     }
@@ -543,7 +542,7 @@ namespace EDM{
 	      (boundary_max_[i] - boundary_min_[i]);	
 	
 	    //which bound is closest
-	    if(fabsl(grid_.min_[i] - x[i] - dp[0]) < fabsl(grid_.max_[i] - x[i] - dp[1]))
+	    if(fabs(grid_.min_[i] - x[i] - dp[0]) < fabs(grid_.max_[i] - x[i] - dp[1]))
 	      x[i] += dp[0]; //wrap to it
 	    else
 	      x[i] += dp[1];
@@ -563,7 +562,9 @@ namespace EDM{
     double bc_denom_table_[DIM][BC_TABLE_SIZE];
     double bc_denom_deriv_table_[DIM][BC_TABLE_SIZE];
 
-  private:
+
+  //these need to be protected b/c we need access to them with the derived GPU class
+  protected:
     int b_dirty_bounds; //true if we've added hills and our bounds may be inconsitent. Only needed for simulations where we have 0 derivative forces
     /**
      * Calculate the amount of grid that needs to be considered based on gaussian width and grid width 
@@ -579,6 +580,10 @@ namespace EDM{
 	minisize_total_ *= (2 * minisize_[i] + 1);
       }
     }
+    
+  private:
+
+
 
     void duplicate_boundary() {
     

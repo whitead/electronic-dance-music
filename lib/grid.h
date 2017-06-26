@@ -14,7 +14,7 @@
 #define GRID_TYPE 32
 #endif //GRID_TYPE
 
-inline
+HOST_DEV inline
  int int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
 }     

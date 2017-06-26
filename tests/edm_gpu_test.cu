@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity )
 	gpuErrchk(cudaMemcpy(d_array, array, 3*sizeof(size_t), cudaMemcpyHostToDevice));
 
 	//g.one2multi(g.multi2one(array), temp);
-	multi2one_kernel<3><<<1,1>>>(d_g, d_array, d_temp);
+	multi2one_kernel<3><<<1,1>>>( d_array, d_temp, d_g);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaMemcpy(array, d_array, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
 	gpuErrchk(cudaMemcpy(temp, d_temp, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
@@ -302,7 +302,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
 }
 
 BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
-  
+  gpuErrchk(cudaDeviceReset());
   double min[] = {0};
   double max[] = {10};
   double bin_spacing[] = {1};
@@ -366,6 +366,8 @@ BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
 
   array[0] = 0.0;
   gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  gpuErrchk(cudaMemcpy(d_der, der, sizeof(double), cudaMemcpyHostToDevice ));
+  gpuErrchk(cudaMemcpy(d_fhat, fhat, sizeof(double), cudaMemcpyHostToDevice ));
   get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
 
   gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
@@ -374,8 +376,9 @@ BOOST_AUTO_TEST_CASE( gpu_interpolation_1d ) {
 
   array[0] = 10.0;
   gpuErrchk(cudaMemcpy(d_array, array, sizeof(double), cudaMemcpyHostToDevice ));
+  gpuErrchk(cudaDeviceSynchronize());
   get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
-
+  gpuErrchk(cudaDeviceSynchronize());
   gpuErrchk(cudaMemcpy(array, d_array, sizeof(double), cudaMemcpyDeviceToHost ));
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost ));
   gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost ));
@@ -428,7 +431,7 @@ BOOST_AUTO_TEST_CASE( gpu_interp_1d_periodic ) {
   //test periodic
   array[0] = 5 * M_PI / 4;
   gpuErrchk(cudaMemcpy((void**)d_array, array, sizeof(double), cudaMemcpyHostToDevice));
-  get_value_deriv_kernel<1><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+  get_value_deriv_kernel<1><<<1,1,32>>>(d_array, d_der, d_fhat, d_g);
   gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost));
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
   
@@ -446,7 +449,6 @@ BOOST_AUTO_TEST_CASE( gpu_interp_1d_periodic ) {
 }
 
 BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
-
   //this test simulates a subdivision that is periodic and stretches across the box in 1D
   //and is non-periodic and partial in the other
 
@@ -461,16 +463,32 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<2>), cudaMemcpyHostToDevice));
   
   max[1] = 10;
+  periodic[1] = 1;
+
+  double* d_min;
   double* d_max;
+  int* d_periodic;
+/*
+  gpuErrchk(cudaMalloc((void**)&d_min, 2*sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_min, min, 2*sizeof(double), cudaMemcpyHostToDevice));
   gpuErrchk(cudaMalloc((void**)&d_max, 2*sizeof(double)));
   gpuErrchk(cudaMemcpy(d_max, max, 2*sizeof(double), cudaMemcpyHostToDevice));
-  periodic[1] = 1;
-  double* d_periodic;
   gpuErrchk(cudaMalloc((void**)&d_periodic, 2*sizeof(int)));
-  g.set_boundary(min, max, periodic);
+  gpuErrchk(cudaMemcpy(d_periodic, periodic, 2*sizeof(int), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaDeviceSynchronize());
+  set_boundary_kernel<2><<<1,1>>>(d_min, d_max, d_periodic, d_g);
+  gpuErrchk(cudaDeviceSynchronize());
+*/
+//  g.set_boundary(min, max, periodic);
 
-  double test_point[] = {0,1}; //should not remap
-  g.remap(test_point);
+  double test_point[2] = {0.0,1.0}; //should not remap
+  double* d_test_point;
+  gpuErrchk(cudaMalloc((void**)&d_test_point, 2*sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<32,32>>>(d_test_point, d_g);
+
+  
+  //g.remap(test_point);
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
 
@@ -498,8 +516,6 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   g.remap(test_point);
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
-
-  gpuErrchk(cudaFree(d_g));
 
 }
 

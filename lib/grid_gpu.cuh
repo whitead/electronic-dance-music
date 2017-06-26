@@ -58,6 +58,12 @@ namespace EDM{
       initialize();
     }
 
+    /**
+     * Default constructor
+
+    DimmedGridGPU():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL){}
+     **/
+
 
     /**
      * Constructor from file, with interpolation specified
@@ -102,6 +108,8 @@ namespace EDM{
       }
       read(input_grid);
     }
+
+    
 
     ~DimmedGridGPU() {
       gpuErrchk(cudaDeviceSynchronize());
@@ -461,6 +469,8 @@ namespace EDM{
       }
       gpuErrchk(cudaDeviceSynchronize());
     }
+
+
     
   };
 }
@@ -498,7 +508,7 @@ namespace EDM_Kernels{
    * Takes in target array and temp array to fill as arguments. Validate host-side.
    */
   template <int DIM>
-  __global__ void multi2one_kernel(const DimmedGridGPU<DIM>* g, size_t* array, size_t* temp){
+  __global__ void multi2one_kernel(size_t* array, size_t* temp, const DimmedGridGPU<DIM>* g){
 //    int i = threadIdx.x + blockIdx.x * blockDim.x;
 //    int j = threadIdx.y + blockIdx.y * blockDim.y;
 //    int k = threadIdx.z + blockIdx.z * blockDim.z;
