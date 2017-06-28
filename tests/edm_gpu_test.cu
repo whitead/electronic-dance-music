@@ -459,15 +459,15 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   double sigma[] = {0.1, 0.1};
   DimmedGaussGridGPU<2> g (min, max, bin_spacing, periodic, 1, sigma);
   DimmedGaussGridGPU<2>* d_g;
+  double* d_min;
+  double* d_max;
+  int* d_periodic;
+  
   gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<2>)));
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<2>), cudaMemcpyHostToDevice));
   
   max[1] = 10;
   periodic[1] = 1;
-
-  double* d_min;
-  double* d_max;
-  int* d_periodic;
 
   gpuErrchk(cudaMalloc((void**)&d_min, 2*sizeof(double)));
   gpuErrchk(cudaMemcpy(d_min, min, 2*sizeof(double), cudaMemcpyHostToDevice));
@@ -532,6 +532,121 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
 
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_min));
+  gpuErrchk(cudaFree(d_max));
+  gpuErrchk(cudaFree(d_periodic));
+  gpuErrchk(cudaFree(d_test_point));
+
+}
+
+BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {-2};
+  double max[] = {7};
+  double bin_spacing[] = {0.1};
+  int periodic[] = {0};
+  double sigma[] = {0.1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+
+  min[0] = 0;
+  double* d_min;
+  max[0] = 10;
+  double* d_max;
+  periodic[0] = 1;
+  int* d_periodic;
+  
+  gpuErrchk(cudaMalloc((void**)&d_min, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_min, min, sizeof(double), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_max, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_max, max, sizeof(double), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_periodic, sizeof(int)));
+  gpuErrchk(cudaMemcpy(d_periodic, periodic, sizeof(int), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaDeviceSynchronize());
+
+  set_boundary_kernel<1><<<1,1>>>(d_min, d_max, d_periodic, d_g);
+  
+
+  double test_point[] = {0}; //should not remap
+  double* d_test_point;
+  gpuErrchk(cudaMalloc((void**)&d_test_point, sizeof(double)));
+  
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<1><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, sizeof(double), cudaMemcpyDeviceToHost));
+  
+  BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
+
+  test_point[0] = -1;//shoul not remap
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<1><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, sizeof(double), cudaMemcpyDeviceToHost));
+
+  BOOST_REQUIRE(pow(test_point[0] - -1, 2) < 0.1);
+
+  test_point[0] = 9;//should remap
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<1><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, sizeof(double), cudaMemcpyDeviceToHost));
+
+  BOOST_REQUIRE(pow(test_point[0] - -1, 2) < 0.1);
+
+  test_point[0] = 6;//should not remap
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<1><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, sizeof(double), cudaMemcpyDeviceToHost));
+  
+  BOOST_REQUIRE(pow(test_point[0] - 6, 2) < 0.1);
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_min));
+  gpuErrchk(cudaFree(d_max));
+  gpuErrchk(cudaFree(d_periodic));
+  gpuErrchk(cudaFree(d_test_point));
+ 
+}
+
+BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
+
+  //this test simulates a subdivision that is periodic and stretches across the box in 1D
+  //and is non-periodic and partial in the other
+
+  double min[] = {-2};
+  double max[] = {7};
+  double bin_spacing[] = {0.1};
+  int periodic[] = {0};
+  double sigma[] = {0.1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  min[0] = 0;
+  max[0] = 10;
+  periodic[0] = 1;
+  g.set_boundary(min, max, periodic);
+
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+
+
+  double point[] = {0.01};
+  double* d_point;
+  gpuErrchk(cudaMalloc((void**)&d_point, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_point, point, sizeof(double), cudaMemcpyHostToDevice));
+
+//THE MOMENT WE'VE ALL BEEN WAITING FOR!!
+  
+  g.add_value(point,1);
+  double der[1];
+  point[0] = 0;
+  g.get_value_deriv(point, der);
+  BOOST_REQUIRE(fabs(der[0]) > 0.1);
+
+
 }
 
 
@@ -546,6 +661,7 @@ BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
   double x[1] = {0};
   unsigned int n_hills = 5000;
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
+  
   //now just do a generic loop, adding 10k gaussians, and time it
   boost::timer::auto_cpu_timer t;
   for( unsigned int i = 0; i < n_hills; i++){

@@ -76,8 +76,6 @@ namespace EDM{
 #ifdef __CUDACC__
       double dp[2];
       size_t i;
-      printf("doing do_remap on the GPU!\n");
-      printf("test: can I access stuff from grid_? grid_.b_periodic_[0] is %d\n", grid_.b_periodic_[0]);
 
       //this is a special wrapping. We want to find the nearest image, not the minimal image
       // eg, our grid runs from 0 to 5 and the box runs from 0 to 10.
