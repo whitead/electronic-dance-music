@@ -131,6 +131,9 @@ namespace EDM{
      * Need to have g_grid pointer as an argument because host/device functions get inlined...
      **/
     HOST_DEV double do_get_value( const double* x) const {
+      if(!in_grid(x)){
+	return(0);
+      }
       #ifdef __CUDACC__ //device version
 
       if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers

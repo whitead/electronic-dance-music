@@ -468,7 +468,7 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   double* d_min;
   double* d_max;
   int* d_periodic;
-/*
+
   gpuErrchk(cudaMalloc((void**)&d_min, 2*sizeof(double)));
   gpuErrchk(cudaMemcpy(d_min, min, 2*sizeof(double), cudaMemcpyHostToDevice));
   gpuErrchk(cudaMalloc((void**)&d_max, 2*sizeof(double)));
@@ -478,42 +478,57 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap) {
   gpuErrchk(cudaDeviceSynchronize());
   set_boundary_kernel<2><<<1,1>>>(d_min, d_max, d_periodic, d_g);
   gpuErrchk(cudaDeviceSynchronize());
-*/
-//  g.set_boundary(min, max, periodic);
+
+  g.set_boundary(min, max, periodic);
 
   double test_point[2] = {0.0,1.0}; //should not remap
   double* d_test_point;
+  
   gpuErrchk(cudaMalloc((void**)&d_test_point, 2*sizeof(double)));
   gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
-  remap_kernel<2><<<32,32>>>(d_test_point, d_g);
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
 
-  
-  //g.remap(test_point);
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
 
   test_point[0] = -1;//on grid, at 9
-  g.remap(test_point);
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
+  
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
 
   test_point[1] = 6;//closest point is 6
-  g.remap(test_point);
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
+  
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 6, 2) < 0.1);
 
   test_point[1] = 11;//actually in grid at 1
-  g.remap(test_point);
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
+
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
 
   test_point[1] = 9; //closest point is -1
-  g.remap(test_point);
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
+  
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
 
   test_point[1] = -1; //closest point is -1
-  g.remap(test_point);
+  gpuErrchk(cudaMemcpy(d_test_point, test_point, 2*sizeof(double), cudaMemcpyHostToDevice));
+  remap_kernel<2><<<1,1>>>(d_test_point, d_g);
+  gpuErrchk(cudaMemcpy(test_point, d_test_point, 2*sizeof(double), cudaMemcpyDeviceToHost));
+  
   BOOST_REQUIRE(pow(test_point[0] - 9, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
 

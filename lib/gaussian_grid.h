@@ -13,7 +13,7 @@
 #define BC_CORRECTION
 
 
-inline
+HOST_DEV inline
 double sigmoid(double x) {
   if(x < 0)
     return 1;
@@ -22,7 +22,7 @@ double sigmoid(double x) {
   return 2*x*x*x - 3*x*x + 1;
 }
 
-inline
+HOST_DEV inline
 double sigmoid_dx(double x) {
   if(x < 0)
     return 0;
@@ -563,7 +563,7 @@ namespace EDM{
     double bc_denom_deriv_table_[DIM][BC_TABLE_SIZE];
 
 
-  //these need to be protected b/c we need access to them with the derived GPU class
+    //these need to be protected b/c we need access to them with the derived GPU class
   protected:
     int b_dirty_bounds; //true if we've added hills and our bounds may be inconsitent. Only needed for simulations where we have 0 derivative forces
     /**
