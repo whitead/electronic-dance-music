@@ -685,7 +685,7 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_nowrap_1) {
 //  g.add_value(point,1);
   add_value_kernel<1><<<1, g.minisize_total_>>>(d_point, 1.0, d_g);
 
-  double der[1];
+//  double der[1];
   double* d_der;
   gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
   point[0] = 0;
@@ -696,9 +696,104 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_nowrap_1) {
   get_value_deriv_kernel<1><<<1,1>>>(d_point, d_der, d_target, &(d_g->grid_));//gross
   gpuErrchk(cudaMemcpy(point, d_point, sizeof(double), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(fabs(point[0]) < EPSILON);
+}//gpu_boundary_remap_nowrap_1
+
+BOOST_AUTO_TEST_CASE( gpu_interp_3d_mixed ) {
+  double min[] = {-M_PI, -M_PI, 0};
+  double max[] = {M_PI, M_PI, 10};
+  double bin_spacing[] = {M_PI / 100, M_PI / 100, 1};
+  int periodic[] = {1, 1, 0};
+  DimmedGridGPU<3> g (min, max, bin_spacing, periodic, 1, 0);
+  size_t index = 0;
+  double x,y,z;
+  
+  for(int i = 0; i < g.grid_number_[2]; i++) {
+    for(int j = 0; j < g.grid_number_[1]; j++) {
+      for(int k = 0; k < g.grid_number_[0]; k++) {
+	x = g.min_[0] + k * g.dx_[0];
+	y = g.min_[1] + j * g.dx_[1];
+	z = g.min_[2] + i * g.dx_[2];
+	g.grid_[index] = cos(x) * sin(y) * z;
+	g.grid_deriv_[index * 3 + 0] = -sin(x) * sin(y) * z;
+	g.grid_deriv_[index * 3 + 1] = cos(x) * cos(y) * z;
+	g.grid_deriv_[index * 3 + 2] = cos(x) * sin(y);
+	index++;
+      }
+    }
+  }
+  DimmedGridGPU<3>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGridGPU<3>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGridGPU<3>), cudaMemcpyHostToDevice));
 
 
-}
+  double array[] = {-10.75 * M_PI / 2, 8.43 * M_PI / 2, 3.5};
+  double* d_array;
+  gpuErrchk(cudaMalloc((void**)&d_array, 3*sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_array, array, 3*sizeof(double), cudaMemcpyHostToDevice));
+  double der[3];
+  double* d_der;
+  gpuErrchk(cudaMalloc((void**)&d_der, 3*sizeof(double)));
+  double* d_fhat;
+  gpuErrchk(cudaMalloc((void**)&d_fhat, sizeof(double)));
+  get_value_deriv_kernel<3><<<1,1>>>(d_array, d_der, d_fhat, d_g);
+  double fhat[1];
+  gpuErrchk(cudaMemcpy(fhat, d_fhat, sizeof(double), cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(der, d_der, 3*sizeof(double), cudaMemcpyDeviceToHost));
+//  double fhat = g.get_value_deriv(array,der);
+  double f = cos(array[0]) * sin(array[1]) * array[2];
+  double true_der[] = {-sin(array[0]) * sin(array[1]) * array[2],
+		       cos(array[0]) * cos(array[1]) * array[2],
+		       cos(array[0]) * sin(array[1])};
+  
+  BOOST_REQUIRE(pow(f- fhat[0], 2) < 0.1);
+  BOOST_REQUIRE(pow(der[0] - true_der[0], 2) < 0.1);
+  BOOST_REQUIRE(pow(der[1] - true_der[1], 2) < 0.1);
+  BOOST_REQUIRE(pow(der[2] - true_der[2], 2) < 0.1);
+
+}//gpu_interp_3d_mixed
+
+BOOST_AUTO_TEST_CASE( gpu_gauss_grid_add_check ) {
+  double min[] = {-10};
+  double max[] = {10};
+  double sigma[] = {1};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 0, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+  //add 1 gaussian
+  double x[] = {0};
+  double* d_x;
+  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+//  g.add_value(x, 1);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_g);
+
+  //now check a few points
+  double* d_target;
+  gpuErrchk(cudaMalloc((void**)&d_target, sizeof(double)));
+  get_value_kernel<1><<<1,1>>>(d_x, d_target, &(d_g->grid_));
+  double target[1];
+  gpuErrchk(cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost));
+  BOOST_REQUIRE(pow(target[0] - 1 / sqrt(2 * M_PI), 2) < EPSILON);
+
+  int i;
+  double der[1];
+  double* d_der;
+  gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
+  for( i = -6; i < 7; i++) {
+    x[0] = i;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+//    value = g.get_value_deriv(x, der);
+    get_value_deriv_kernel<1><<<1, 1>>>(d_x, d_der, d_target, &(d_g->grid_));
+    gpuErrchk(cudaMemcpy(target, d_target, sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
+    BOOST_REQUIRE(pow(target[0] - exp(-x[0]*x[0]/2.) / sqrt(2*M_PI), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)) / sqrt(2*M_PI), 2) < 0.01);
+  }
+ 
+}//gpu_gauss_grid_add_check
 
 
 //This test will simply run several thousand timesteps and time how long it takes.

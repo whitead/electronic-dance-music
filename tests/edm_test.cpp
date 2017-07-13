@@ -382,7 +382,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
   BOOST_REQUIRE(fabs(point[0]) < EPSILON);
 
 
-}
+}//boundary_remap_nowrap_1
 
 
 
@@ -452,7 +452,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
     BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)) / sqrt(2*M_PI), 2) < 0.01);
   }
  
-}
+}//gauss_grid_add_check
 
 
 BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
