@@ -58,7 +58,7 @@ namespace EDM{
      *Write out the file in lammps tabular potential format.
      **/
     virtual void lammps_multi_write(const std::string& filename) const = 0;
-  };
+  };//class Grid
 
   template< int DIM>
     class DimmedGaussGrid : public GaussGrid{
@@ -125,7 +125,7 @@ namespace EDM{
       }
     
       return grid_.get_value(xx);
-    }
+    }//get_value
 
     double get_value_deriv(const double* x, double* der) const{
 
@@ -147,26 +147,26 @@ namespace EDM{
       }
 
       return grid_.get_value_deriv(xx, der);
-    }
+    }//get_value_deriv
 
     void read(const std::string& filename) {
       grid_.read(filename);
-    }
+    }//read
 
     void write(const std::string& filename) const {
       grid_.write(filename);
-    }
+    }//write
 
     /**
      * Uses its known boundaries to handle assembling all grids
      **/
     void multi_write(const std::string& filename) const {
       grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 0);
-    }
+    }//multi_write
 
     void lammps_multi_write(const std::string& filename) const {
       grid_.multi_write(filename, boundary_min_, boundary_max_, b_periodic_boundary_, 1);
-    }
+    }//lammps_multi_write
 
 
     void multi_write(const std::string& filename, 
@@ -175,12 +175,12 @@ namespace EDM{
 		     const int* b_periodic,
 		     int b_lammps_format) const {
       grid_.multi_write(filename, box_low, box_high, b_periodic, 0);
-    }
+    }//multi_write
 
   
     void set_interpolation(int b_interpolate) {
       grid_.b_interpolate_ = b_interpolate;
-    }
+    }//set_interpolation
 
     /**
      * The workhorse method of the program. The source is very well-documented
@@ -381,7 +381,7 @@ namespace EDM{
 
 
       return bias_added;
-    }
+    }//add_value
 
     /**
      * Specifying the period here means that we can wrap points along
@@ -444,7 +444,7 @@ namespace EDM{
 	}
       }
     
-    }
+    }//set_boundary
 
     double get_volume() const {
       double vol = 1;
@@ -453,51 +453,51 @@ namespace EDM{
 	vol *= boundary_max_[i] - boundary_min_[i];
       }
       return vol;
-    }
+    }//get_volume
  
     void one2multi(size_t index, size_t result[DIM]) const {
       grid_.one2multi(index, result);
-    }
+    }//one2multi
 
     double* get_grid() {
       return grid_.get_grid();
-    }
+    }//get_grid()
 
     const double* get_dx() const{
       return grid_.get_dx();
-    }
+    }//get_dx
 
     const double* get_min() const{
       return grid_.get_min();
-    }
+    }//get_min
 
     const double* get_max() const{
       return grid_.get_max();
-    }
+    }//get_max
 
     double max_value() const {
       return grid_.max_value();
-    }
+    }//max_value
 
     double min_value() const {
       return grid_.min_value();
-    }
+    }//min_value
 
     void add(const Grid* other, double scale, double offset) {
       grid_.add(other, scale, offset);
-    }
+    }//add
 
     double expected_bias() const {
       return grid_.expected_bias();
-    }
+    }//expected_bias
 
     void clear() {
       grid_.clear();
-    }
+    }//clear
     
     size_t get_grid_size() const{
       return grid_.get_grid_size();
-    }
+    }//get_grid_size
 
     int in_bounds(const double x[DIM]) const {
 
@@ -508,7 +508,7 @@ namespace EDM{
       }
 
       return 1;
-    }
+    }//in_bounds
 
     /**
      * Possibly wrap a value across the system boundaries to be as close as possible to the grid
@@ -549,7 +549,7 @@ namespace EDM{
 	  }
 	}
       }
-    }
+    }//remap
 
 
     size_t minisize_[DIM];// On DIM-dimensional grid, how far we must search before gaussian decays enough to ignore
@@ -579,12 +579,8 @@ namespace EDM{
 	minisize_[i] =  int_floor(dist / grid_.dx_[i]);
 	minisize_total_ *= (2 * minisize_[i] + 1);
       }
-    }
+    }//update_minigrid
     
-  private:
-
-
-
     void duplicate_boundary() {
     
       size_t i,j,k,l;
@@ -643,9 +639,9 @@ namespace EDM{
 	  l = grid_.multi2one(index_bound);
 	  grid_.grid_[k] = grid_.grid_[l];
 	}
-      }
-    }
-  };
+      }//for i in (0, offset_size)
+    }//duplicate_boundary
+  };//class DimmedGaussGrid
 
 /**
  * Used to avoid template constructors
@@ -663,5 +659,5 @@ namespace EDM{
 **/
   GaussGrid* read_gauss_grid( int dim, const std::string& filename, const double* sigma);
 
-}
+}//namespace EDM
 #endif //GAUSS_GRID_H_

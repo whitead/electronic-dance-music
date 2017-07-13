@@ -22,8 +22,7 @@ using namespace boost;
 using namespace EDM;
 
 
-BOOST_AUTO_TEST_CASE( grid_1d_sanity )
-{
+BOOST_AUTO_TEST_CASE( grid_1d_sanity ){
   /* Visual:
    * values:   0   1   2   3
    * grid:   |---|---|---|---|---
@@ -56,10 +55,9 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity )
   x[0] = 10;
   g.get_value(x);
 
-}
+}//grid_1d_sanity
 
-BOOST_AUTO_TEST_CASE( grid_3d_sanity )
-{
+BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
   double min[] = {-2, -5, -3};
   double max[] = {125, 63, 78};
   double bin_spacing[] = {1.27, 1.36, 0.643};
@@ -105,7 +103,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity )
       }
     }
   }  
-}
+}//grid_3d_sanity
 
 BOOST_AUTO_TEST_CASE( grid_1d_read ) {
   DimmedGrid<1> g(GRID_SRC + "/1.grid");
@@ -178,7 +176,7 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
 
   }
   
-}
+}//grid_read_write_consistency
 
 BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   
@@ -215,7 +213,7 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   array[0] = 10.0;
   g.get_value(array);
 
-}
+}// interpolation_1d
 
 BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
   double min[] = {-M_PI};
@@ -247,7 +245,7 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
   BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
   BOOST_REQUIRE(pow(der[0] - cos(array[0]), 2) < 0.1);
 
-}
+}//interp_1d_periodic
 
 BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
 
@@ -295,7 +293,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
   BOOST_REQUIRE(pow(test_point[1] - -1, 2) < 0.1);
 
 
-}
+}//boundary_remap_wrap
 
 BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
 
@@ -330,7 +328,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
   BOOST_REQUIRE(pow(test_point[0] - 6, 2) < 0.1);
 
 
-}
+}// boundary_remap_wrap_2
 
 
 BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
@@ -357,7 +355,7 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
   BOOST_REQUIRE(fabs(der[0]) > 0.1);
 
 
-}
+}//boundary_remap_wrap_3
 
 
 BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
@@ -427,7 +425,7 @@ BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
   BOOST_REQUIRE(pow(der[1] - true_der[1], 2) < 0.1);
   BOOST_REQUIRE(pow(der[2] - true_der[2], 2) < 0.1);
 
-}
+}//interp_3d_mixed
 
 BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
   double min[] = {-10};
