@@ -795,6 +795,56 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_add_check ) {
  
 }//gpu_gauss_grid_add_check
 
+BOOST_AUTO_TEST_CASE( gpu_gauss_pbc_check ) {
+  double min[] = {2};
+  double max[] = {10};
+  double sigma[] = {1};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 0, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+
+  //add 1 gaussian
+  double x[] = {2};
+  double* d_x;
+  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+//  g.add_value(x, 1);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_g);
+  
+  int i;
+  double der[1];
+  double value[1];
+  double* d_value;
+  gpuErrchk(cudaMalloc((void**)&d_value, sizeof(double)));
+  double* d_der;
+  gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
+  double dx;//delta-x, not device_x
+  for( i = -6; i < 7; i++) {
+    x[0] = i;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+    dx = x[0] - 2;
+    dx -= round(dx / (min[0] - max[0])) * (min[0] - max[0]);
+//    value = g.get_value_deriv(x, der);
+    get_value_deriv_kernel<1><<<1,1>>>(d_x, d_der, d_value, &(d_g->grid_));
+    gpuErrchk(cudaMemcpy(value, d_value, sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
+
+    std::cout << "x = " << x[0]
+	      << " dx = " << dx 
+	      << "(" 
+	      << " value = " << value[0]
+	      << " (" << exp(-dx*dx/2.) / sqrt(2 * M_PI) << ")" 
+	      << std::endl;
+
+    BOOST_REQUIRE(pow(value[0] - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
+    BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
+  }
+ 
+}//gpu_gauss_pbc_check
+
 
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){

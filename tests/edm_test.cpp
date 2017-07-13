@@ -488,7 +488,7 @@ BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
     BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
  
-}
+}//gauss_pbc_check
 
 
 BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
