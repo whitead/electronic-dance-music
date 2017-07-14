@@ -711,7 +711,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   g.get_value_deriv(x,der);  
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
-}
+}//gauss_grid_interp_test_mcgdp_1D
 
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
   double min[] = {-10, -10, -10};
@@ -760,7 +760,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
   g.get_value_deriv(x,der);  
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
-}
+}//gauss_grid_interp_test_mcgdp_3D
 
 
 
