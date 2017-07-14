@@ -250,7 +250,6 @@ namespace EDM{
       size_t index_outter[DIM], index_bound[DIM];
       size_t min_i[DIM], max_i[DIM];
       int b_flag;
-      printf("running do_duplicate_boundary from GPU!\n");
 
       grid_.get_index(boundary_min_, min_i);
       grid_.get_index(boundary_max_, max_i);
@@ -508,7 +507,6 @@ namespace EDM{
 	//If we have added gaussians and are trying to maintain 
 	//out of bounds with 0 derivative, we need to update the out of bounds potential
 	if(b_dirty_bounds) {
-	  printf("about to run do_duplicate_boundary from within do_add_value on GPU!\n");
 	  do_duplicate_boundary();
 	  b_dirty_bounds = 0;
 	}

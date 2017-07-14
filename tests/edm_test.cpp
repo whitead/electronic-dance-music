@@ -662,7 +662,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.1);
   BOOST_REQUIRE(pow(der_last, 2) < 0.01);
 
-}
+}//gauss_grid_derivative_test_mcgdp_1
 
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   double min[] = {-100};
