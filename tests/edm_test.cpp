@@ -613,7 +613,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
     der_last = der[0];
   }
 
-}
+}//gauss_grid_derivative_test
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   double min[] = {-100};

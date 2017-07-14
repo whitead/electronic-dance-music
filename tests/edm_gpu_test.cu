@@ -930,9 +930,6 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
     }
   }
   
-
-
-
   //now we integrate the grid
   double area = 0;
   double value[1] = {0};
@@ -957,6 +954,64 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
   printf("area is %f but g_integral_total is %f\n", area, g_integral_total);
   BOOST_REQUIRE(pow(area - g_integral_total, 2) < 0.1);
 }//gpu_gauss_grid_integral_test
+
+BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double* d_x;
+  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(double)));
+  
+  double offsets = 1. / N;
+  
+  //generate a random number but use sequential grid point offsets
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.5, d_g);
+    //g.add_value(x, 1.5);
+  }
+
+  //now we calculate finite differences on the grid
+  double vlast, vlastlast, v, approx_der;
+  double* d_v;
+  gpuErrchk(cudaMalloc((void**)&d_v, sizeof(double)));
+
+  double der[1];
+  double* d_der;
+  gpuErrchk(cudaMalloc((void**)&d_der, sizeof(double)));
+  double der_last;
+  double dx = 0.1;
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+//    v = g.get_value_deriv(x,der);
+    get_value_deriv_kernel<1><<<1,1>>>(d_x, d_der, d_v, &(d_g->grid_));
+    gpuErrchk(cudaMemcpy(&v, d_v, sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
+    if(i > 1) {
+      approx_der = (v - vlastlast) / (2*dx);
+      BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.01);
+    }
+    vlastlast = vlast;
+    vlast = v;
+
+    der_last = der[0];
+  }
+
+}//gpu_gauss_grid_derivative_test
 
 
 //This test will simply run several thousand timesteps and time how long it takes.
