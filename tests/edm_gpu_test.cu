@@ -895,6 +895,69 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_subdivided_pbc_check ) {
  
 }//gpu_gauss_subdivided_pbc_check
 
+BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
+  double min[] = {-100};
+  double max[] = {100};
+  double sigma[] = {1.2};
+  double bin_spacing[] = {1};
+  int periodic[] = {1};
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<1>* d_g;
+  gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+  
+  //add N gaussian
+  int N = 20;
+  int i;
+  double x[1];
+  double* d_x;
+  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(double)));
+  double offsets = 1. / N;
+  double g_integral[g.minisize_total_];
+  double* d_g_integral;
+  gpuErrchk(cudaMalloc((void**)&d_g_integral, g.minisize_total_*sizeof(double)));
+
+  double g_integral_total = 0;
+  //generate a random number but use sequential grid point offsets
+  int j;
+  for(i = 0; i < N; i++) {
+    x[0] = rand() % 200 - 100 + i * offsets;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+    add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.5, d_g_integral, d_g);
+    gpuErrchk(cudaMemcpy(g_integral, d_g_integral, g.minisize_total_*sizeof(double), cudaMemcpyDeviceToHost));
+    for(j = 0; j < g.minisize_total_; j++){
+      g_integral_total += g_integral[j];
+    }
+  }
+  
+
+
+
+  //now we integrate the grid
+  double area = 0;
+  double value[1] = {0};
+  double dx = 0.1;
+  double* d_value;
+  gpuErrchk(cudaMalloc((void**)&d_value, sizeof(double)));
+  int bins = (int) 200 / dx;
+  for(i = 0; i < bins; i++) {
+    x[0] = -100 + i * dx;
+    gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
+    get_value_kernel<1><<<1,1>>>(d_x, d_value, &(d_g->grid_));
+    gpuErrchk(cudaMemcpy(value, d_value, sizeof(double), cudaMemcpyDeviceToHost));
+    area += value[0] * dx;
+  }
+
+  //Make sure the integrated area is correct
+  //unnormalized, so a little height scaling is necessary
+  //  std::cout << area << " " << N * 1.5 << std::endl;
+  BOOST_REQUIRE(pow(area - N * 1.5, 2) < 1);
+
+  //now make sure that add_value returned the correct answers as well
+  printf("area is %f but g_integral_total is %f\n", area, g_integral_total);
+  BOOST_REQUIRE(pow(area - g_integral_total, 2) < 0.1);
+}//gpu_gauss_grid_integral_test
+
 
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){

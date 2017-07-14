@@ -589,7 +589,8 @@ namespace EDM_Kernels{
 
   /*
    * Kernel wrapper for do_add_value() on the GPU. Takes in a point, the hill height to add, 
-   * and an instance of DimmedGaussGridGPU to do the adding.
+   * and an instance of DimmedGaussGridGPU to do the adding. Call this if it doesn't matter
+   * how much mass was added.
    */
   template <int DIM>
   __global__ void add_value_kernel(const double* point, double height, DimmedGaussGridGPU<DIM>* g){
@@ -597,7 +598,19 @@ namespace EDM_Kernels{
     return;
   }
 
-  
+  /*
+   * Kernel wrapper for do_add_value() on the GPU. Takes in a point, the hill height to add, 
+   * an instance of DimmedGaussGridGPU to do the adding, as well as a pointer to a double array
+   * of size equal to the gaussian support where the total height added (hill integral) 
+   * will be stored.
+   */
+
+  template <int DIM>
+  __global__ void add_value_integral_kernel(const double* point, double height, double* target, DimmedGaussGridGPU<DIM>* g){
+    target[threadIdx.x] = g->do_add_value(point, height);
+    return;
+  }
+
 }
 
 #endif //GPU_GAUSS_GRID_CH_

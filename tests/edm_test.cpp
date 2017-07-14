@@ -569,7 +569,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
 
   //now make sure that add_value returned the correct answers as well
    BOOST_REQUIRE(pow(area - g_integral, 2) < 0.1);
-}
+}//gauss_grid_integral_test
 
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
