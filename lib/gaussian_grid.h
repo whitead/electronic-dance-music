@@ -655,8 +655,8 @@ namespace EDM{
 			      const double* sigma);
 
 /**
-   p * Used to avoid template constructors
-**/
+ * Used to avoid template constructors
+ **/
   GaussGrid* read_gauss_grid( int dim, const std::string& filename, const double* sigma);
 
 }//namespace EDM

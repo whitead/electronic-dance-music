@@ -16,9 +16,12 @@
 #define GRID_TYPE 32
 #endif //GRID_TYPE
 
+#ifndef GPU_INT_FLOOR
+#define GPU_INT_FLOOR
 HOST_DEV  int gpu_int_floor(double number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);
 }
+#endif
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true, bool print=true)

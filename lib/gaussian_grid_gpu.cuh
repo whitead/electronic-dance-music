@@ -34,7 +34,9 @@ namespace EDM{
      **/
   public:
     virtual ~GaussGridGPU() {};
-    double add_value(const double* x, double height) = 0;
+
+
+    
 
 //  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
   };

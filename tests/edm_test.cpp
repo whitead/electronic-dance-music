@@ -785,7 +785,7 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
   BOOST_REQUIRE(pow(bias_added - h, 2) < 0.1);
 
   delete g;
-}
+}// gauss_grid_integral_regression_1
 
 
 BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
