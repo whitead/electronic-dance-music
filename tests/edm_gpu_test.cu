@@ -1330,9 +1330,6 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
 }//gpu_gauss_grid_interp_test_mcgdp_3D
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
-  size_t bigger_stack[1] = {4*4096};
-  gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, bigger_stack[0]));
-  cudaDeviceGetLimit(bigger_stack, cudaLimitStackSize);
   double min[] = {0};
   double max[] = {10};
   double bin_spacing[] = {0.009765625};
