@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity ){
 	BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 	BOOST_REQUIRE_EQUAL(array[1], temp[1]);
 	BOOST_REQUIRE_EQUAL(array[2], temp[2]);
-*/
+	  */
 	g.grid_[g.multi2one(array)] = g.multi2one(array);
       }
     }
@@ -655,6 +655,11 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap_3) {
 
 //  g.get_value_deriv(point, der);
   BOOST_REQUIRE(fabs(der[0]) > 0.1);
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_point));
+  gpuErrchk(cudaFree(d_target));
+  gpuErrchk(cudaFree(d_der));
 }//gpu_boundary_remap_wrap_3
 
 BOOST_AUTO_TEST_CASE( gpu_boundary_remap_nowrap_1) {
@@ -696,6 +701,12 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_nowrap_1) {
   get_value_deriv_kernel<1><<<1,1>>>(d_point, d_der, d_target, &(d_g->grid_));//gross
   gpuErrchk(cudaMemcpy(point, d_point, sizeof(double), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(fabs(point[0]) < EPSILON);
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_point));
+  gpuErrchk(cudaFree(d_target));
+  gpuErrchk(cudaFree(d_der));
+
 }//gpu_boundary_remap_nowrap_1
 
 BOOST_AUTO_TEST_CASE( gpu_interp_3d_mixed ) {
@@ -750,6 +761,12 @@ BOOST_AUTO_TEST_CASE( gpu_interp_3d_mixed ) {
   BOOST_REQUIRE(pow(der[1] - true_der[1], 2) < 0.1);
   BOOST_REQUIRE(pow(der[2] - true_der[2], 2) < 0.1);
 
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_array));
+  gpuErrchk(cudaFree(d_fhat));
+  gpuErrchk(cudaFree(d_der));
+
 }//gpu_interp_3d_mixed
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_add_check ) {
@@ -792,7 +809,12 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_add_check ) {
     BOOST_REQUIRE(pow(target[0] - exp(-x[0]*x[0]/2.) / sqrt(2*M_PI), 2) < 0.01);
     BOOST_REQUIRE(pow(der[0] - (-x[0] *exp(-x[0]*x[0]/2.)) / sqrt(2*M_PI), 2) < 0.01);
   }
- 
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_target));
+  gpuErrchk(cudaFree(d_der));
+
 }//gpu_gauss_grid_add_check
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_pbc_check ) {
@@ -842,6 +864,11 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_pbc_check ) {
     BOOST_REQUIRE(pow(value[0] - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
     BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_value));
+  gpuErrchk(cudaFree(d_der));
  
 }//gpu_gauss_pbc_check
 
@@ -892,7 +919,13 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_subdivided_pbc_check ) {
     BOOST_REQUIRE(pow(value[0] - exp(-dx*dx/2.) / sqrt(2 * M_PI), 2) < 0.01);
     BOOST_REQUIRE(pow(der[0] - (-dx *exp(-dx*dx/2.)) / sqrt(2 * M_PI), 2) < 0.01);
   }
- 
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_value));
+  gpuErrchk(cudaFree(d_der));
+  gpuErrchk(cudaFree(d_gauss_loc));
+
 }//gpu_gauss_subdivided_pbc_check
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
@@ -952,6 +985,11 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
 
   //now make sure that add_value returned the correct answers as well
   BOOST_REQUIRE(pow(area - g_integral_total, 2) < 0.1);
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_value));
+  gpuErrchk(cudaFree(d_g_integral));
 }//gpu_gauss_grid_integral_test
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test ) {
@@ -1007,6 +1045,11 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test ) {
 
     der_last = der[0];
   }
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_v));
+  gpuErrchk(cudaFree(d_der));
 
 }//gpu_gauss_grid_derivative_test
 
@@ -1070,6 +1113,12 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test_mcgdp_1 ) {
   approx_der = (vlast - vlastlast) / dx;
   BOOST_REQUIRE(pow(approx_der - der_last, 2) < 0.1);
   BOOST_REQUIRE(pow(der_last, 2) < 0.01);
+
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_v));
+  gpuErrchk(cudaFree(d_der));
 
 }//gpu_gauss_grid_derivative_test_mcgdp_1
 
@@ -1166,6 +1215,16 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(double), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_min));
+  gpuErrchk(cudaFree(d_max));
+  gpuErrchk(cudaFree(d_periodic));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_value));
+  gpuErrchk(cudaFree(d_dummy));
+  gpuErrchk(cudaFree(d_der));
+
 }//gpu_gauss_grid_interp_test_mcgdp_1D
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
@@ -1258,45 +1317,77 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
   gpuErrchk(cudaMemcpy(der, d_der, 3*sizeof(double), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
 
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_min));
+  gpuErrchk(cudaFree(d_max));
+  gpuErrchk(cudaFree(d_periodic));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_v));
+  gpuErrchk(cudaFree(d_dummy));
+  gpuErrchk(cudaFree(d_der));
+
 }//gpu_gauss_grid_interp_test_mcgdp_3D
 
-/*BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
+BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
+  size_t bigger_stack[1] = {4*4096};
+  gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, bigger_stack[0]));
+  cudaDeviceGetLimit(bigger_stack, cudaLimitStackSize);
   double min[] = {0};
   double max[] = {10};
   double bin_spacing[] = {0.009765625};
   double sigma[] = {0.1};
   int periodic[] = {1};
-  GaussGrid* g  = make_gauss_grid_gpu(1, min, max, bin_spacing, periodic, 1, sigma);
+  DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 1, sigma);
   periodic[0] = 1;
-  g->set_boundary(min, max, periodic);
-
   DimmedGaussGridGPU<1>* d_g;
   gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
-  gpuErrchk(cudaMemcpy(d_g, g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
 
+  double* d_min;
+  gpuErrchk(cudaMalloc((void**)&d_min, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_min, min, sizeof(double), cudaMemcpyHostToDevice));
+  double* d_max;
+  gpuErrchk(cudaMalloc((void**)&d_max, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_max, max, sizeof(double), cudaMemcpyHostToDevice));
+  int* d_periodic;
+  gpuErrchk(cudaMalloc((void**)&d_periodic, sizeof(int)));
+  gpuErrchk(cudaMemcpy(d_periodic, periodic, sizeof(int), cudaMemcpyHostToDevice));
+
+  set_boundary_kernel<1><<<1,1>>>(d_min, d_max, d_periodic, d_g);
+  
   //add gaussian that was failing
-  double x[] = {-3.91944};
-  double* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(double)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));
-  double bias_added[32];
+  double x[1] = {-3.91944};
+  double h = 1.0;
+  double bias_added[g.minisize_total_]; //= g->add_value(x, h);
   double* d_bias_added;
-  gpuErrchk(cudaMalloc((void**)&d_bias_added, 32*sizeof(double)));
-  add_value_integral_kernel<1><<<1, 32>>>(d_x, 1.0, d_bias_added, d_g);
-  gpuErrchk(cudaMemcpy(bias_added, d_bias_added, 32*sizeof(double), cudaMemcpyDeviceToHost));
-  double bias_added_tot = 0.0;
-  for(int i = 0; i < 32; i++){
-    bias_added_tot += bias_added[i];
-  }
-//  double bias_added = g->add_value(x, 1.0);
+  gpuErrchk(cudaMalloc((void**)&d_bias_added, g.minisize_total_ * sizeof(double)));
+  double* d_x;
+  gpuErrchk(cudaMalloc(&d_x, sizeof(double)));
+  gpuErrchk(cudaMemcpy(d_x, x, sizeof(double), cudaMemcpyHostToDevice));//here w/ limit=4096
 
+
+  add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_bias_added, d_g);
+ gpuErrchk(cudaDeviceSynchronize());
+  gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(double), cudaMemcpyDeviceToHost));
+  double tot_bias_added = 0;
+  for (int i = 0; i < g.minisize_total_; i++){
+    tot_bias_added += bias_added[i];
+  }
+  
   //unnormalized, so a little height scaling is necessary
   //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
-  BOOST_REQUIRE(pow(bias_added_tot - 1.0, 2) < 0.1);
+  BOOST_REQUIRE(pow(tot_bias_added - h, 2) < 0.1);
 
-  delete g;
+
+  gpuErrchk(cudaFree(d_g));
+  gpuErrchk(cudaFree(d_min));
+  gpuErrchk(cudaFree(d_max));
+  gpuErrchk(cudaFree(d_periodic));
+  gpuErrchk(cudaFree(d_x));
+  gpuErrchk(cudaFree(d_bias_added));
+
 }//gpu_gauss_grid_integral_regression_1
-*/
 
 
 //This test will simply run several thousand timesteps and time how long it takes.

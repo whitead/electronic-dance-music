@@ -24,23 +24,6 @@
 
 namespace EDM{
 
-/**
- * This class uses a compositional ("has-a") relationship with Grid. This is the 
- * interface and DimmedGaussGrid has the dimension template parameter
- **/
-  class GaussGridGPU : public GaussGrid {
-    /**
-     * Retruns the integrated amount of bias added to the system
-     **/
-  public:
-    virtual ~GaussGridGPU() {};
-
-
-    
-
-//  __device__ virtual double add_hills_gpu(const double* buffer, const size_t hill_number, char hill_type, double *grid_);
-  };
-
   template< int DIM>
   class DimmedGaussGridGPU : public DimmedGaussGrid<DIM>{
     /** A class for treating grids that have gaussians on it 

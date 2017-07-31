@@ -16,13 +16,6 @@
 #define GRID_TYPE 32
 #endif //GRID_TYPE
 
-#ifndef GPU_INT_FLOOR
-#define GPU_INT_FLOOR
-HOST_DEV  int gpu_int_floor(double number) {
-  return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);
-}
-#endif
-
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true, bool print=true)
 {
@@ -162,7 +155,7 @@ namespace EDM{
       for(i = 0; i < DIM; i++) {
 	xi = x[i];
 	if(b_periodic_[i]){
-	  xi -= (max_[i] - min_[i]) * gpu_int_floor((xi - min_[i]) / (max_[i] - min_[i]));
+	  xi -= (max_[i] - min_[i]) * int_floor((xi - min_[i]) / (max_[i] - min_[i]));
 	}
 	result[i] = (size_t) floor((xi - min_[i]) / dx_[i]);
       }
@@ -229,7 +222,7 @@ namespace EDM{
 	  //wrap x, if needed
 	  wrapped_x = x[i];
 	  if(b_periodic_[i])
-	    wrapped_x -= (max_[i] - min_[i]) * gpu_int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
+	    wrapped_x -= (max_[i] - min_[i]) * int_floor((wrapped_x - min_[i]) / (max_[i] - min_[i]));
 	  //get position relative to neighbors
 	  where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	  //treat possible stride wrap

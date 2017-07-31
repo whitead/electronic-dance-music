@@ -7,10 +7,18 @@
 #include <iostream>
 #include <cmath>
 
+#ifndef GAUSS_SUPPORT
 #define GAUSS_SUPPORT 8.0 // sigma^2 considered for gaussian
-#define BC_TABLE_SIZE 65536 //boundary correction function look up size 
+#endif
+#ifndef BC_TABLE_SIZE
+#define BC_TABLE_SIZE 65536 //boundary correction function look up size
+#endif
+#ifndef BC_MAR
 #define BC_MAR 2.0
+#endif
+#ifndef BC_CORRECTION
 #define BC_CORRECTION
+#endif
 
 
 HOST_DEV inline
