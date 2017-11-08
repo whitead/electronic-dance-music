@@ -10,7 +10,7 @@ namespace EDM{
 
 
   template <unsigned int blockSize>
-  __device__ void warpAddReduce(volatile double *sdata, unsigned int tid){
+  __device__ void warpAddReduce(volatile edm_data_t *sdata, unsigned int tid){
     if (blockSize >= 64) sdata[tid] += sdata[tid + 32];
     if (blockSize >= 32) sdata[tid] += sdata[tid + 16];
     if (blockSize >= 16) sdata[tid] += sdata[tid + 8];
@@ -20,8 +20,8 @@ namespace EDM{
   }
 
   template <unsigned int blockSize>
-  __global__ void addReduce(double *g_idata, double *g_odata, unsigned int n){
-    extern __shared__ double sdata[];
+  __global__ void addReduce(edm_data_t *g_idata, edm_data_t *g_odata, unsigned int n){
+    extern __shared__ edm_data_t sdata[];
     unsigned int tid= threadIdx.x;
     unsigned int i = blockIdx.x * (blockSize * 2) + tid;
     unsigned int gridSize = blockSize * 2 * gridDim.x;
@@ -39,7 +39,7 @@ namespace EDM{
   }
 
   template <unsigned int blockSize>
-  __global__ void gpu_add_matrices(double *MatA, double *MatB, double *MatC, int nx, int ny){
+  __global__ void gpu_add_matrices(edm_data_t *MatA, edm_data_t *MatB, edm_data_t *MatC, int nx, int ny){
     unsigned int ix = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int iy = threadIdx.y + blockIdx.y * blockDim.y;
     unsigned int idx = iy*nx + ix;

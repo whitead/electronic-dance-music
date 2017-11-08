@@ -16,6 +16,12 @@
 #include "unistd.h"
 #endif
 
+#ifdef USE_DOUBLES
+#define MPI_EDM_DATA_T MPI_DOUBLE
+#else
+#define MPI_EDM_DATA_T MPI_FLOAT
+#endif//USE_DOUBLES
+
 //Some stuff for reading in files quickly 
 namespace std {
   istream& operator >> (istream& is, pair<string, string>& ps) {
@@ -94,12 +100,12 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 //infer if the given boundary extends across the entire system. That
 //determines the acutal b_periodic
 
-void EDM::EDMBias::subdivide(const double sublo[3], 
-			const double subhi[3], 
-			const double boxlo[3],
-			const double boxhi[3],
+void EDM::EDMBias::subdivide(const edm_data_t sublo[3], 
+			const edm_data_t subhi[3], 
+			const edm_data_t boxlo[3],
+			const edm_data_t boxhi[3],
 			const int b_periodic[3],
-			const double skin[3]) {
+			const edm_data_t skin[3]) {
 
 #ifdef EDM_MPI_DEBUG
   if(mpi_rank_ == 2) {
@@ -125,8 +131,8 @@ void EDM::EDMBias::subdivide(const double sublo[3],
     edm_error("Must call setup before subdivide", "edm_bias.cpp:subdivide");
   
   int grid_period[] = {0, 0, 0};
-  double min[3];
-  double max[3];
+  edm_data_t min[3];
+  edm_data_t max[3];
   size_t i;
   int bounds_flag = 1;
 
@@ -207,12 +213,12 @@ void EDM::EDMBias::subdivide(const double sublo[3],
   //between regions. However, it is correct for getting average bias
   //because some hills will be counted twice and this increase in volume
   //compensates for that.
-  double other_vol = 0;
-  double vol = bias_->get_volume();
+  edm_data_t other_vol = 0;
+  edm_data_t vol = bias_->get_volume();
   total_volume_ = 0;
 
   #ifndef EDM_SERIAL
-  MPI_Allreduce(&vol, &other_vol, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&vol, &other_vol, 1, MPI_EDM_DATA_T, MPI_SUM, MPI_COMM_WORLD);
   #else
   other_vol = vol;
   #endif
@@ -260,19 +266,19 @@ void EDM::EDMBias::write_lammps_table(const std::string& output) const {
 
 }
 
-void EDM::EDMBias::setup(double temperature, double boltzmann_constant) {
+void EDM::EDMBias::setup(edm_data_t temperature, edm_data_t boltzmann_constant) {
 
   temperature_ = temperature;
   boltzmann_factor_ = boltzmann_constant * temperature;
 
 }
 
-double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces) const {
+edm_data_t EDM::EDMBias::update_forces(int nlocal, const edm_data_t* const* positions, edm_data_t** forces) const {
   return update_forces(nlocal, positions, forces, -1);
 }
 
 
-double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const {
+edm_data_t EDM::EDMBias::update_forces(int nlocal, const edm_data_t* const* positions, edm_data_t** forces, int apply_mask) const {
 
   //are we active?
   if(b_outofbounds_)
@@ -281,8 +287,8 @@ double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, d
   
   //simply perform table look-ups of the positions to get the forces
   int i,j;
-  double der[3] = {0, 0, 0};
-  double energy = 0;
+  edm_data_t der[3] = {0, 0, 0};
+  edm_data_t energy = 0;
   for(i = 0; i < nlocal; i++) {
     if(apply_mask < 0 || mask_[i] & apply_mask) {
       energy += bias_->get_value_deriv(&positions[i][0], der);
@@ -293,7 +299,7 @@ double EDM::EDMBias::update_forces(int nlocal, const double* const* positions, d
   return energy;
 }
 
-double EDM::EDMBias::update_force(const double* positions, double* forces) const {
+edm_data_t EDM::EDMBias::update_force(const edm_data_t* positions, edm_data_t* forces) const {
 
   //are we active?
   if(b_outofbounds_)
@@ -302,19 +308,19 @@ double EDM::EDMBias::update_force(const double* positions, double* forces) const
   
   //simply perform table look-ups of the positions to get the forces
   int i;
-  double der[3] = {0, 0, 0};
-  double energy = bias_->get_value_deriv(positions, der);
+  edm_data_t der[3] = {0, 0, 0};
+  edm_data_t energy = bias_->get_value_deriv(positions, der);
   for(i = 0; i < dim_; i++)
     forces[i] -= der[i];
   return energy;
 }
 
 
-void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform) {
+void EDM::EDMBias::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform) {
   add_hills(nlocal, positions, runiform, -1);
 }
 
-void EDM::EDMBias::add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask) {
+void EDM::EDMBias::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask) {
 
   int i;
   pre_add_hill(nlocal);
@@ -350,8 +356,8 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
 
 }
 
-double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number, char hill_type){
-  double bias_added = 0;
+edm_data_t EDM::EDMBias::do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type){
+  edm_data_t bias_added = 0;
   
   size_t i;
   for(i = 0; i < hill_number; i++){
@@ -363,7 +369,7 @@ double EDM::EDMBias::do_add_hills(const double* buffer, const size_t hill_number
   return bias_added;
 }
 
-void EDM::EDMBias::queue_add_hill(const double* position, double this_h){
+void EDM::EDMBias::queue_add_hill(const edm_data_t* position, edm_data_t this_h){
   size_t i;
   for(i = 0; i < dim_; i++)
     send_buffer_[buffer_i_ * (dim_+ 1) + i] = position[i];
@@ -377,12 +383,12 @@ void EDM::EDMBias::queue_add_hill(const double* position, double this_h){
 }
 
 
-void EDM::EDMBias::add_hill(const double* position, double runiform) {
+void EDM::EDMBias::add_hill(const edm_data_t* position, edm_data_t runiform) {
 
   if(temp_hill_prefactor_ < 0)
     edm_error("Must call pre_add_hill before add_hill", "edm_bias.cpp:add_hill");
   
-  double this_h = temp_hill_prefactor_;
+  edm_data_t this_h = temp_hill_prefactor_;
 
   //are we active?
   if(!b_outofbounds_) {
@@ -431,7 +437,7 @@ void EDM::EDMBias::post_add_hill() {
 }
  
 
-void EDM::EDMBias::output_hill(const double* position, double height, double bias_added, char type) {
+void EDM::EDMBias::output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type) {
    
    size_t i;
    
@@ -475,9 +481,9 @@ int EDM::EDMBias::check_for_flush() {//this is fine??
 
 }
 
-double EDM::EDMBias::flush_buffers(int synched) {
+edm_data_t EDM::EDMBias::flush_buffers(int synched) {
 
-  double bias_added = 0;
+  edm_data_t bias_added = 0;
   
   //flush our own buffer first
   bias_added += do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
@@ -499,10 +505,10 @@ double EDM::EDMBias::flush_buffers(int synched) {
       for(i = 0; i < mpi_size_; i++) {
 	if(mpi_rank_ == i) {
 	  MPI_Bcast(&buffer_i_, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
-	  MPI_Bcast(send_buffer_, buffer_i_ * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
+	  MPI_Bcast(send_buffer_, buffer_i_ * (dim_ + 1), MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
 	} else {
 	  MPI_Bcast(&buffer_j, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
-	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_DOUBLE, i, MPI_COMM_WORLD);
+	  MPI_Bcast(receive_buffer_, buffer_j * (dim_ + 1), MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
 	  bias_added += do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  
 	}
       }
@@ -519,7 +525,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		  &srequest1);
 
 	MPI_Isend(send_buffer_, buffer_i_ * (dim_ + 1), 
-		  MPI_DOUBLE, mpi_neighbors_[i], 
+		  MPI_EDM_DATA_T, mpi_neighbors_[i], 
 		  i, MPI_COMM_WORLD, &srequest2);
 
 	//do sync receive, because we need it to continue
@@ -528,7 +534,7 @@ double EDM::EDMBias::flush_buffers(int synched) {
 		 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 	MPI_Recv(receive_buffer_, buffer_j * (dim_ + 1), 
-		 MPI_DOUBLE, mpi_neighbors_[i], 
+		 MPI_EDM_DATA_T, mpi_neighbors_[i], 
 		 i, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 
 	bias_added += do_add_hills(receive_buffer_, buffer_j, NEIGH_HILL);	  	
@@ -548,11 +554,11 @@ double EDM::EDMBias::flush_buffers(int synched) {
   return bias_added;
 }
 
-void EDM::EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
+void EDM::EDMBias::infer_neighbors(const int* b_periodic, const edm_data_t* skin) {
 
    //now the hard part, we need to infer the domain decomposition topology
    size_t i,j;
-   double* bounds = (double*) malloc(sizeof(double) * dim_ * 2);
+   edm_data_t* bounds = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_ * 2);
    int dim_overlap; //if somethig overlaps in all dimensions
    
 
@@ -571,10 +577,10 @@ void EDM::EDMBias::infer_neighbors(const int* b_periodic, const double* skin) {
 	 bounds[j*2] = bias_->get_min()[j];
 	 bounds[j*2 + 1] = bias_->get_max()[j];
        }
-       MPI_Bcast(bounds, dim_ * 2, MPI_DOUBLE, i, MPI_COMM_WORLD);
+       MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
 
      }  else {
-       MPI_Bcast(bounds, dim_ * 2, MPI_DOUBLE, i, MPI_COMM_WORLD);
+       MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
        
        //check if this could be a neighbor
        dim_overlap = 0;
@@ -762,10 +768,10 @@ void EDM::EDMBias::sort_neighbors() {
    } 
 }
 
-void EDM::EDMBias::update_height(double bias_added) {
-  double other_bias = 0;
+void EDM::EDMBias::update_height(edm_data_t bias_added) {
+  edm_data_t other_bias = 0;
   #ifndef EDM_SERIAL
-  MPI_Allreduce(&bias_added, &other_bias, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&bias_added, &other_bias, 1, MPI_EDM_DATA_T, MPI_SUM, MPI_COMM_WORLD);
   #else
   other_bias = bias_added;
   #endif
@@ -773,7 +779,7 @@ void EDM::EDMBias::update_height(double bias_added) {
 		
 }
 
-int extract_double(const std::string& key, std::map<std::string, std::string> map, int required, double* result) {
+int extract_edm_data_t(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result) {
 
   if(map.find(key) != map.end()) {
     *result = atof(map.at(key).c_str());
@@ -792,7 +798,7 @@ int extract_double(const std::string& key, std::map<std::string, std::string> ma
   
 }
 
-int extract_double_array(const std::string& key, std::map<std::string, std::string> map, int required, double* result, int length) {
+int extract_edm_data_t_array(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result, int length) {
 
   if(map.find(key) != map.end()) {
     std::istringstream is(map.at(key));
@@ -855,14 +861,14 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
   }
 
   if(b_tempering_) {
-    if(!extract_double("bias_factor", parsed_input, 1,&bias_factor_))
+    if(!extract_edm_data_t("bias_factor", parsed_input, 1,&bias_factor_))
       return 0;
-    extract_double("global_tempering", parsed_input, 0,&global_tempering_);    
+    extract_edm_data_t("global_tempering", parsed_input, 0,&global_tempering_);    
   }
   
-  if(!extract_double("hill_prefactor", parsed_input, 1, &hill_prefactor_))
+  if(!extract_edm_data_t("hill_prefactor", parsed_input, 1, &hill_prefactor_))
     return 0;
-  extract_double("hill_density", parsed_input, 0, &hill_density_);
+  extract_edm_data_t("hill_density", parsed_input, 0, &hill_density_);
   int tmp;
   if(!extract_int("dimension", parsed_input, 1, &tmp))
     return 0;
@@ -876,19 +882,19 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
     
 
   //parse arrays now
-  bias_dx_ = (double*) malloc(sizeof(double) * dim_);
-  bias_sigma_ = (double*) malloc(sizeof(double) * dim_);
-  min_ = (double*) malloc(sizeof(double) * dim_);
-  max_ = (double*) malloc(sizeof(double) * dim_);
+  bias_dx_ = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_);
+  bias_sigma_ = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_);
+  min_ = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_);
+  max_ = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_);
   b_periodic_boundary_ = (int*) malloc(sizeof(int) * dim_);
   
-  if(!extract_double_array("bias_spacing", parsed_input, 1, bias_dx_, dim_))
+  if(!extract_edm_data_t_array("bias_spacing", parsed_input, 1, bias_dx_, dim_))
     return 0;
-  if(!extract_double_array("bias_sigma", parsed_input, 1, bias_sigma_, dim_))
+  if(!extract_edm_data_t_array("bias_sigma", parsed_input, 1, bias_sigma_, dim_))
     return 0;
-  if(!extract_double_array("box_low", parsed_input, 1, min_, dim_))
+  if(!extract_edm_data_t_array("box_low", parsed_input, 1, min_, dim_))
     return 0;
-  if(!extract_double_array("box_high", parsed_input, 1, max_, dim_))
+  if(!extract_edm_data_t_array("box_high", parsed_input, 1, max_, dim_))
     return 0;
 
   //get target

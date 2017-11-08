@@ -1,9 +1,9 @@
 #include "grid.h"
 
 EDM::Grid* EDM::make_grid( int dim, 
-		const double* min, 
-		const double* max, 
-		const double* bin_spacing, 
+		const edm_data_t* min, 
+		const edm_data_t* max, 
+		const edm_data_t* bin_spacing, 
 		const int* b_periodic, 
 		int b_derivatives, 
 		int b_interpolate) {

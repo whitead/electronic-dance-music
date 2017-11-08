@@ -31,12 +31,12 @@ namespace EDM{
      *
      **/
   public:
-    DimmedGaussGridGPU(const double* min, 
-		       const double* max, 
-		       const double* bin_spacing, 
+    DimmedGaussGridGPU(const edm_data_t* min, 
+		       const edm_data_t* max, 
+		       const edm_data_t* bin_spacing, 
 		       const int* b_periodic, 
 		       int b_interpolate,
-		       const double* sigma) : DimmedGaussGrid<DIM>(min, max, bin_spacing, b_periodic, b_interpolate, sigma), grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate) {
+		       const edm_data_t* sigma) : DimmedGaussGrid<DIM>(min, max, bin_spacing, b_periodic, b_interpolate, sigma), grid_(min, max, bin_spacing, b_periodic, 1, b_interpolate) {
       
       size_t i;
       for(i = 0; i < DIM; i++) {
@@ -51,15 +51,15 @@ namespace EDM{
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
      **/
-    DimmedGaussGridGPU(const std::string& filename, const double* sigma) : DimmedGaussGrid<DIM>( filename, sigma), grid_(filename) {}
+    DimmedGaussGridGPU(const std::string& filename, const edm_data_t* sigma) : DimmedGaussGrid<DIM>( filename, sigma), grid_(filename) {}
   
     ~DimmedGaussGridGPU() {
       //nothing
     }
 
-    HOST_DEV void do_remap(double x[DIM]) const {
+    HOST_DEV void do_remap(edm_data_t x[DIM]) const {
 #ifdef __CUDACC__
-      double dp[2];
+      edm_data_t dp[2];
       size_t i;
 
       //this is a special wrapping. We want to find the nearest image, not the minimal image
@@ -101,12 +101,12 @@ namespace EDM{
     }//do_remap
 
 
-    HOST_DEV void do_set_boundary(const double* min, const double* max, const int* b_periodic) {
+    HOST_DEV void do_set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
 #ifdef __CUDACC__
       //do the set_boundary on GPU
       size_t i,j;
-      double s;
-      double tmp1,tmp2,tmp3;
+      edm_data_t s;
+      edm_data_t tmp1,tmp2,tmp3;
 
       b_dirty_bounds = 0;
 
@@ -170,10 +170,10 @@ namespace EDM{
      * Specifying the period here means that we can wrap points along
      * the boundary, not necessarily along the grid bounds
      **/
-    void set_boundary(const double* min, const double* max, const int* b_periodic) {
+    void set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
       size_t i,j;
-      double s;
-      double tmp1,tmp2,tmp3;
+      edm_data_t s;
+      edm_data_t tmp1,tmp2,tmp3;
 
       b_dirty_bounds = 0;
 
@@ -301,29 +301,29 @@ namespace EDM{
 #endif//CUDACC
     }//do_duplicate_boundary
 
-    HOST_DEV double do_add_value(const double* x0, double height) {
+    HOST_DEV edm_data_t do_add_value(const edm_data_t* x0, edm_data_t height) {
 #ifdef __CUDACC__ //device version
       size_t i,j;
 
       int index[DIM];//some temp local index, possibly negative
       int index1; //some temp collapsed index, possibly negative
 
-      double xx[DIM]; //points away from hill center but affected by addition
+      edm_data_t xx[DIM]; //points away from hill center but affected by addition
       size_t xx_index[DIM];//The grid index that corresponds to xx
       size_t xx_index1;//The collapsed grid index that corresponds to xx
       int x_index[DIM];//The grid index that corresponds to the hill center, possibly negative for points outside grid
       int b_flag; //a flag
-      double dp[DIM]; //essentially distance vector, changes in course of calculation
-      double dp2; //essentially magnitude of distance vector, changes in course of calculation
-      double expo; //exponential portion used in calculation
-      double bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
-      double vol_element = 1;//integration volume element
+      edm_data_t dp[DIM]; //essentially distance vector, changes in course of calculation
+      edm_data_t dp2; //essentially magnitude of distance vector, changes in course of calculation
+      edm_data_t expo; //exponential portion used in calculation
+      edm_data_t bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
+      edm_data_t vol_element = 1;//integration volume element
 
-      double bc_denom; //Boundary correction denominator
-      double bc_correction;
-      double bc_force[DIM]; //Boundary correction force denominator
+      edm_data_t bc_denom; //Boundary correction denominator
+      edm_data_t bc_correction;
+      edm_data_t bc_force[DIM]; //Boundary correction force denominator
       size_t bc_index; //Boundary correction index
-      double temp1, temp2, temp3, temp4, temp5, temp6, temp7;
+      edm_data_t temp1, temp2, temp3, temp4, temp5, temp6, temp7;
 
       //get volume element for bias integration
       for(i = 0; i < DIM; i++) {
@@ -331,9 +331,9 @@ namespace EDM{
       }
 
       //switch to non-const so we can wrap
-      double x[DIM];
+      edm_data_t x[DIM];
       for(i = 0; i < DIM; i++)
-	x[i] = x0[i];
+	x[i] = x0[i + threadIdx.x/minisize_total_ + blockIdx.x * blockDim.x ];
 
 
       do_remap(x); //attempt to remap to be close or in grid
@@ -474,6 +474,7 @@ namespace EDM{
       
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
+//	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
 	    grid_.grid_[xx_index1] += height * (expo + bc_correction);
 	    bias_added += height * (expo + bc_correction) * vol_element;
 	    for(j = 0; j < DIM; j++) {
@@ -533,17 +534,17 @@ namespace EDM{
  * Used to avoid template constructors
  **/
   GaussGrid* make_gauss_grid_gpu( int dim, 
-				  const double* min, 
-				  const double* max, 
-				  const double* bin_spacing, 
+				  const edm_data_t* min, 
+				  const edm_data_t* max, 
+				  const edm_data_t* bin_spacing, 
 				  const int* b_periodic, 
 				  int b_interpolate,
-				  const double* sigma);
+				  const edm_data_t* sigma);
 
 /**
  * Used to avoid template constructors
  **/
-  GaussGrid* read_gauss_grid_gpu( int dim, const std::string& filename, const double* sigma);
+  GaussGrid* read_gauss_grid_gpu( int dim, const std::string& filename, const edm_data_t* sigma);
 
 }
 
@@ -555,7 +556,7 @@ namespace EDM_Kernels{
    * Kernel wrapper for do_set_boundary() on the GPU. Takes in an instance of DimmedGaussGridGPU
    */
   template <int DIM>
-  __global__ void set_boundary_kernel(const double* min, const double* max,
+  __global__ void set_boundary_kernel(const edm_data_t* min, const edm_data_t* max,
 				      const int* periodic, DimmedGaussGridGPU<DIM>* g){
     g->do_set_boundary(min, max, periodic);
     return;
@@ -565,7 +566,7 @@ namespace EDM_Kernels{
    * Kernel wrapper for do_remap() on the GPU. Takes in an instance of DimmedGaussGridGPU
    */
   template <int DIM>
-  __global__ void remap_kernel(double* point, DimmedGaussGridGPU<DIM>* g){
+  __global__ void remap_kernel(edm_data_t* point, DimmedGaussGridGPU<DIM>* g){
     g->do_remap(point);
     return;
   }
@@ -576,20 +577,20 @@ namespace EDM_Kernels{
    * how much mass was added.
    */
   template <int DIM>
-  __global__ void add_value_kernel(const double* point, double height, DimmedGaussGridGPU<DIM>* g){
+  __global__ void add_value_kernel(const edm_data_t* point, edm_data_t height, DimmedGaussGridGPU<DIM>* g){
     g->do_add_value(point, height);
     return;
   }
 
   /*
    * Kernel wrapper for do_add_value() on the GPU. Takes in a point, the hill height to add, 
-   * an instance of DimmedGaussGridGPU to do the adding, as well as a pointer to a double array
+   * an instance of DimmedGaussGridGPU to do the adding, as well as a pointer to a edm_data_t array
    * of size equal to the gaussian support where the total height added (hill integral) 
    * will be stored.
    */
 
   template <int DIM>
-  __global__ void add_value_integral_kernel(const double* point, double height, double* target, DimmedGaussGridGPU<DIM>* g){
+  __global__ void add_value_integral_kernel(const edm_data_t* point, edm_data_t height, edm_data_t* target, DimmedGaussGridGPU<DIM>* g){
     target[threadIdx.x] = g->do_add_value(point, height);
     return;
   }

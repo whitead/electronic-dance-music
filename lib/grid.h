@@ -13,9 +13,17 @@
 #ifndef GRID_TYPE
 #define GRID_TYPE 32
 #endif //GRID_TYPE
+//Take advantage of compute-capability 6.x+ optionally
+
+#ifdef USE_DOUBLES
+typedef double edm_data_t;
+#else//Otherwise we just use floats on 5.x-
+typedef float edm_data_t;
+#endif
+
 
 HOST_DEV inline
- int int_floor(double number) {
+ int int_floor(edm_data_t number) {
   return (int) number < 0.0 ? -ceil(fabs(number)) : floor(number);                                                                   
 }     
                      
@@ -44,12 +52,12 @@ namespace EDM{
 // Giovanni
 
 template<int DIM> 
- HOST_DEV double interp(const double* dx, 
-	      const double* where, 
-	      const double* tabf, 
-	      const double* tabder, 
+ HOST_DEV edm_data_t interp(const edm_data_t* dx, 
+	      const edm_data_t* where, 
+	      const edm_data_t* tabf, 
+	      const edm_data_t* tabder, 
 	      const int* stride, 
-	      double* der){
+	      edm_data_t* der){
 // DIM:   dimensionality
 // dx:     delta between grid points
 // where:  location relative to the floor grid point (always between 0 and dx)
@@ -63,17 +71,17 @@ template<int DIM>
 
   int idim, jdim;
   int npoints,ipoint;
-  double X;
-  double X2;
-  double X3; 
+  edm_data_t X;
+  edm_data_t X2;
+  edm_data_t X3; 
   int x0[DIM]; //0 or 1, indicates neighbors relative position on local grid to interpolating point
-  double fd[DIM]; // the unscaled interpolated derivative contribution from a neighbor
-  double C[DIM]; // The value of the polynomials
-  double D[DIM]; // The derivative of the polynomials
+  edm_data_t fd[DIM]; // the unscaled interpolated derivative contribution from a neighbor
+  edm_data_t C[DIM]; // The value of the polynomials
+  edm_data_t D[DIM]; // The derivative of the polynomials
   int  tmp,shift;
-  double f; //the final value of the interpolated function
-  double ff; // the unscaled interpolated contribution from a neighbor
-  double qq; // the neighbor derivative divided by its value
+  edm_data_t f; //the final value of the interpolated function
+  edm_data_t ff; // the unscaled interpolated contribution from a neighbor
+  edm_data_t qq; // the neighbor derivative divided by its value
 
   //Get the number of neighbors for a given dimension
   npoints = 1; 
@@ -137,39 +145,39 @@ class Grid {
 
 
  public:  
-  virtual  double get_value(const double* x) const = 0;
+  virtual  edm_data_t get_value(const edm_data_t* x) const = 0;
   /**
    * Adds the given value to the grid and then returns how much was
    * actually added. The discrepancy can arise due to boundaries
    * and/or kernels.
    */
-  virtual  double add_value(const double* x0, double value) = 0;
+  virtual  edm_data_t add_value(const edm_data_t* x0, edm_data_t value) = 0;
   virtual ~Grid() {};
   /**
    * Get value and put derivatives into "der"
    **/
-  virtual  double get_value_deriv(const double* x, double* der) const = 0;
+  virtual  edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const = 0;
   /**
    * Write the grid to the given file
    **/
   virtual void write(const std::string& filename) const = 0;
   virtual void multi_write(const std::string& filename, 
-			   const double* box_low, 
-			   const double* box_high, 
+			   const edm_data_t* box_low, 
+			   const edm_data_t* box_high, 
 			   const int* b_periodic,
 			   int b_lammps_format) const = 0;
   virtual void read(const std::string& filename) = 0;
   virtual void set_interpolation(int b_interpolate) = 0;
-  virtual double* get_grid() = 0;
-  virtual const double* get_dx() const = 0;
-  virtual const double* get_max() const = 0;
-  virtual const double* get_min() const = 0;
-  virtual double max_value() const = 0;
-  virtual double min_value() const = 0;
-  virtual void add(const Grid* other, double scale, double offset) = 0;
+  virtual edm_data_t* get_grid() = 0;
+  virtual const edm_data_t* get_dx() const = 0;
+  virtual const edm_data_t* get_max() const = 0;
+  virtual const edm_data_t* get_min() const = 0;
+  virtual edm_data_t max_value() const = 0;
+  virtual edm_data_t min_value() const = 0;
+  virtual void add(const Grid* other, edm_data_t scale, edm_data_t offset) = 0;
   virtual size_t get_grid_size() const = 0;
 //  virtual void one2multi(size_t index, size_t* result) const = 0;
-  virtual double expected_bias() const = 0;
+  virtual edm_data_t expected_bias() const = 0;
   //clear all values and derivatives
   virtual void clear() = 0;
 
@@ -181,9 +189,9 @@ class DimmedGrid : public Grid {
    *
    **/
  public:
- DimmedGrid(const double* min, 
-	    const double* max, 
-	    const double* bin_spacing, 
+ DimmedGrid(const edm_data_t* min, 
+	    const edm_data_t* max, 
+	    const edm_data_t* bin_spacing, 
 	    const int* b_periodic, 
 	    int b_derivatives, 
 	    int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
@@ -260,9 +268,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Go from a point to an array of indices
    **/ 
-   void get_index(const double* x, size_t result[DIM]) const {
+   void get_index(const edm_data_t* x, size_t result[DIM]) const {
     size_t i;
-    double xi;
+    edm_data_t xi;
     for(i = 0; i < DIM; i++) {
       xi = x[i];
       if(b_periodic_[i]){
@@ -272,11 +280,11 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     }
   }
 
-  void add(const Grid* other, double scale, double offset) {
+  void add(const Grid* other, edm_data_t scale, edm_data_t offset) {
     //probably should specialize here, but I'll blindly assume the dimensions are the same
     size_t index[DIM];
-    double x[DIM];
-    double der[DIM];
+    edm_data_t x[DIM];
+    edm_data_t der[DIM];
     size_t i,j;
     for(i = 0; i < grid_size_; i++) {
       one2multi(i, index);
@@ -289,8 +297,8 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     }
   }
   
-  double max_value() const {
-    double max = grid_[0];
+  edm_data_t max_value() const {
+    edm_data_t max = grid_[0];
     size_t i;
     for(i = 0; i < grid_size_; i++) {
       max = fmax(max, grid_[i]);
@@ -299,8 +307,8 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     return max;
   }
 
-  double min_value() const {
-    double min = grid_[0];
+  edm_data_t min_value() const {
+    edm_data_t min = grid_[0];
     size_t i;
     for(i = 0; i < grid_size_; i++) {
       min = fmin(min, grid_[i]);
@@ -340,7 +348,7 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Get the value of the grid at x
    **/ 
-  double get_value(const double* x) const{
+  edm_data_t get_value(const edm_data_t* x) const{
 
     if(!in_grid(x)) {
 //	std::cout << "THIS SHOULD BE PRINTING\n";
@@ -356,7 +364,7 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 
       
     if(b_interpolate_ && b_derivatives_) {
-      double temp[DIM];
+      edm_data_t temp[DIM];
       return get_value_deriv(x, temp);
     }
 
@@ -368,7 +376,7 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Add a value to the grid. Only makes sense if there is no derivative
    **/
-   double add_value(const double* x0, double value) {
+   edm_data_t add_value(const edm_data_t* x0, edm_data_t value) {
     if(b_interpolate_) {
       edm_error("Cannot add_value when using derivatives", "grid.h:add_value");
     }
@@ -388,9 +396,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Get value and derivatives, optionally using interpolation
    **/ 
-   double get_value_deriv(const double* x, double* der) const {
+   edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const {
     
-    double value;
+    edm_data_t value;
     size_t index[DIM];
     size_t index1;
     size_t i;
@@ -414,9 +422,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 
     if(b_interpolate_) {
       
-      double where[DIM]; //local position (local meaning relative to neighbors)
+      edm_data_t where[DIM]; //local position (local meaning relative to neighbors)
       int stride[DIM]; //the indexing stride, which also accounts for periodicity
-      double wrapped_x;
+      edm_data_t wrapped_x;
       
       stride[0] = 1; //dim 0 is fastest
       for(i = 1; i < DIM; i++)
@@ -510,8 +518,8 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
    * MPI-based writing that will attempt to gather all grid values. Needs to know 
    * overall box size, since MPI processes don't normally know this.
    **/
-  void multi_write(const std::string& filename, const double box_min[DIM], 
-		   const double box_max[DIM], 
+  void multi_write(const std::string& filename, const edm_data_t box_min[DIM], 
+		   const edm_data_t box_max[DIM], 
 		   const int b_periodic[DIM],
 		   int b_lammps_format) const {
 
@@ -527,14 +535,14 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-    double x[DIM];
+    edm_data_t x[DIM];
     unsigned int reduced_counts[DIM];
     ofstream output;     
-    double der[DIM];
+    edm_data_t der[DIM];
     int b_amwriting = 0;
     size_t super_index[DIM];
     size_t temp;
-    double value;
+    edm_data_t value;
     unsigned int extra_n = 0;
 
     //calculate the extra lines, if any we need to create
@@ -693,9 +701,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 
   //calculate the expected bias assuming the grid is made 
   //up of unormalized -ln(p)
-  double expected_bias() const {
+  edm_data_t expected_bias() const {
     size_t i;
-    double Z, offset, avg;
+    edm_data_t Z, offset, avg;
     Z = offset = avg = 0;
 
     //make sure the highest value is 0
@@ -840,20 +848,20 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     b_interpolate_ = b_interpolate;
   }
  
-  double* get_grid() {
+  edm_data_t* get_grid() {
     return grid_;
   }
 
-  const double* get_dx() const{
-    return const_cast<double*>(dx_);
+  const edm_data_t* get_dx() const{
+    return const_cast<edm_data_t*>(dx_);
   }
 
-  const double* get_min() const{
-    return const_cast<double*>(min_);
+  const edm_data_t* get_min() const{
+    return const_cast<edm_data_t*>(min_);
   }
 
-  const double* get_max() const{
-    return const_cast<double*>(max_);
+  const edm_data_t* get_max() const{
+    return const_cast<edm_data_t*>(max_);
   }
 
 
@@ -864,7 +872,7 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   /**
    * Check if a point is in bounds
    **/
-  bool in_grid(const double x[DIM]) const {
+  bool in_grid(const edm_data_t x[DIM]) const {
     size_t i;
     for(i = 0; i < DIM; i++) {
       if(!b_periodic_[i] && (x[i] < min_[i] || x[i] > (max_[i])) ){
@@ -877,11 +885,11 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   size_t grid_size_;//total size of grid
   int b_derivatives_;//if derivatives are going to be used
   int b_interpolate_;//if interpolation should be used on the grid
-  double* grid_;//the grid values
-  double* grid_deriv_;//derivatives    
-  double dx_[DIM];//grid spacing
-  double min_[DIM];//grid minimum
-  double max_[DIM];//maximum
+  edm_data_t* grid_;//the grid values
+  edm_data_t* grid_deriv_;//derivatives    
+  edm_data_t dx_[DIM];//grid spacing
+  edm_data_t min_[DIM];//grid minimum
+  edm_data_t max_[DIM];//maximum
   int grid_number_[DIM];//number of points on grid
   int b_periodic_[DIM];//if a dimension is periodic
 
@@ -895,9 +903,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
     grid_size_ = 1;
     for(i = 0; i < DIM; i++)
       grid_size_ *= grid_number_[i];
-    grid_ = (double *) calloc( grid_size_, sizeof(double));
+    grid_ = (edm_data_t *) calloc( grid_size_, sizeof(edm_data_t));
     if(b_derivatives_) {
-      grid_deriv_ = (double *) calloc( DIM * grid_size_, sizeof(double));
+      grid_deriv_ = (edm_data_t *) calloc( DIM * grid_size_, sizeof(edm_data_t));
       if(!grid_deriv_) {
 	edm_error("Out of memory!!", "grid.h:initialize");	
       }
@@ -910,9 +918,9 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
  * This is a non-template constructor which dispatches to the appropiate template
  **/
 Grid* make_grid( int dim, 
-		const double* min, 
-		const double* max, 
-		const double* bin_spacing, 
+		const edm_data_t* min, 
+		const edm_data_t* max, 
+		const edm_data_t* bin_spacing, 
 		const int* b_periodic, 
 		int b_derivatives, 
 		int b_interpolate);

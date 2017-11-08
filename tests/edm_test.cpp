@@ -28,9 +28,9 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity ){
    * grid:   |---|---|---|---|---
    *         0   1   2   3   4
    */
-  double min[] = {0};
-  double max[] = {10};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {0};
+  edm_data_t max[] = {10};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 0, 0);
 
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity ){
   for(int i = 0; i < 10; i++)
     g.grid_[i] = i;
 
-  double x[] = {3.5};
+  edm_data_t x[] = {3.5};
   BOOST_REQUIRE(pow(g.get_value(x) - 3, 2) < 0.000001);
 
   //try to break it
@@ -58,9 +58,9 @@ BOOST_AUTO_TEST_CASE( grid_1d_sanity ){
 }//grid_1d_sanity
 
 BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
-  double min[] = {-2, -5, -3};
-  double max[] = {125, 63, 78};
-  double bin_spacing[] = {1.27, 1.36, 0.643};
+  edm_data_t min[] = {-2, -5, -3};
+  edm_data_t max[] = {125, 63, 78};
+  edm_data_t bin_spacing[] = {1.27, 1.36, 0.643};
   int periodic[] = {0, 1, 1};
   DimmedGrid<3> g (min, max, bin_spacing, periodic, 0, 0);
 
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
     }
   }
 
-  double point[3];
+  edm_data_t point[3];
   for(int i = 0; i < g.grid_number_[0]; i++) {
     point[0] = i * g.dx_[0] + g.min_[0] + EPSILON;
     array[0] = i;
@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_read ) {
   BOOST_REQUIRE_EQUAL(g.min_[2], 0);
   BOOST_REQUIRE_EQUAL(g.max_[2], 2.5 + g.dx_[2]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[2], 11);
-  double temp[] = {0.75, 0, 1.00};
+  edm_data_t temp[] = {0.75, 0, 1.00};
   BOOST_REQUIRE(pow(g.get_value(temp) - 1.260095, 2) < EPSILON);
   
 }
@@ -127,8 +127,8 @@ BOOST_AUTO_TEST_CASE( derivative_direction ) {
   DimmedGrid<3> g(GRID_SRC + "/3.grid");
   g.b_interpolate_ = 1;
 
-  double temp[] = {0.75, 0, 1.00};
-  double temp2[] = {0.76, 0, 1.00};
+  edm_data_t temp[] = {0.75, 0, 1.00};
+  edm_data_t temp2[] = {0.76, 0, 1.00};
   BOOST_REQUIRE(g.get_value(temp2)> g.get_value(temp));
   temp2[0] = 0.75;
   temp2[2] = 0.99;
@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
     g->write(output);
     //grab the grid for comparison
     size_t ref_length = g->get_grid_size();
-    double ref_grid[ref_length];
+    edm_data_t ref_grid[ref_length];
     for(j = 0; j < ref_length; j++)
       ref_grid[j] = g->get_grid()[j];
     //re-read
@@ -180,9 +180,9 @@ BOOST_AUTO_TEST_CASE( grid_read_write_consistency ) {
 
 BOOST_AUTO_TEST_CASE( interpolation_1d ) {
   
-  double min[] = {0};
-  double max[] = {10};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {0};
+  edm_data_t max[] = {10};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
   
@@ -191,9 +191,9 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
     g.grid_deriv_[i] = 1. / i;
   }
 
-  double array[] = {5.3};
-  double der[1];
-  double fhat = g.get_value_deriv(array,der);
+  edm_data_t array[] = {5.3};
+  edm_data_t der[1];
+  edm_data_t fhat = g.get_value_deriv(array,der);
 
   //make sure it's at least in the ballpark
   BOOST_REQUIRE(fhat > log(5) && fhat < log(6));
@@ -216,9 +216,9 @@ BOOST_AUTO_TEST_CASE( interpolation_1d ) {
 }// interpolation_1d
 
 BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
-  double min[] = {-M_PI};
-  double max[] = {M_PI};
-  double bin_spacing[] = {M_PI / 100};
+  edm_data_t min[] = {-M_PI};
+  edm_data_t max[] = {M_PI};
+  edm_data_t bin_spacing[] = {M_PI / 100};
   int periodic[] = {1};
   DimmedGrid<1> g (min, max, bin_spacing, periodic, 1, 1);
 
@@ -228,9 +228,9 @@ BOOST_AUTO_TEST_CASE( interp_1d_periodic ) {
   }
 
 
-  double array[] = {M_PI / 4};
-  double der[1];
-  double fhat = g.get_value_deriv(array,der);
+  edm_data_t array[] = {M_PI / 4};
+  edm_data_t der[1];
+  edm_data_t fhat = g.get_value_deriv(array,der);
 
   //Make sure it's reasonably accurate
   BOOST_REQUIRE(pow(fhat - sin(array[0]), 2) < 0.1);
@@ -252,17 +252,17 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap) {
   //this test simulates a subdivision that is periodic and stretches across the box in 1D
   //and is non-periodic and partial in the other
 
-  double min[] = {0, 0};
-  double max[] = {10, 5};
-  double bin_spacing[] = {1, 1};
+  edm_data_t min[] = {0, 0};
+  edm_data_t max[] = {10, 5};
+  edm_data_t bin_spacing[] = {1, 1};
   int periodic[] = {1, 0, 0};
-  double sigma[] = {0.1, 0.1};
+  edm_data_t sigma[] = {0.1, 0.1};
   DimmedGaussGrid<2> g (min, max, bin_spacing, periodic, 1, sigma);
   max[1] = 10;
   periodic[1] = 1;
   g.set_boundary(min, max, periodic);
 
-  double test_point[] = {0,1}; //should not remap
+  edm_data_t test_point[] = {0,1}; //should not remap
   g.remap(test_point);
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
   BOOST_REQUIRE(pow(test_point[1] - 1, 2) < 0.1);
@@ -300,18 +300,18 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_2) {
   //this test simulates a subdivision that is periodic and stretches across the box in 1D
   //and is non-periodic and partial in the other
 
-  double min[] = {-2};
-  double max[] = {7};
-  double bin_spacing[] = {0.1};
+  edm_data_t min[] = {-2};
+  edm_data_t max[] = {7};
+  edm_data_t bin_spacing[] = {0.1};
   int periodic[] = {0};
-  double sigma[] = {0.1};
+  edm_data_t sigma[] = {0.1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
   min[0] = 0;
   max[0] = 10;
   periodic[0] = 1;
   g.set_boundary(min, max, periodic);
 
-  double test_point[] = {0}; //should not remap
+  edm_data_t test_point[] = {0}; //should not remap
   g.remap(test_point);
   BOOST_REQUIRE(pow(test_point[0] - 0, 2) < 0.1);
 
@@ -336,20 +336,20 @@ BOOST_AUTO_TEST_CASE( boundary_remap_wrap_3) {
   //this test simulates a subdivision that is periodic and stretches across the box in 1D
   //and is non-periodic and partial in the other
 
-  double min[] = {-2};
-  double max[] = {7};
-  double bin_spacing[] = {0.1};
+  edm_data_t min[] = {-2};
+  edm_data_t max[] = {7};
+  edm_data_t bin_spacing[] = {0.1};
   int periodic[] = {0};
-  double sigma[] = {0.1};
+  edm_data_t sigma[] = {0.1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
   min[0] = 0;
   max[0] = 10;
   periodic[0] = 1;
   g.set_boundary(min, max, periodic);
 
-  double point[] = {0.01};
+  edm_data_t point[] = {0.01};
   g.add_value(point,1);
-  double der[1];
+  edm_data_t der[1];
   point[0] = 0;
   g.get_value_deriv(point, der);
   BOOST_REQUIRE(fabs(der[0]) > 0.1);
@@ -363,20 +363,20 @@ BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
   //this test simulates a subdivision that is periodic and stretches across the box in 1D
   //and is non-periodic and partial in the other
 
-  double min[] = {-2};
-  double max[] = {7};
-  double bin_spacing[] = {0.1};
+  edm_data_t min[] = {-2};
+  edm_data_t max[] = {7};
+  edm_data_t bin_spacing[] = {0.1};
   int periodic[] = {0};
-  double sigma[] = {0.1};
+  edm_data_t sigma[] = {0.1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
   min[0] = 0;
   max[0] = 10;
   periodic[0] = 0;
   g.set_boundary(min, max, periodic);
 
-  double point[] = {-0.01};
+  edm_data_t point[] = {-0.01};
   g.add_value(point,1);
-  double der[1];
+  edm_data_t der[1];
   point[0] = 0;
   g.get_value_deriv(point, der);
   BOOST_REQUIRE(fabs(point[0]) < EPSILON);
@@ -388,14 +388,14 @@ BOOST_AUTO_TEST_CASE( boundary_remap_nowrap_1) {
 
 
 BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
-  double min[] = {-M_PI, -M_PI, 0};
-  double max[] = {M_PI, M_PI, 10};
-  double bin_spacing[] = {M_PI / 100, M_PI / 100, 1};
+  edm_data_t min[] = {-M_PI, -M_PI, 0};
+  edm_data_t max[] = {M_PI, M_PI, 10};
+  edm_data_t bin_spacing[] = {M_PI / 100, M_PI / 100, 1};
   int periodic[] = {1, 1, 0};
   DimmedGrid<3> g (min, max, bin_spacing, periodic, 1, 0);
   
   size_t index = 0;
-  double x,y,z;
+  edm_data_t x,y,z;
   
   for(int i = 0; i < g.grid_number_[2]; i++) {
     for(int j = 0; j < g.grid_number_[1]; j++) {
@@ -412,11 +412,11 @@ BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
     }
   }
 
-  double array[] = {-10.75 * M_PI / 2, 8.43 * M_PI / 2, 3.5};
-  double der[3];
-  double fhat = g.get_value_deriv(array,der);
-  double f = cos(array[0]) * sin(array[1]) * array[2];
-  double true_der[] = {-sin(array[0]) * sin(array[1]) * array[2],
+  edm_data_t array[] = {-10.75 * M_PI / 2, 8.43 * M_PI / 2, 3.5};
+  edm_data_t der[3];
+  edm_data_t fhat = g.get_value_deriv(array,der);
+  edm_data_t f = cos(array[0]) * sin(array[1]) * array[2];
+  edm_data_t true_der[] = {-sin(array[0]) * sin(array[1]) * array[2],
 		       cos(array[0]) * cos(array[1]) * array[2],
 		       cos(array[0]) * sin(array[1])};
   
@@ -428,23 +428,23 @@ BOOST_AUTO_TEST_CASE( interp_3d_mixed ) {
 }//interp_3d_mixed
 
 BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
-  double min[] = {-10};
-  double max[] = {10};
-  double sigma[] = {1};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {-10};
+  edm_data_t max[] = {10};
+  edm_data_t sigma[] = {1};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
 
   //add 1 gaussian
-  double x[] = {0};
+  edm_data_t x[] = {0};
   g.add_value(x, 1);
 
   //now check a few points
   BOOST_REQUIRE(pow(g.get_value(x) - 1 / sqrt(2 * M_PI), 2) < EPSILON);
   
   int i;
-  double der[1];
-  double value;
+  edm_data_t der[1];
+  edm_data_t value;
   for( i = -6; i < 7; i++) {
     x[0] = i;
     value = g.get_value_deriv(x, der);
@@ -456,21 +456,21 @@ BOOST_AUTO_TEST_CASE( gauss_grid_add_check ) {
 
 
 BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
-  double min[] = {2};
-  double max[] = {10};
-  double sigma[] = {1};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {2};
+  edm_data_t max[] = {10};
+  edm_data_t sigma[] = {1};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
 
   //add 1 gaussian
-  double x[] = {2};
+  edm_data_t x[] = {2};
   g.add_value(x, 1);
 
   int i;
-  double der[1];
-  double value;
-  double dx;
+  edm_data_t der[1];
+  edm_data_t value;
+  edm_data_t dx;
   for( i = -6; i < 7; i++) {
     x[0] = i;
     dx = x[0] - 2;
@@ -492,13 +492,13 @@ BOOST_AUTO_TEST_CASE( gauss_pbc_check ) {
 
 
 BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
-  double min[] = {2};
-  double max[] = {4};
-  double sigma[] = {1};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {2};
+  edm_data_t max[] = {4};
+  edm_data_t sigma[] = {1};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {0};
-  double gauss_loc[] = {11};
-  double x[1];
+  edm_data_t gauss_loc[] = {11};
+  edm_data_t x[1];
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 0, sigma);
   periodic[0] = 1;
   max[0] = 10;
@@ -508,9 +508,9 @@ BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
   g.add_value(gauss_loc, 1); //added at equivalent to 1
 
   int i;
-  double der[1];
-  double value;
-  double dx;
+  edm_data_t der[1];
+  edm_data_t value;
+  edm_data_t dx;
   for( i = 2; i < 4; i++) {
     x[0] = i;
     dx = x[0] - gauss_loc[0];
@@ -533,19 +533,19 @@ BOOST_AUTO_TEST_CASE( gauss_subdivided_pbc_check ) {
 
 
 BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {1.2};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {-100};
+  edm_data_t max[] = {100};
+  edm_data_t sigma[] = {1.2};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
 
   //add N gaussian
   int N = 20;
   int i;
-  double x[1];
-  double offsets = 1. / N;
-  double g_integral = 0;
+  edm_data_t x[1];
+  edm_data_t offsets = 1. / N;
+  edm_data_t g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
@@ -554,8 +554,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
   }
 
   //now we integrate the grid
-  double area = 0;
-  double dx = 0.1;
+  edm_data_t area = 0;
+  edm_data_t dx = 0.1;
   int bins = (int) 200 / dx;
   for(i = 0; i < bins; i++) {
     x[0] = -100 + i * dx;
@@ -573,19 +573,19 @@ BOOST_AUTO_TEST_CASE( gauss_grid_integral_test ) {
 
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {1.2};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {-100};
+  edm_data_t max[] = {100};
+  edm_data_t sigma[] = {1.2};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
 
   //add N gaussian
   int N = 20;
   int i;
-  double x[1];
-  double offsets = 1. / N;
-  double g_integral = 0;
+  edm_data_t x[1];
+  edm_data_t offsets = 1. / N;
+  edm_data_t g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
@@ -594,11 +594,11 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
   }
 
   //now we calculate finite differences on the grid
-  double vlast, vlastlast, v, approx_der;  
+  edm_data_t vlast, vlastlast, v, approx_der;  
 
-  double der[1];
-  double der_last;
-  double dx = 0.1;
+  edm_data_t der[1];
+  edm_data_t der_last;
+  edm_data_t dx = 0.1;
   int bins = (int) 200 / dx;
   for(i = 0; i < bins; i++) {
     x[0] = -100 + i * dx;
@@ -616,19 +616,19 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test ) {
 }//gauss_grid_derivative_test
 
 BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {1.2};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {-100};
+  edm_data_t max[] = {100};
+  edm_data_t sigma[] = {1.2};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {0};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
 
   //add N gaussian
   int N = 20;
   int i;
-  double x[1];
-  double offsets = 1. / N;
-  double g_integral = 0;
+  edm_data_t x[1];
+  edm_data_t offsets = 1. / N;
+  edm_data_t g_integral = 0;
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
@@ -637,11 +637,11 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
   }
 
   //now we calculate finite differences on the grid
-  double vlast, vlastlast, v, approx_der;  
+  edm_data_t vlast, vlastlast, v, approx_der;  
 
-  double der[1];
-  double der_last;
-  double dx = 0.1;
+  edm_data_t der[1];
+  edm_data_t der_last;
+  edm_data_t dx = 0.1;
   int bins = (int) 200 / dx;
   for(i = 0; i < bins; i++) {
     x[0] = -100 + i * dx;
@@ -665,10 +665,10 @@ BOOST_AUTO_TEST_CASE( gauss_grid_derivative_test_mcgdp_1 ) {
 }//gauss_grid_derivative_test_mcgdp_1
 
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
-  double min[] = {-100};
-  double max[] = {100};
-  double sigma[] = {10.0};
-  double bin_spacing[] = {1};
+  edm_data_t min[] = {-100};
+  edm_data_t max[] = {100};
+  edm_data_t sigma[] = {10.0};
+  edm_data_t bin_spacing[] = {1};
   int periodic[] = {1};
   DimmedGaussGrid<1> g (min, max, bin_spacing, periodic, 1, sigma);
   periodic[0]  = 0;
@@ -679,8 +679,8 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
   //add N gaussian
   int N = 20;
   int i;
-  double x[1];
-  double der[1];
+  edm_data_t x[1];
+  edm_data_t der[1];
 
   //generate a random number
   for(i = 0; i < N; i++) {
@@ -714,10 +714,10 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_1D ) {
 }//gauss_grid_interp_test_mcgdp_1D
 
 BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
-  double min[] = {-10, -10, -10};
-  double max[] = {10, 10, 10};
-  double sigma[] = {3.0, 3.0, 3.0};
-  double bin_spacing[] = {0.9, 1.1, 1.4};
+  edm_data_t min[] = {-10, -10, -10};
+  edm_data_t max[] = {10, 10, 10};
+  edm_data_t sigma[] = {3.0, 3.0, 3.0};
+  edm_data_t bin_spacing[] = {0.9, 1.1, 1.4};
   int periodic[] = {1, 1, 1};
   DimmedGaussGrid<3> g (min, max, bin_spacing, periodic, 1, sigma);
   periodic[0]  = periodic[1] = periodic[2] = 0;
@@ -728,9 +728,9 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
   //add N gaussian
   int N = 20;
   int i;
-  double x[3];
-  double der[3];
-  double v;
+  edm_data_t x[3];
+  edm_data_t der[3];
+  edm_data_t v;
 
   //generate a random number
   for(i = 0; i < N; i++) {
@@ -766,19 +766,19 @@ BOOST_AUTO_TEST_CASE( gauss_grid_interp_test_mcgdp_3D ) {
 
 
 BOOST_AUTO_TEST_CASE( gauss_grid_integral_regression_1 ) {
-  double min[] = {0};
-  double max[] = {10};
-  double bin_spacing[] = {0.009765625};
-  double sigma[] = {0.1};
+  edm_data_t min[] = {0};
+  edm_data_t max[] = {10};
+  edm_data_t bin_spacing[] = {0.009765625};
+  edm_data_t sigma[] = {0.1};
   int periodic[] = {1};
   GaussGrid* g  = make_gauss_grid(1, min, max, bin_spacing, periodic, 1, sigma);
   periodic[0] = 1;
   g->set_boundary(min, max, periodic);
 
   //add gaussian that was failing
-  double x[] = {-3.91944};
-  double h = 1.0;
-  double bias_added = g->add_value(x, h);
+  edm_data_t x[] = {-3.91944};
+  edm_data_t h = 1.0;
+  edm_data_t bias_added = g->add_value(x, h);
 
   //unnormalized, so a little height scaling is necessary
   //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
@@ -802,10 +802,10 @@ struct EDMBiasTest {
   EDMBiasTest() : bias(EDM_SRC + "/sanity.edm") {
         
     bias.setup(1, 1);
-    double low[] = {0};
-    double high[] = {10};
+    edm_data_t low[] = {0};
+    edm_data_t high[] = {10};
     int p[] = {1};
-    double skin[] = {0};
+    edm_data_t skin[] = {0};
     bias.subdivide(low, high, low, high, p, skin);
     
   }     
@@ -816,9 +816,9 @@ struct EDMBiasTest {
 BOOST_FIXTURE_TEST_SUITE( edmbias_test, EDMBiasTest )
 
 BOOST_AUTO_TEST_CASE( edm_sanity ) {
-  double** positions = (double**) malloc(sizeof(double*));
-  positions[0] = (double*) malloc(sizeof(double));
-  double runiform[] = {1};
+  edm_data_t** positions = (edm_data_t**) malloc(sizeof(edm_data_t*));
+  positions[0] = (edm_data_t*) malloc(sizeof(edm_data_t));
+  edm_data_t runiform[] = {1};
   
   positions[0][0] = 5.0;
   bias.add_hills(1, positions, runiform);
@@ -831,7 +831,7 @@ BOOST_AUTO_TEST_CASE( edm_sanity ) {
   BOOST_REQUIRE(pow(bias.cum_bias_ - bias.hill_prefactor_, 2) < 0.001);
   
   //now  check that the forces point away from the hills
-  double der[0];
+  edm_data_t der[0];
   positions[0][0] = 4.99; //to the left
   bias.bias_->get_value_deriv(positions[0], der);
   //the negative of the bias (the force) should point to the left

@@ -40,15 +40,15 @@ class EDMBias {
    * MUSt CALL SETUP FIRST
    *
    **/
-  void subdivide(const double sublo[3], const double subhi[3], 
-		 const double boxlo[3], const double boxhi[3],
-		 const int b_periodic[3], const double skin[3]);
+  void subdivide(const edm_data_t sublo[3], const edm_data_t subhi[3], 
+		 const edm_data_t boxlo[3], const edm_data_t boxhi[3],
+		 const int b_periodic[3], const edm_data_t skin[3]);
 
 
   /** This must be called so that EDM can learn the temperature and kt
    *
    **/
-  void setup(double temperature, double boltzmann_constant);
+  void setup(edm_data_t temperature, edm_data_t boltzmann_constant);
     
   int read_input(const std::string& input_filename);
   /**
@@ -56,15 +56,15 @@ class EDMBias {
    * the forces of the arrays. apply_mask will be used to test against
    * the mask given in the set_mask method. Returns energy
    **/
-  double update_forces(int nlocal, const double* const* positions, double** forces, int apply_mask) const;
+  edm_data_t update_forces(int nlocal, const edm_data_t* const* positions, edm_data_t** forces, int apply_mask) const;
   /**
    * An array-based update_forces without a mask
    **/
-  double update_forces(int nlocal, const double* const* positions,  double** forces) const;
+  edm_data_t update_forces(int nlocal, const edm_data_t* const* positions,  edm_data_t** forces) const;
   /**
    * Update the force of a single position
    **/
-  double update_force(const double* positions,  double* forces) const;
+  edm_data_t update_force(const edm_data_t* positions,  edm_data_t* forces) const;
   /**
    * Set a mask that will be used for the add_hills/update_forces methods which can take a mask
    **/
@@ -73,11 +73,11 @@ class EDMBias {
    * Add hills using arrays. A precomputed array (different each time) needs to be
    * passed if stochastic sampling is done (otherwise NULL).
    **/
-  void add_hills(int nlocal, const double* const* positions, const double* runiform);
+  void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform);
   /**
    * Add hills using arrays and taking a mask.
    **/
-  void add_hills(int nlocal, const double* const* positions, const double* runiform, int apply_mask);
+  void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask);
 
   /**
    * A way to add hills one at a time. Call pre_add_hill first,
@@ -90,7 +90,7 @@ class EDMBias {
    *
    **/
   void pre_add_hill(int est_hill_count);
-  void add_hill(const double* position, double runiform);
+  void add_hill(const edm_data_t* position, edm_data_t runiform);
   void post_add_hill();
 
   /**
@@ -121,22 +121,22 @@ class EDMBias {
   int mpi_rank_; //my MPI rank
   int mpi_size_; //my MPI size
    int dim_;//the dimension
-  double global_tempering_;// global tempering threshold
-  double bias_factor_;
-  double boltzmann_factor_;
-  double temperature_;
-  double hill_prefactor_; //hill height prefactor
-  double hill_density_;// hills sampling density
-  double cum_bias_;//the current average bias  
-  double total_volume_;//total volume of grid
-  double expected_target_; //the expected value of the target factor
+  edm_data_t global_tempering_;// global tempering threshold
+  edm_data_t bias_factor_;
+  edm_data_t boltzmann_factor_;
+  edm_data_t temperature_;
+  edm_data_t hill_prefactor_; //hill height prefactor
+  edm_data_t hill_density_;// hills sampling density
+  edm_data_t cum_bias_;//the current average bias  
+  edm_data_t total_volume_;//total volume of grid
+  edm_data_t expected_target_; //the expected value of the target factor
 
   int b_outofbounds_; //true if this MPI instance will always be out of grid
 
-  double* bias_dx_; //bias spacing
-  double* bias_sigma_;
-  double* min_; //boundary minimum
-  double* max_; //boundary maximum
+  edm_data_t* bias_dx_; //bias spacing
+  edm_data_t* bias_sigma_;
+  edm_data_t* min_; //boundary minimum
+  edm_data_t* max_; //boundary maximum
   int* b_periodic_boundary_;//true if the boundaries are periodic
  
 
@@ -149,8 +149,8 @@ class EDMBias {
   int* mpi_neighbors_;//who my neighbors are
   
   //buffers for sending and receiving with neighbors
-  double send_buffer_[BIAS_BUFFER_DBLS];
-  double receive_buffer_[BIAS_BUFFER_DBLS];
+  edm_data_t send_buffer_[BIAS_BUFFER_DBLS];
+  edm_data_t receive_buffer_[BIAS_BUFFER_DBLS];
   unsigned int buffer_i_;
 
 
@@ -158,8 +158,8 @@ class EDMBias {
 
  private:
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
-  double temp_hill_cum_;
-  double temp_hill_prefactor_;
+  edm_data_t temp_hill_cum_;
+  edm_data_t temp_hill_prefactor_;
   int est_hill_count_;
 
   Grid* cv_hist_;//Histogram of observed collective variables
@@ -177,29 +177,29 @@ class EDMBias {
    * This code performs the actual adding of hills in the buffer OR it 
    * calls the GPU host method to invoke a GPU kernel to execute the hill add 
    */
-  double do_add_hills(const double* buffer, const size_t hill_number, char hill_type);
+  edm_data_t do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type);
 
   /*
    * This function will put the hills into our buffer of hills to 
    * add. The buffer will be flushed either when it's full or at the end
    * of the overall hill-add step.
    */
-  void queue_add_hill(const double* position, double this_h);
+  void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
 
     
   EDMBias(const EDMBias& that);//just disable copy constructor
-  void output_hill(const double* position, double height, double bias_added, char type);
+  void output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type);
   /* This will update the height, optionally with tempering. It also
    * will reduce across all processes the average height so that we
    * know if global tempering is necessary.
    *
    */
-  void update_height(double bias_added);
+  void update_height(edm_data_t bias_added);
 
   /*
    * Find out which other MPI processes I need to communicate with for add_hills
    */
-  void infer_neighbors(const int* b_periodic, const double* skin);
+  void infer_neighbors(const int* b_periodic, const edm_data_t* skin);
   /*
    * Sort my neighbors into a non-blocking schedule
    */
@@ -209,7 +209,7 @@ class EDMBias {
    * These two methods are used to send hills to my neighobrs
    */
   int check_for_flush();
-  double flush_buffers(int snyched);
+  edm_data_t flush_buffers(int snyched);
 
   /*
    * Convienence method to stride whitespace from a string.

@@ -22,7 +22,7 @@
 
 
 HOST_DEV inline
-double sigmoid(double x) {
+edm_data_t sigmoid(edm_data_t x) {
   if(x < 0)
     return 1;
   if(x > 1)
@@ -31,7 +31,7 @@ double sigmoid(double x) {
 }
 
 HOST_DEV inline
-double sigmoid_dx(double x) {
+edm_data_t sigmoid_dx(edm_data_t x) {
   if(x < 0)
     return 0;
   if(x > 1)
@@ -52,14 +52,14 @@ namespace EDM{
      **/
   public:
     virtual ~GaussGrid() {};
-    virtual  double add_value(const double* x, double height) = 0;
-    virtual void set_boundary(const double* min, const double* max, const int* b_periodic) = 0;
-    virtual double get_volume() const = 0;
-    virtual  int in_bounds(const double* x) const = 0;
+    virtual  edm_data_t add_value(const edm_data_t* x, edm_data_t height) = 0;
+    virtual void set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) = 0;
+    virtual edm_data_t get_volume() const = 0;
+    virtual  int in_bounds(const edm_data_t* x) const = 0;
     virtual void multi_write (const std::string& filename) const = 0;
     virtual void multi_write(const std::string& filename, 
-			     const double* box_low, 
-			     const double* box_high, 
+			     const edm_data_t* box_low, 
+			     const edm_data_t* box_high, 
 			     const int* b_periodic,
 			     int b_lammps_format) const = 0;
     /**
@@ -75,12 +75,12 @@ namespace EDM{
      *
      **/
   public:
-  DimmedGaussGrid(const double* min, 
-		  const double* max, 
-		  const double* bin_spacing, 
+  DimmedGaussGrid(const edm_data_t* min, 
+		  const edm_data_t* max, 
+		  const edm_data_t* bin_spacing, 
 		  const int* b_periodic, 
 		  int b_interpolate,
-		  const double* sigma) : grid_(min, max, bin_spacing, b_periodic,
+		  const edm_data_t* sigma) : grid_(min, max, bin_spacing, b_periodic,
 					       1, b_interpolate), b_dirty_bounds(0){
       //the 1 means we always use derivatives for a gaussian grid
     
@@ -102,7 +102,7 @@ namespace EDM{
     /**
      * Rebuild from a file. Files don't store sigma, so it must be set again.
      **/
-  DimmedGaussGrid(const std::string& filename, const double* sigma) : grid_(filename), b_dirty_bounds(0) {
+  DimmedGaussGrid(const std::string& filename, const edm_data_t* sigma) : grid_(filename), b_dirty_bounds(0) {
       size_t i;
       for(i = 0; i < DIM; i++) {
 	sigma_[i] = sigma[i] * sqrt(2.);
@@ -116,12 +116,12 @@ namespace EDM{
       //nothing
     }
 
-    double get_value(const double* x) const {
+    edm_data_t get_value(const edm_data_t* x) const {
 
       size_t i;
 
       //for constness
-      double xx[DIM];
+      edm_data_t xx[DIM];
       for(i = 0; i < DIM; i++)
 	xx[i] = x[i];
 
@@ -135,12 +135,12 @@ namespace EDM{
       return grid_.get_value(xx);
     }//get_value
 
-    double get_value_deriv(const double* x, double* der) const{
+    edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const{
 
       size_t i;
 
       //for constness
-      double xx[DIM];
+      edm_data_t xx[DIM];
       for(i = 0; i < DIM; i++)
 	xx[i] = x[i];
 
@@ -178,8 +178,8 @@ namespace EDM{
 
 
     void multi_write(const std::string& filename, 
-		     const double* box_low, 
-		     const double* box_high, 
+		     const edm_data_t* box_low, 
+		     const edm_data_t* box_high, 
 		     const int* b_periodic,
 		     int b_lammps_format) const {
       grid_.multi_write(filename, box_low, box_high, b_periodic, 0);
@@ -193,29 +193,29 @@ namespace EDM{
     /**
      * The workhorse method of the program. The source is very well-documented
      **/
-    double  add_value(const double* x0, double height) {
+    edm_data_t  add_value(const edm_data_t* x0, edm_data_t height) {
 
       size_t i,j;
 
       int index[DIM];//some temp local index, possibly negative
       int index1; //some temp collapsed index, possibly negative
 
-      double xx[DIM]; //points away from hill center but affected by addition
+      edm_data_t xx[DIM]; //points away from hill center but affected by addition
       size_t xx_index[DIM];//The grid index that corresponds to xx
       size_t xx_index1;//The collapsed grid index that corresponds to xx
       int x_index[DIM];//The grid index that corresponds to the hill center, possibly negative for points outside grid
       int b_flag; //a flag
-      double dp[DIM]; //essentially distance vector, changes in course of calculation
-      double dp2; //essentially magnitude of distance vector, changes in course of calculation
-      double expo; //exponential portion used in calculation
-      double bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
-      double vol_element = 1;//integration volume element
+      edm_data_t dp[DIM]; //essentially distance vector, changes in course of calculation
+      edm_data_t dp2; //essentially magnitude of distance vector, changes in course of calculation
+      edm_data_t expo; //exponential portion used in calculation
+      edm_data_t bias_added = 0;// amount of bias added to the system as a result. decreases due to boundaries
+      edm_data_t vol_element = 1;//integration volume element
 
-      double bc_denom; //Boundary correction denominator
-      double bc_correction;
-      double bc_force[DIM]; //Boundary correction force denominator
+      edm_data_t bc_denom; //Boundary correction denominator
+      edm_data_t bc_correction;
+      edm_data_t bc_force[DIM]; //Boundary correction force denominator
       size_t bc_index; //Boundary correction index
-      double temp1, temp2, temp3, temp4, temp5, temp6, temp7;
+      edm_data_t temp1, temp2, temp3, temp4, temp5, temp6, temp7;
 
       //get volume element for bias integration
       for(i = 0; i < DIM; i++) {
@@ -223,7 +223,7 @@ namespace EDM{
       }
 
       //switch to non-const so we can wrap
-      double x[DIM];
+      edm_data_t x[DIM];
       for(i = 0; i < DIM; i++)
 	x[i] = x0[i];
 
@@ -395,10 +395,10 @@ namespace EDM{
      * Specifying the period here means that we can wrap points along
      * the boundary, not necessarily along the grid bounds
      **/
-    void set_boundary(const double* min, const double* max, const int* b_periodic) {
+    void set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
       size_t i,j;
-      double s;
-      double tmp1,tmp2,tmp3;
+      edm_data_t s;
+      edm_data_t tmp1,tmp2,tmp3;
 
       b_dirty_bounds = 0;
 
@@ -454,8 +454,8 @@ namespace EDM{
     
     }//set_boundary
 
-    double get_volume() const {
-      double vol = 1;
+    edm_data_t get_volume() const {
+      edm_data_t vol = 1;
       size_t i;
       for(i = 0; i < DIM; i++) {
 	vol *= boundary_max_[i] - boundary_min_[i];
@@ -467,35 +467,35 @@ namespace EDM{
       grid_.one2multi(index, result);
     }//one2multi
 
-    double* get_grid() {
+    edm_data_t* get_grid() {
       return grid_.get_grid();
     }//get_grid()
 
-    const double* get_dx() const{
+    const edm_data_t* get_dx() const{
       return grid_.get_dx();
     }//get_dx
 
-    const double* get_min() const{
+    const edm_data_t* get_min() const{
       return grid_.get_min();
     }//get_min
 
-    const double* get_max() const{
+    const edm_data_t* get_max() const{
       return grid_.get_max();
     }//get_max
 
-    double max_value() const {
+    edm_data_t max_value() const {
       return grid_.max_value();
     }//max_value
 
-    double min_value() const {
+    edm_data_t min_value() const {
       return grid_.min_value();
     }//min_value
 
-    void add(const Grid* other, double scale, double offset) {
+    void add(const Grid* other, edm_data_t scale, edm_data_t offset) {
       grid_.add(other, scale, offset);
     }//add
 
-    double expected_bias() const {
+    edm_data_t expected_bias() const {
       return grid_.expected_bias();
     }//expected_bias
 
@@ -507,7 +507,7 @@ namespace EDM{
       return grid_.get_grid_size();
     }//get_grid_size
 
-    int in_bounds(const double x[DIM]) const {
+    int in_bounds(const edm_data_t x[DIM]) const {
 
       size_t i;
       for(i = 0; i < DIM; i++) {
@@ -521,9 +521,9 @@ namespace EDM{
     /**
      * Possibly wrap a value across the system boundaries to be as close as possible to the grid
      **/
-    void remap(double x[DIM]) const {
+    void remap(edm_data_t x[DIM]) const {
     
-      double dp[2];
+      edm_data_t dp[2];
       size_t i;
 
       //this is a special wrapping. We want to find the nearest image, not the minimal image
@@ -562,13 +562,13 @@ namespace EDM{
 
     size_t minisize_[DIM];// On DIM-dimensional grid, how far we must search before gaussian decays enough to ignore
     size_t minisize_total_; //On reduced grid, how far we must search before gaussian decays enough to ignore
-    double sigma_[DIM];//gaussian sigma
-    double boundary_min_[DIM]; //optional boundary minmimum
-    double boundary_max_[DIM]; //optional boundary maximum
+    edm_data_t sigma_[DIM];//gaussian sigma
+    edm_data_t boundary_min_[DIM]; //optional boundary minmimum
+    edm_data_t boundary_max_[DIM]; //optional boundary maximum
     int b_periodic_boundary_[DIM];//optional, this means the explicitly set boundary is treated as periodic
     DimmedGrid<DIM> grid_; //the underlying grid
-    double bc_denom_table_[DIM][BC_TABLE_SIZE];
-    double bc_denom_deriv_table_[DIM][BC_TABLE_SIZE];
+    edm_data_t bc_denom_table_[DIM][BC_TABLE_SIZE];
+    edm_data_t bc_denom_deriv_table_[DIM][BC_TABLE_SIZE];
 
 
     //these need to be protected b/c we need access to them with the derived GPU class
@@ -579,7 +579,7 @@ namespace EDM{
      **/
     void update_minigrid() {
       size_t i;
-      double dist;
+      edm_data_t dist;
 
       minisize_total_ = 1;
       for(i = 0; i < DIM; i++) {
@@ -655,17 +655,17 @@ namespace EDM{
  * Used to avoid template constructors
  **/
   GaussGrid* make_gauss_grid( int dim, 
-			      const double* min, 
-			      const double* max, 
-			      const double* bin_spacing, 
+			      const edm_data_t* min, 
+			      const edm_data_t* max, 
+			      const edm_data_t* bin_spacing, 
 			      const int* b_periodic, 
 			      int b_interpolate,
-			      const double* sigma);
+			      const edm_data_t* sigma);
 
 /**
  * Used to avoid template constructors
  **/
-  GaussGrid* read_gauss_grid( int dim, const std::string& filename, const double* sigma);
+  GaussGrid* read_gauss_grid( int dim, const std::string& filename, const edm_data_t* sigma);
 
 }//namespace EDM
 #endif //GAUSS_GRID_H_

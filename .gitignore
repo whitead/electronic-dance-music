@@ -42,6 +42,9 @@ build/*
 #Images
 *.png
 
+#ipython notebook checkpoints
+**/.ipynb_checkpoints/*
+
 #My workaround files
 .rebuild
 .remake
