@@ -89,6 +89,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
   }
 
   edm_data_t point[3];
+  edm_data_t denom;
   for(int i = 0; i < g.grid_number_[0]; i++) {
     point[0] = i * g.dx_[0] + g.min_[0] + EPSILON;
     array[0] = i;
@@ -98,8 +99,8 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
       for(int k = 0; k < g.grid_number_[2]; k++) {
 	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
 	array[2] = k;
-
-	BOOST_REQUIRE(pow(g.get_value(point) - g.grid_[g.multi2one(array)],2) < 0.0000001);
+	denom = g.get_value(point) > EPSILON ? g.get_value(point) : edm_data_t(1.0);
+	BOOST_REQUIRE((g.get_value(point) - g.grid_[g.multi2one(array)])/edm_data_t(1.0) < 0.0000001);
       }
     }
   }  
@@ -108,7 +109,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
 BOOST_AUTO_TEST_CASE( grid_1d_read ) {
   DimmedGrid<1> g(GRID_SRC + "/1.grid");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
-  BOOST_REQUIRE_EQUAL(g.max_[0], 2.5 + g.dx_[0]);
+  BOOST_REQUIRE((g.max_[0] -  (2.5 + g.dx_[0]))/g.max_[0]);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }
@@ -794,7 +795,7 @@ BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
   BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
-}
+}//edm_bias_reader
 
 
 
