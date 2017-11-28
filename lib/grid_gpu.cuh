@@ -259,7 +259,7 @@ namespace EDM{
 
       if(!input.is_open()) {      
 	cerr << "Cannot open input file \"" << filename <<"\"" <<  endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       }
 
       // read plumed-style header
@@ -267,7 +267,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("FORCE") != 0) {
 	cerr << "Mangled grid file: " << filename << "No FORCE found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	input >> b_derivatives_;
       }
@@ -280,7 +280,7 @@ namespace EDM{
 	input >> i;
 	if(i != DIM) {
 	  cerr << "Dimension of this grid does not match the one found in the file" << endl;
-	  edm_error("", "grid.h:read");
+	  edm_error("", "grid_gpu.cuh:read");
 
 	}
       }
@@ -288,7 +288,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("TYPE") != 0) {
 	cerr << "Mangled grid file: " << filename << " No TYPE found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> j;
@@ -301,7 +301,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("BIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> grid_number_[i];
@@ -311,7 +311,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("MIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> min_[i];
@@ -321,7 +321,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("MAX") != 0) {
 	cerr << "Mangled grid file: " << filename << " No MAX found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> max_[i];
@@ -331,7 +331,7 @@ namespace EDM{
       input >> word >> word;
       if(word.compare("PBC") != 0) {
 	cerr << "Mangled grid file: " << filename << " No PBC found" << endl;
-	edm_error("", "grid.h:read");
+	edm_error("", "grid_gpu.cuh:read");
       } else {
 	for(i = 0; i < DIM; i++) {
 	  input >> b_periodic_[i];
@@ -419,13 +419,13 @@ namespace EDM{
       return grid_[multi2one(index)];
     }
 
-//    edm_data_t* grid_;
-//    edm_data_t* grid_deriv_;
+    //edm_data_t* grid_;
+    //edm_data_t* grid_deriv_;
     int* d_grid_number_;//device grid number arr
     int* d_b_derivatives_;//device 'bool' for whether we're using derivatives
     int* d_b_interpolate_;//device 'bool' for whether we're interpolating
 
-//need to tell compiler where to find these since we have a derived templated class.
+    //need to tell compiler where to find these since we have a derived templated class.
     using DimmedGrid<DIM>::grid_size_;
     using DimmedGrid<DIM>::b_derivatives_;
     using DimmedGrid<DIM>::b_interpolate_;

@@ -36,7 +36,7 @@ class EDMBias {
 
   EDMBias(const std::string& input_filename);
   ~EDMBias();
-  /** Create a grid that only occupies enough space for this processes local box.
+  /** Create a grid that only occupies enough space for this process' local box.
    * MUSt CALL SETUP FIRST
    *
    **/

@@ -58,7 +58,7 @@ namespace EDM{
     }
 
     HOST_DEV void do_remap(edm_data_t x[DIM]) const {
-#ifdef __CUDACC__
+    #ifdef __CUDACC__
       edm_data_t dp[2];
       size_t i;
 
@@ -94,15 +94,15 @@ namespace EDM{
 	}
       }
       return;
-#else
+    #else
       remap(x);
-#endif //CUDACC
+    #endif //CUDACC
       
     }//do_remap
 
 
     HOST_DEV void do_set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
-#ifdef __CUDACC__
+    #ifdef __CUDACC__
       //do the set_boundary on GPU
       size_t i,j;
       edm_data_t s;
@@ -128,28 +128,28 @@ namespace EDM{
 		erf((boundary_max_[i] - s) / sigma_[i]));
 
 	    bc_denom_table_[i][j] = tmp1;
-#ifdef BC_CORRECTION
+    #ifdef BC_CORRECTION
 	    tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
 
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
-#endif
+    #endif
 	    //mcgovern-de pablo contribution derivative
 	    tmp3 = 1. * 
 	      (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
 	       exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
 
 	    bc_denom_deriv_table_[i][j] = tmp3;
-#ifdef BC_CORRECTION
+    #ifdef BC_CORRECTION
 	    bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
 	      sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
-#endif
+    #endif
 	    if(j > 2) {
 	      //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	    }
@@ -160,9 +160,9 @@ namespace EDM{
 	}
       }
       return;
-#else
+    #else
       set_boundary(min, max, b_periodic);
-#endif //CUDACC
+    #endif //CUDACC
 
     }//do_set_boundary
     
@@ -195,28 +195,28 @@ namespace EDM{
 		erf((boundary_max_[i] - s) / sigma_[i]));
 
 	    bc_denom_table_[i][j] = tmp1;
-#ifdef BC_CORRECTION
+  #ifdef BC_CORRECTION
 	    tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
 
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
-#endif
+  #endif
 	    //mcgovern-de pablo contribution derivative
 	    tmp3 = 1. * 
 	      (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
 	       exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
 
 	    bc_denom_deriv_table_[i][j] = tmp3;
-#ifdef BC_CORRECTION
+  #ifdef BC_CORRECTION
 	    bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
 	      sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
-#endif
+  #endif
 	    if(j > 2) {
 	      //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	    }
@@ -230,7 +230,7 @@ namespace EDM{
     }
 
     HOST_DEV void do_duplicate_boundary(){
-#ifdef __CUDACC__
+  #ifdef __CUDACC__
       size_t i,j,k,l;
       size_t index_outter[DIM], index_bound[DIM];
       size_t min_i[DIM], max_i[DIM];
@@ -296,13 +296,13 @@ namespace EDM{
     
       
       return;
-#else
+  #else
       duplicate_boundary();
-#endif//CUDACC
+  #endif//CUDACC
     }//do_duplicate_boundary
 
     HOST_DEV edm_data_t do_add_value(const edm_data_t* x0, edm_data_t height) {
-#ifdef __CUDACC__ //device version
+        #ifdef __CUDACC__ //device version
       size_t i,j;
 
       int index[DIM];//some temp local index, possibly negative
@@ -441,9 +441,9 @@ namespace EDM{
 		temp3 = exp(-pow(x[j] - boundary_max_[j], 2) / (pow(sigma_[j],2)));
 		temp4 = sigmoid((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR));
 
-#ifdef BC_CORRECTION
+  #ifdef BC_CORRECTION
 		bc_correction = (temp1  - expo ) * temp2 + (temp3 - expo ) * temp4;
-#endif
+  #endif
 		bc_denom *= bc_denom_table_[j][bc_index];
 	    
 		//dp has been divided by sigma once already
@@ -454,12 +454,12 @@ namespace EDM{
 		//this is just the force of the uncorrected
 		bc_force[j] = temp5 * expo;
 
-#ifdef BC_CORRECTION
+  #ifdef BC_CORRECTION
 		bc_force[j] +=  (temp1 - expo) * temp6 - 
 		  temp5 * expo * temp2 + 
 		  (temp3 - expo) * temp7  -
 		  temp5 * expo * temp4;
-#endif
+  #endif
 
 		bc_force[j] = bc_force[j] * bc_denom - bc_denom_deriv_table_[j][bc_index] * (expo + bc_correction);	    
 		bc_force[j] /= bc_denom * bc_denom;
@@ -501,10 +501,10 @@ namespace EDM{
       return bias_added;
     
       //return(0);
-#else
+      #else
       return(add_value(x0, height));
 
-#endif//CUDACC
+      #endif//CUDACC
     }//do_add_value
 
 
@@ -530,9 +530,9 @@ namespace EDM{
     DimmedGridGPU<DIM> grid_;//the underlying grid is a GPU-able grid
   };//DimmedGaussGridGPU class
   
-/**
- * Used to avoid template constructors
- **/
+  /**
+   * Used to avoid template constructors
+   **/
   GaussGrid* make_gauss_grid_gpu( int dim, 
 				  const edm_data_t* min, 
 				  const edm_data_t* max, 
@@ -541,9 +541,9 @@ namespace EDM{
 				  int b_interpolate,
 				  const edm_data_t* sigma);
 
-/**
- * Used to avoid template constructors
- **/
+  /**
+   * Used to avoid template constructors
+   **/
   GaussGrid* read_gauss_grid_gpu( int dim, const std::string& filename, const edm_data_t* sigma);
 
 }
@@ -597,4 +597,4 @@ namespace EDM_Kernels{
 
 }
 
-#endif //GPU_GAUSS_GRID_CH_
+  #endif //GPU_GAUSS_GRID_CH_

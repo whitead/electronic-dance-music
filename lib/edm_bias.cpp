@@ -107,7 +107,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
 			const int b_periodic[3],
 			const edm_data_t skin[3]) {
 
-#ifdef EDM_MPI_DEBUG
+  #ifdef EDM_MPI_DEBUG
   if(mpi_rank_ == 2) {
     volatile int i = 0;
     char hostname[256];
@@ -119,7 +119,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
   }
   
 
-#endif
+  #endif
 
 
   //has subdivide already been called?
@@ -172,7 +172,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
     bias_->add(initial_bias_, 1.0, 0.0);
   
 
-#ifndef EDM_SERIAL
+  #ifndef EDM_SERIAL
   infer_neighbors(b_periodic, skin);
 
   //make hill density a per-system measurement not per replica
@@ -199,7 +199,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
 
 
   
-#endif
+  #endif
   
   if(bounds_flag) {
     //we do this after so that we have a grid to at least write out

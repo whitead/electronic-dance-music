@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
 	point[2] = k * g.dx_[2] + g.min_[2] + EPSILON;
 	array[2] = k;
 	denom = g.get_value(point) > EPSILON ? g.get_value(point) : edm_data_t(1.0);
-	BOOST_REQUIRE((g.get_value(point) - g.grid_[g.multi2one(array)])/edm_data_t(1.0) < 0.0000001);
+	BOOST_REQUIRE((g.get_value(point) - g.grid_[g.multi2one(array)])/denom < 0.0000001);
       }
     }
   }  

@@ -15,6 +15,7 @@
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 #define GRID_SRC std::string(STR(TEST_GRID_SRC))
+#define EDM_SRC std::string(STR(TEST_EDM_SRC))
 
 #include <boost/timer/timer.hpp>
 #include <boost/chrono.hpp>
@@ -132,7 +133,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity ){
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaMemcpy(array, d_array, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
 	gpuErrchk(cudaMemcpy(temp, d_temp, 3*sizeof(size_t), cudaMemcpyDeviceToHost));
-//	gpuErrchk(cudaDeviceSynchronize());
+	//gpuErrchk(cudaDeviceSynchronize());
 	BOOST_REQUIRE_EQUAL(array[0], temp[0]);
 	BOOST_REQUIRE_EQUAL(array[1], temp[1]);
 	BOOST_REQUIRE_EQUAL(array[2], temp[2]);
@@ -1395,14 +1396,14 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
 
 }//gpu_gauss_grid_integral_regression_1
 
-/*BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
-  EDMBias bias(EDM_SRC + "/read_test.edm");
+BOOST_AUTO_TEST_CASE( edm_bias_reader ) {
+  EDMBiasGPU bias(EDM_SRC + "/read_test.edm");//looks like this works just fine inheriting everything...?
   BOOST_REQUIRE_EQUAL(bias.dim_, 2);
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
   BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
 }//edm_gpu_bias_reader
-*/
+
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
   
