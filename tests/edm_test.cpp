@@ -16,7 +16,7 @@
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 #define GRID_SRC std::string(STR(TEST_GRID_SRC))
-#define EDM_SRC std::string(STR(TEST_EDM_SRC))
+#define EDM_SRC std::string(STR(TEST_EDM_SRC))//defined in the CMakeLists.txt in /tests/
 
 using namespace boost;
 using namespace EDM;

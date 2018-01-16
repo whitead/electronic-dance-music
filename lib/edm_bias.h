@@ -25,8 +25,23 @@
 #define ADD_UNDO_HILL 'u'
 #define BUFF_ZERO_HILL 'z'
 
+namespace std {
+  extern istream& operator >> (istream& is, pair<string, string>& ps);
+  
+  extern ostream& operator << (ostream& os, const pair<const string, string>& ps);
+  
+}
+
+
 namespace EDM{ 
 
+  extern int extract_edm_data_t(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result);
+
+  extern int extract_edm_data_t_array(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result, int length);
+
+  extern int extract_int(const std::string& key, std::map<std::string, std::string> map, int required, int* result);
+  
+  
 class EDMBias {
   /** The EDM bias class. The main biasing class
    *
@@ -156,6 +171,12 @@ class EDMBias {
 
   std::ofstream hill_output_;//hill writing
 
+  /*
+   * Convienence method to stride whitespace from a string.
+   */
+  std::string clean_string(const std::string& input, int append_rank);
+
+
  private:
   //these are used for the pre_add_hill, add_hill, post_add_hill sequence 
   edm_data_t temp_hill_cum_;
@@ -211,10 +232,6 @@ class EDMBias {
   int check_for_flush();
   edm_data_t flush_buffers(int snyched);
 
-  /*
-   * Convienence method to stride whitespace from a string.
-   */
-  std::string clean_string(const std::string& input, int append_rank);
 
 
 };

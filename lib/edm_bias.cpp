@@ -1,7 +1,6 @@
+#include "edm_bias.h"
 #include <cuda_runtime.h>
 #include <cuda.h>
-#include "edm_bias.h"
-
 #include <cmath>
 #include <iterator>
 #include <sstream>
@@ -21,6 +20,57 @@
 #else
 #define MPI_EDM_DATA_T MPI_FLOAT
 #endif//USE_DOUBLES
+
+namespace EDM{
+
+  int extract_edm_data_t(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result) {
+
+    if(map.find(key) != map.end()) {
+      *result = atof(map.at(key).c_str());
+      if(*result == 0.0) {
+	std::cerr << "Invalid value found for " << key << " (" << result << ")" << std::endl;    
+	return 0;
+      }
+      return 1;
+    
+    } else{
+      if(required)
+	std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;    
+    }
+
+    return 0;
+  
+  }
+
+  int extract_edm_data_t_array(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result, int length) {
+
+    if(map.find(key) != map.end()) {
+      std::istringstream is(map.at(key));
+      for(int i = 0; i < length; i++)
+	is >> result[i];
+      return 1;    
+    } else{
+      if(required)
+	std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;
+    }
+
+    return 0;
+  
+  }
+
+  int extract_int(const std::string& key, std::map<std::string, std::string> map, int required, int* result) {
+
+    if(map.find(key) != map.end()) {
+      *result = atoi(map.at(key).c_str());    
+      return 1;
+    } else{
+      if(required)
+	std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;    
+    }
+    return 0;
+  
+  }
+}
 
 //Some stuff for reading in files quickly 
 namespace std {
@@ -777,54 +827,6 @@ void EDM::EDMBias::update_height(edm_data_t bias_added) {
   #endif
   cum_bias_ += other_bias;
 		
-}
-
-int extract_edm_data_t(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result) {
-
-  if(map.find(key) != map.end()) {
-    *result = atof(map.at(key).c_str());
-    if(*result == 0.0) {
-      std::cerr << "Invalid value found for " << key << " (" << result << ")" << std::endl;    
-      return 0;
-    }
-    return 1;
-    
-  } else{
-    if(required)
-      std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;    
-  }
-
-  return 0;
-  
-}
-
-int extract_edm_data_t_array(const std::string& key, std::map<std::string, std::string> map, int required, edm_data_t* result, int length) {
-
-  if(map.find(key) != map.end()) {
-    std::istringstream is(map.at(key));
-    for(int i = 0; i < length; i++)
-      is >> result[i];
-    return 1;    
-  } else{
-    if(required)
-      std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;
-  }
-
-  return 0;
-  
-}
-
-int extract_int(const std::string& key, std::map<std::string, std::string> map, int required, int* result) {
-
-  if(map.find(key) != map.end()) {
-    *result = atoi(map.at(key).c_str());    
-    return 1;
-  } else{
-    if(required)
-      std::cerr << "Could not find key " << key << " (" << result << ")" << std::endl;    
-  }
-  return 0;
-  
 }
 
 

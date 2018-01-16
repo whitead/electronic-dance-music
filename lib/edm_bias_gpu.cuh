@@ -58,6 +58,12 @@ namespace EDM{
     EDMBiasGPU(const std::string& input_filename);
     ~EDMBiasGPU();
 
+    int read_input(const std::string& input_filename);
+  private:
+    //histogram output
+    std::string hist_output_;
+
+
   };
 
 }
