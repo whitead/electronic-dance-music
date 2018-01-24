@@ -26,7 +26,7 @@ namespace EDM{
 
   template< int DIM>
   class DimmedGaussGridGPU : public DimmedGaussGrid<DIM>{
-    /** A class for treating grids that have gaussians on it 
+    /** A GPU class for treating grids that have gaussians on them
      *
      *
      **/
@@ -474,8 +474,8 @@ namespace EDM{
       
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
-//	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
-	    grid_.grid_[xx_index1] += height * (expo + bc_correction);
+	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
+//	    grid_.grid_[xx_index1] += height * (expo + bc_correction);
 	    bias_added += height * (expo + bc_correction) * vol_element;
 	    for(j = 0; j < DIM; j++) {
 	      if(b_periodic_boundary_[j])

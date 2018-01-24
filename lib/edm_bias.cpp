@@ -123,7 +123,7 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
   read_input(input_filename);
 }
   
-  EDM::EDMBias::~EDMBias() {
+EDM::EDMBias::~EDMBias() {
   if(target_ != NULL)
     delete target_;
   if(bias_ != NULL)
@@ -151,13 +151,13 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
 //determines the acutal b_periodic
 
 void EDM::EDMBias::subdivide(const edm_data_t sublo[3], 
-			const edm_data_t subhi[3], 
-			const edm_data_t boxlo[3],
-			const edm_data_t boxhi[3],
-			const int b_periodic[3],
-			const edm_data_t skin[3]) {
+			     const edm_data_t subhi[3], 
+			     const edm_data_t boxlo[3],
+			     const edm_data_t boxhi[3],
+			     const int b_periodic[3],
+			     const edm_data_t skin[3]) {
 
-  #ifdef EDM_MPI_DEBUG
+#ifdef EDM_MPI_DEBUG
   if(mpi_rank_ == 2) {
     volatile int i = 0;
     char hostname[256];
@@ -169,7 +169,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
   }
   
 
-  #endif
+#endif
 
 
   //has subdivide already been called?
@@ -222,7 +222,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
     bias_->add(initial_bias_, 1.0, 0.0);
   
 
-  #ifndef EDM_SERIAL
+#ifndef EDM_SERIAL
   infer_neighbors(b_periodic, skin);
 
   //make hill density a per-system measurement not per replica
@@ -249,7 +249,7 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
 
 
   
-  #endif
+#endif
   
   if(bounds_flag) {
     //we do this after so that we have a grid to at least write out
@@ -267,11 +267,11 @@ void EDM::EDMBias::subdivide(const edm_data_t sublo[3],
   edm_data_t vol = bias_->get_volume();
   total_volume_ = 0;
 
-  #ifndef EDM_SERIAL
+#ifndef EDM_SERIAL
   MPI_Allreduce(&vol, &other_vol, 1, MPI_EDM_DATA_T, MPI_SUM, MPI_COMM_WORLD);
-  #else
+#else
   other_vol = vol;
-  #endif
+#endif
   total_volume_ += other_vol;
 
 }
@@ -394,8 +394,8 @@ void EDM::EDMBias::pre_add_hill(int est_hill_count) {
     if(global_tempering_ > 0)
       if(cum_bias_ / total_volume_ >= global_tempering_)
 	temp_hill_prefactor_ *= exp(-(cum_bias_ / total_volume_ - 
-		   global_tempering_) / 
-		 (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
+				      global_tempering_) / 
+				    (global_tempering_ * (bias_factor_ - 1) * boltzmann_factor_));                   
 
     temp_hill_cum_ = 0;
     hills_added_ = 0;
@@ -489,31 +489,31 @@ void EDM::EDMBias::post_add_hill() {
 
 void EDM::EDMBias::output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type) {
    
-   size_t i;
+  size_t i;
    
-   hill_output_ << std::setprecision(8) << std::fixed;
-   hill_output_ << steps_ << " ";
-   hill_output_ << type << " ";
-   hill_output_ << hills_added_ << " ";
-   for(i = 0; i < dim_; i++)  {
-     hill_output_ << position[i] << " ";
-   }
-   hill_output_ << height << " ";
-   hill_output_ << bias_added << " ";
-   hill_output_ << cum_bias_ / total_volume_ << std::endl;
+  hill_output_ << std::setprecision(8) << std::fixed;
+  hill_output_ << steps_ << " ";
+  hill_output_ << type << " ";
+  hill_output_ << hills_added_ << " ";
+  for(i = 0; i < dim_; i++)  {
+    hill_output_ << position[i] << " ";
+  }
+  hill_output_ << height << " ";
+  hill_output_ << bias_added << " ";
+  hill_output_ << cum_bias_ / total_volume_ << std::endl;
 
-   //histogram it
-   if(type == NEIGH_HILL ||
-      type == BUFF_HILL ||
-      type == ADD_HILL) {
-     cv_hist_->add_value(position, 1);
-   } else if(type == ADD_UNDO_HILL ||
-	     type == BUFF_UNDO_HILL) {
-     //undo histogram
-     cv_hist_->add_value(position, -1);
-   }
+  //histogram it
+  if(type == NEIGH_HILL ||
+     type == BUFF_HILL ||
+     type == ADD_HILL) {
+    cv_hist_->add_value(position, 1);
+  } else if(type == ADD_UNDO_HILL ||
+	    type == BUFF_UNDO_HILL) {
+    //undo histogram
+    cv_hist_->add_value(position, -1);
+  }
    
- }
+}
 
 int EDM::EDMBias::check_for_flush() {//this is fine??
   
@@ -606,86 +606,86 @@ edm_data_t EDM::EDMBias::flush_buffers(int synched) {
 
 void EDM::EDMBias::infer_neighbors(const int* b_periodic, const edm_data_t* skin) {
 
-   //now the hard part, we need to infer the domain decomposition topology
-   size_t i,j;
-   edm_data_t* bounds = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_ * 2);
-   int dim_overlap; //if somethig overlaps in all dimensions
+  //now the hard part, we need to infer the domain decomposition topology
+  size_t i,j;
+  edm_data_t* bounds = (edm_data_t*) malloc(sizeof(edm_data_t) * dim_ * 2);
+  int dim_overlap; //if somethig overlaps in all dimensions
    
 
-   if(mpi_neighbors_ != NULL)
-     free(mpi_neighbors_);
+  if(mpi_neighbors_ != NULL)
+    free(mpi_neighbors_);
 
-   mpi_neighbors_ = (int*) malloc(sizeof(int) * mpi_size_);
-   for(i = 0; i < mpi_size_; i++) 
-     mpi_neighbors_[i] = NO_COMM_PARTNER;
+  mpi_neighbors_ = (int*) malloc(sizeof(int) * mpi_size_);
+  for(i = 0; i < mpi_size_; i++) 
+    mpi_neighbors_[i] = NO_COMM_PARTNER;
 
-   for(i = 0; i < mpi_size_; i++) {   //for each rank 
+  for(i = 0; i < mpi_size_; i++) {   //for each rank 
 
-     if(mpi_rank_ == i) {//it's my turn to broadcast my boundaries
+    if(mpi_rank_ == i) {//it's my turn to broadcast my boundaries
 
-       for(j = 0; j < dim_; j++) {//pack up my bounds
-	 bounds[j*2] = bias_->get_min()[j];
-	 bounds[j*2 + 1] = bias_->get_max()[j];
-       }
-       MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
+      for(j = 0; j < dim_; j++) {//pack up my bounds
+	bounds[j*2] = bias_->get_min()[j];
+	bounds[j*2 + 1] = bias_->get_max()[j];
+      }
+      MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
 
-     }  else {
-       MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
+    }  else {
+      MPI_Bcast(bounds, dim_ * 2, MPI_EDM_DATA_T, i, MPI_COMM_WORLD);
        
-       //check if this could be a neighbor
-       dim_overlap = 0;
-       for(j = 0; j < dim_; j++) {
-	 //check if their min is within our bounds
-	 if(bounds[j * 2] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
-	    bounds[j * 2] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
-	   dim_overlap++;
-	   continue;
-	   //or if their max is wihtin our bounds
-	 } else if(bounds[j * 2 + 1] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
-		   bounds[j * 2 + 1] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
-	   dim_overlap++;
-	   continue;
-	 }
-	 //those were the easy cases, now wrapping
-	 if(b_periodic[j]) {
+      //check if this could be a neighbor
+      dim_overlap = 0;
+      for(j = 0; j < dim_; j++) {
+	//check if their min is within our bounds
+	if(bounds[j * 2] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
+	   bounds[j * 2] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
+	  dim_overlap++;
+	  continue;
+	  //or if their max is wihtin our bounds
+	} else if(bounds[j * 2 + 1] < (bias_->get_max()[j] + GAUSS_SUPPORT * bias_sigma_[j]) &&
+		  bounds[j * 2 + 1] > (bias_->get_min()[j] - GAUSS_SUPPORT * bias_sigma_[j])) {
+	  dim_overlap++;
+	  continue;
+	}
+	//those were the easy cases, now wrapping
+	if(b_periodic[j]) {
 
-	   if(fabs(bias_->get_min()[j] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && // I am at left
-	      fabs(bounds[j * 2 + 1] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) { //other is at right
-	     dim_overlap++;
-	     continue;
-	   } else if(fabs(bias_->get_max()[j] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && //or I am at right
-		     fabs(bounds[j * 2] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) {//other is at left
-	     dim_overlap++;
-	     continue;
-	   }
-	 }
-       }
-       if(dim_overlap == dim_) {
-	 mpi_neighbors_[mpi_neighbor_count_] = i;
-	 mpi_neighbor_count_++;
-       }
-     }
-   }
+	  if(fabs(bias_->get_min()[j] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && // I am at left
+	     fabs(bounds[j * 2 + 1] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) { //other is at right
+	    dim_overlap++;
+	    continue;
+	  } else if(fabs(bias_->get_max()[j] - max_[j] - bias_dx_[j] - skin[j]) < GAUSS_SUPPORT * bias_sigma_[j] && //or I am at right
+		    fabs(bounds[j * 2] - min_[j] + skin[j]) < GAUSS_SUPPORT * bias_sigma_[j]) {//other is at left
+	    dim_overlap++;
+	    continue;
+	  }
+	}
+      }
+      if(dim_overlap == dim_) {
+	mpi_neighbors_[mpi_neighbor_count_] = i;
+	mpi_neighbor_count_++;
+      }
+    }
+  }
 
-   //print out the unsorted neighbors
-   for(i = 0; i < mpi_size_; i++) {
-     if(mpi_rank_ == i) {
-       std::cout << "Neighobrs of " << i << " [";
-       for(j = 0; j < dim_; j++)
-	 std::cout << bias_->get_min()[j] << ", ";
-       std::cout << "-> ";
-       for(j = 0; j < dim_; j++)
-	 std::cout << bias_->get_max()[j] << ", ";
-       std::cout << "] == ";
+  //print out the unsorted neighbors
+  for(i = 0; i < mpi_size_; i++) {
+    if(mpi_rank_ == i) {
+      std::cout << "Neighobrs of " << i << " [";
+      for(j = 0; j < dim_; j++)
+	std::cout << bias_->get_min()[j] << ", ";
+      std::cout << "-> ";
+      for(j = 0; j < dim_; j++)
+	std::cout << bias_->get_max()[j] << ", ";
+      std::cout << "] == ";
 
-       for(j = 0; j < mpi_neighbor_count_; j++){
-	 std::cout << mpi_neighbors_[j] << " ";
-       }
-       std::cout << std::endl;
-     }
-   }
-   std::cout << std::endl;
- }
+      for(j = 0; j < mpi_neighbor_count_; j++){
+	std::cout << mpi_neighbors_[j] << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
+  std::cout << std::endl;
+}
 
 
 /** This method will take the unordered list of neighbors and create sorted versions
@@ -701,130 +701,130 @@ void EDM::EDMBias::sort_neighbors() {
   int* b_paired;
   int flag;
 
-   //only execute on head node, because it's too much comm to try to parallelize it
-   if(mpi_rank_ == 0) {
+  //only execute on head node, because it's too much comm to try to parallelize it
+  if(mpi_rank_ == 0) {
      
-     sorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
-     unsorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
-     sorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
-     unsorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
-     b_paired = (int*) malloc(sizeof(int) * mpi_size_);
+    sorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
+    unsorted_neighbors = (int*) malloc(sizeof(int) * mpi_size_ * mpi_size_);
+    sorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
+    unsorted_counts = (unsigned int*) malloc(sizeof(unsigned int) * mpi_size_);
+    b_paired = (int*) malloc(sizeof(int) * mpi_size_);
      
-     for(i = 0; i < mpi_size_; i++)
-       sorted_counts[i] = 0;
+    for(i = 0; i < mpi_size_; i++)
+      sorted_counts[i] = 0;
 
-   }
+  }
 
-   MPI_Gather(mpi_neighbors_, mpi_size_, MPI_INT, unsorted_neighbors, mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
-   MPI_Gather(&mpi_neighbor_count_, 1, MPI_UNSIGNED, unsorted_counts, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+  MPI_Gather(mpi_neighbors_, mpi_size_, MPI_INT, unsorted_neighbors, mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Gather(&mpi_neighbor_count_, 1, MPI_UNSIGNED, unsorted_counts, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
 
-   if(mpi_rank_ == 0) {
+  if(mpi_rank_ == 0) {
      
-     for(i = 0; i < mpi_size_; i++) {//for each round of communication with neighbors, at most size size
-       //clear paired flags
-       for(j = 0; j < mpi_size_; j++)
-	 b_paired[j] = 0;
+    for(i = 0; i < mpi_size_; i++) {//for each round of communication with neighbors, at most size size
+      //clear paired flags
+      for(j = 0; j < mpi_size_; j++)
+	b_paired[j] = 0;
 
-       for(j = 0; j < mpi_size_; j++) {//for each node
-	 if(!b_paired[j]) {
+      for(j = 0; j < mpi_size_; j++) {//for each node
+	if(!b_paired[j]) {
 
-	   //assume we won't find a neighbor
-	   sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = NO_COMM_PARTNER;
+	  //assume we won't find a neighbor
+	  sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = NO_COMM_PARTNER;
 	   
-	   //iterate through my neighbor list
-	   for(k = 0; k < mpi_size_ && unsorted_neighbors[j * mpi_size_ + k] != NO_COMM_PARTNER; k++) {
-	     //NO_COMM_PARTNER happens to mark the end of the array
+	  //iterate through my neighbor list
+	  for(k = 0; k < mpi_size_ && unsorted_neighbors[j * mpi_size_ + k] != NO_COMM_PARTNER; k++) {
+	    //NO_COMM_PARTNER happens to mark the end of the array
 
-	     if(!b_paired[unsorted_neighbors[j * mpi_size_ + k]]) { //found an unpaired neighbor!
+	    if(!b_paired[unsorted_neighbors[j * mpi_size_ + k]]) { //found an unpaired neighbor!
 
-	       //make sure we haven't already paired with it once before
-	       flag = 0;
-	       for(l = 0; l < sorted_counts[j]; l++) {
-		 if(sorted_neighbors[j * mpi_size_ + l] == unsorted_neighbors[j * mpi_size_ + k]) {
-		   flag = 1;
-		 break;
-		 }
-	       }
+	      //make sure we haven't already paired with it once before
+	      flag = 0;
+	      for(l = 0; l < sorted_counts[j]; l++) {
+		if(sorted_neighbors[j * mpi_size_ + l] == unsorted_neighbors[j * mpi_size_ + k]) {
+		  flag = 1;
+		  break;
+		}
+	      }
 
-	       if(!flag) {
+	      if(!flag) {
 
-		 l = unsorted_neighbors[j * mpi_size_ + k];
+		l = unsorted_neighbors[j * mpi_size_ + k];
 
-		 sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = l;
-		 unsorted_counts[j]--;
+		sorted_neighbors[j * mpi_size_ + sorted_counts[j]] = l;
+		unsorted_counts[j]--;
 
-		 sorted_neighbors[l * mpi_size_ + sorted_counts[l]] = j;
-		 b_paired[l] = 1;
-		 sorted_counts[l]++;
-		 unsorted_counts[l]--;
-		 break;
-	       }
-	     }
-	   }
+		sorted_neighbors[l * mpi_size_ + sorted_counts[l]] = j;
+		b_paired[l] = 1;
+		sorted_counts[l]++;
+		unsorted_counts[l]--;
+		break;
+	      }
+	    }
+	  }
 	   
-	   sorted_counts[j]++;	   
-	   b_paired[j] = 1; //we are either paired or know we're exlcuded
+	  sorted_counts[j]++;	   
+	  b_paired[j] = 1; //we are either paired or know we're exlcuded
 	   
-	 }
-       }
+	}
+      }
 
 
 #ifdef EDM_MPI_DEBUG
-       for(j = 0; j < mpi_size_; j++) {
-	 std::cout << j << ": [";
-	 for(k = 0; k < sorted_counts[j]; k++)
-	   std::cout << sorted_neighbors[j * mpi_size_ + k] << ", ";
-	 std::cout << "] <--> [";
-	 for(k = 0; k < unsorted_counts[j]; k++)
-	   std::cout << unsorted_neighbors[j * mpi_size_ + k] << ", ";
-	 std::cout << "]" << std::endl;
+      for(j = 0; j < mpi_size_; j++) {
+	std::cout << j << ": [";
+	for(k = 0; k < sorted_counts[j]; k++)
+	  std::cout << sorted_neighbors[j * mpi_size_ + k] << ", ";
+	std::cout << "] <--> [";
+	for(k = 0; k < unsorted_counts[j]; k++)
+	  std::cout << unsorted_neighbors[j * mpi_size_ + k] << ", ";
+	std::cout << "]" << std::endl;
 	 
-     }
+      }
 #endif// EDM_MPI_DEBUG
 
 
-       //let's now check that we're finished by ensuring we have
-       //accounted for all the neighbors
-       flag = 0;
-       for(j = 0; j < mpi_size_; j++) {
-	 if(unsorted_counts[j] != 0) {
-	   flag = 1;
-	   break;
-	 }
-       }
-       if(!flag)
-	 break;
-     }
-   }
+      //let's now check that we're finished by ensuring we have
+      //accounted for all the neighbors
+      flag = 0;
+      for(j = 0; j < mpi_size_; j++) {
+	if(unsorted_counts[j] != 0) {
+	  flag = 1;
+	  break;
+	}
+      }
+      if(!flag)
+	break;
+    }
+  }
 
-   //now we distribute the results
-   MPI_Scatter(sorted_counts, 1, MPI_UNSIGNED, &mpi_neighbor_count_,
-	       1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+  //now we distribute the results
+  MPI_Scatter(sorted_counts, 1, MPI_UNSIGNED, &mpi_neighbor_count_,
+	      1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
 
-   MPI_Scatter(sorted_neighbors, mpi_size_, MPI_INT, mpi_neighbors_,
-	       mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Scatter(sorted_neighbors, mpi_size_, MPI_INT, mpi_neighbors_,
+	      mpi_size_, MPI_INT, 0, MPI_COMM_WORLD);
 
-   //truncate results
-   mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
+  //truncate results
+  mpi_neighbors_ = (int*) realloc(mpi_neighbors_, mpi_neighbor_count_ * sizeof(int));
 
-   if(mpi_rank_ == 0) {     
+  if(mpi_rank_ == 0) {     
 
-     free(unsorted_neighbors);
-     free(sorted_neighbors);
-     free(sorted_counts);
-     free(unsorted_counts);
-     free(b_paired);
+    free(unsorted_neighbors);
+    free(sorted_neighbors);
+    free(sorted_counts);
+    free(unsorted_counts);
+    free(b_paired);
 
-   } 
+  } 
 }
 
 void EDM::EDMBias::update_height(edm_data_t bias_added) {
   edm_data_t other_bias = 0;
-  #ifndef EDM_SERIAL
+#ifndef EDM_SERIAL
   MPI_Allreduce(&bias_added, &other_bias, 1, MPI_EDM_DATA_T, MPI_SUM, MPI_COMM_WORLD);
-  #else
+#else
   other_bias = bias_added;
-  #endif
+#endif
   cum_bias_ += other_bias;
 		
 }
@@ -944,17 +944,17 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
 }
 
 
- std::string EDM::EDMBias::clean_string(const std::string& input, int append_rank) {
+std::string EDM::EDMBias::clean_string(const std::string& input, int append_rank) {
   std::string result(input);
   //remove surrounding whitespace 
-    size_t found = result.find_first_not_of(" \t");
-    if (found != std::string::npos)
-      result = result.substr(found);    
-    if(append_rank) {
-  std::ostringstream oss;
-  oss << result << "_" << mpi_rank_;
-  return oss.str();
-}
-    return result;
+  size_t found = result.find_first_not_of(" \t");
+  if (found != std::string::npos)
+    result = result.substr(found);    
+  if(append_rank) {
+    std::ostringstream oss;
+    oss << result << "_" << mpi_rank_;
+    return oss.str();
+  }
+  return result;
 
 }

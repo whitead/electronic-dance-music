@@ -108,6 +108,7 @@ namespace EDM{
     
 
     ~DimmedGridGPU() {
+      printf("The destructor for DimmedGridGPU was called.\n");
       gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
 	gpuErrchk(cudaFree(grid_));
@@ -472,6 +473,29 @@ namespace EDM{
 
     
   };
+  /**
+   * This is a non-template constructor which dispatches to the appropiate template
+   **/
+  Grid* make_grid_gpu( int dim, 
+		   const edm_data_t* min, 
+		   const edm_data_t* max, 
+		   const edm_data_t* bin_spacing, 
+		   const int* b_periodic, 
+		   int b_derivatives, 
+		   int b_interpolate);
+
+  /**
+   * This is a non-template constructor which dispatches to the appropiate template
+   **/
+
+  Grid* read_grid_gpu( int dim, const std::string& filename, int b_interpolate);
+
+  /**
+   * This is a non-template constructor which dispatches to the appropiate template
+   **/
+  Grid* read_grid_gpu( int dim, const std::string& filename);
+
+  
 }
 /*
  * This namespace is used for invoking the GPU functions in the DimmedGridGPU class.

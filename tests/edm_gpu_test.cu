@@ -1397,11 +1397,12 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
 }//gpu_gauss_grid_integral_regression_1
 
 BOOST_AUTO_TEST_CASE( edm_bias_reader_gpu ) {
-  EDMBiasGPU bias(EDM_SRC + "/read_test.edm");//looks like this works just fine inheriting everything...?
+  EDMBiasGPU bias(EDM_SRC + "/read_test.edm");
   BOOST_REQUIRE_EQUAL(bias.dim_, 2);
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
   BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
+  printf("made it this far.\n");
 }//edm_gpu_bias_reader
 
 //This test will simply run several thousand timesteps and time how long it takes.

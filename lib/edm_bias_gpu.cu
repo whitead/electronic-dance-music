@@ -1,4 +1,5 @@
 #include "edm_bias_gpu.cuh"
+#include "grid_gpu.cuh"
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <cmath>
@@ -20,7 +21,42 @@ EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_f
 
 
 EDM::EDMBiasGPU::~EDMBiasGPU() {
-  //nothing yet
+  printf("The destructor for EDMBiasGPU was called.\n");
+  gpuErrchk(cudaDeviceSynchronize());
+  /* 
+   * target_, bias_dx_, and cv_hist_ are all delete'd by the superclass, EDMBias
+   */
+  if(mpi_neighbors_ != NULL){
+    gpuErrchk(cudaFree(mpi_neighbors_));
+    mpi_neighbors_ = NULL;
+  }
+    
+  if(bias_dx_ != NULL){
+    gpuErrchk(cudaFree(bias_dx_));
+    bias_dx_ = NULL;
+  }
+    
+  if(bias_sigma_ != NULL){
+    gpuErrchk(cudaFree(bias_sigma_));
+    bias_sigma_ = NULL;
+  }
+    
+  if(min_ != NULL){
+    gpuErrchk(cudaFree(min_));
+    min_ = NULL;
+  }
+    
+  if(max_ != NULL){
+    gpuErrchk(cudaFree(max_));
+    max_ = NULL;
+  }
+    
+  if(b_periodic_boundary_ != NULL){
+    gpuErrchk(cudaFree(b_periodic_boundary_));
+    b_periodic_boundary_ = NULL;
+  }
+    
+
 }
 
 int EDM::EDMBiasGPU::read_input(const std::string& input_filename){ 
@@ -45,8 +81,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
  
   copy(its, eos, mpsi);
 
-  //  copy(parsed_input.begin(), parsed_input.end(), ostream_iterator<pair<string,string> >(cout, "\n"));
- 
   //now convert key value pairs
   if(!extract_int("tempering", parsed_input, 1, &b_tempering_)) {
     cerr << "Must specify if tempering is enabled, ex: tempering 1 or tempering 0" << endl;
@@ -99,9 +133,9 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     b_targeting_ = 1;
     string tfilename = parsed_input.at("target_filename");
     string cleaned_filename = clean_string(tfilename, 0);
-    target_ = read_grid(dim_, cleaned_filename, 0); //read grid, do not use interpolation
-    expected_target_ = target_->expected_bias();
-    std::cout << "Expected Target is " << expected_target_ << std::endl;
+    target_ = read_grid_gpu(dim_, cleaned_filename, 0); //read grid, do not use interpolation
+    expected_target_ = target_->expected_bias();//read_grid_gpu() returns a Grid*
+    std::cout << "(edm_bias_gpu) Expected Target is " << expected_target_ << std::endl;
   }
 
   if(parsed_input.find("initial_bias_filename") == parsed_input.end()) {
@@ -109,7 +143,7 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
   } else {
     string ibfilename = parsed_input.at("initial_bias_filename");
     string cleaned_filename = clean_string(ibfilename, 0);
-    initial_bias_ = read_grid(dim_, cleaned_filename, 1); //read grid, do use interpolation
+    initial_bias_ = read_grid_gpu(dim_, cleaned_filename, 1); //read grid, do use interpolation
   }
 
 

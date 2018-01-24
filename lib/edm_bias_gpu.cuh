@@ -49,11 +49,11 @@ namespace EDM{
   }
 
   class EDMBiasGPU : public EDMBias {
-  /** The EDM bias class. The main biasing class
-   *
-   *
-   */
- public:
+    /** The EDM bias class. The main biasing class
+     *
+     *
+     */
+  public:
 
     EDMBiasGPU(const std::string& input_filename);
     ~EDMBiasGPU();
