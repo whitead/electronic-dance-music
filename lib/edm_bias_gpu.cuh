@@ -5,6 +5,7 @@
 #include <cuda.h>
 #include "edm.h"
 #include "edm_bias.h"
+#include "gaussian_grid_gpu.cuh"
 
 namespace EDM{ 
 
@@ -57,6 +58,10 @@ namespace EDM{
 
     EDMBiasGPU(const std::string& input_filename);
     ~EDMBiasGPU();
+    void subdivide(const edm_data_t sublo[3], const edm_data_t subhi[3], 
+		   const edm_data_t boxlo[3], const edm_data_t boxhi[3],
+		   const int b_periodic[3], const edm_data_t skin[3]);
+
 
     int read_input(const std::string& input_filename);
   private:

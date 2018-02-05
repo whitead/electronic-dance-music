@@ -1405,6 +1405,57 @@ BOOST_AUTO_TEST_CASE( edm_bias_reader_gpu ) {
   printf("made it this far.\n");
 }//edm_gpu_bias_reader
 
+//this struct is used in the following sanity test
+struct EDMBiasGPUTest{
+  EDMBiasGPUTest() : bias(EDM_SRC + "/sanity.edm"){
+    //subdivide is only called once at setup, on CPU-side
+    bias.setup(1, 1);
+    edm_data_t low[] = {0};
+    edm_data_t high[] = {10};
+    int p[] = {1};
+    edm_data_t skin[] = {0};
+    bias.subdivide(low, high, low, high, p, skin);
+  }
+  EDMBiasGPU bias;
+};
+
+BOOST_FIXTURE_TEST_SUITE( edmbiasgpu_test, EDMBiasGPUTest )
+
+BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
+  edm_data_t** positions = (edm_data_t**) malloc(sizeof(edm_data_t*));
+  positions[0] = (edm_data_t*) malloc(sizeof(edm_data_t));
+  edm_data_t runiform[] = {1};
+
+  positions[0][0] = 5.0;
+  bias.add_hills(1, positions, runiform);
+  
+  bias.write_bias("BIAS");
+
+  //test if the value at the point is correct
+  BOOST_REQUIRE(pow(bias.bias_->get_value(positions[0]) - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
+  //check if the claimed amount of bias added is correct
+  BOOST_REQUIRE(pow(bias.cum_bias_ - bias.hill_prefactor_, 2) < 0.001);
+  
+  //now  check that the forces point away from the hills
+  edm_data_t der[0];
+  positions[0][0] = 4.99; //to the left
+  bias.bias_->get_value_deriv(positions[0], der);
+  //the negative of the bias (the force) should point to the left
+  BOOST_REQUIRE(-der[0] < 0);
+
+  positions[0][0] = 5.01; // to the right of the bias
+  bias.bias_->get_value_deriv(positions[0], der);
+  //the negative of the bias (the force) should point to the right
+  BOOST_REQUIRE(-der[0] > 0);
+
+  
+
+  free(positions[0]);
+  free(positions);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 //This test will simply run several thousand timesteps and time how long it takes.
 BOOST_AUTO_TEST_CASE( edm_cpu_timer_1d ){
   

@@ -108,7 +108,6 @@ namespace EDM{
     
 
     ~DimmedGridGPU() {
-      printf("The destructor for DimmedGridGPU was called.\n");
       gpuErrchk(cudaDeviceSynchronize());
       if(grid_ != NULL){
 	gpuErrchk(cudaFree(grid_));

@@ -21,7 +21,6 @@ EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_f
 
 
 EDM::EDMBiasGPU::~EDMBiasGPU() {
-  printf("The destructor for EDMBiasGPU was called.\n");
   gpuErrchk(cudaDeviceSynchronize());
   /* 
    * target_, bias_dx_, and cv_hist_ are all delete'd by the superclass, EDMBias
@@ -56,6 +55,85 @@ EDM::EDMBiasGPU::~EDMBiasGPU() {
     b_periodic_boundary_ = NULL;
   }
     
+
+}
+
+void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3], 
+			     const edm_data_t subhi[3], 
+			     const edm_data_t boxlo[3],
+			     const edm_data_t boxhi[3],
+			     const int b_periodic[3],
+			     const edm_data_t skin[3]) {
+
+  //has subdivide already been called?
+  if(bias_ != NULL)
+    return;
+
+  //has setup been called?
+  if(temperature_ < 0)
+    edm_error("Must call setup before subdivide", "edm_bias.cpp:subdivide");
+  
+  int grid_period[] = {0, 0, 0};
+  edm_data_t min[3];
+  edm_data_t max[3];
+  size_t i;
+  int bounds_flag = 1;
+
+  for(i = 0; i < dim_; i++) {
+    b_periodic_boundary_[i] = 0;
+    //check if the given boundary matches the system boundary, if so then use the system periodicity
+    if(fabs(boxlo[i] - min_[i]) < 0.000001 && fabs(boxhi[i] - max_[i]) < 0.000001)
+      b_periodic_boundary_[i] = b_periodic[i];
+    
+  }
+
+  for(i = 0; i < dim_; i++) {
+
+    min[i] = sublo[i];      
+    max[i] = subhi[i];      
+
+    //check if we encapsulate the entire bounds in any dimension
+    if(fabs(sublo[i] - min_[i]) < 0.000001 && fabs(subhi[i] - max_[i]) < 0.000001) {
+      grid_period[i] = b_periodic[i];
+      bounds_flag = 0;      
+    } else {
+      min[i] -= skin[i];
+      max[i] += skin[i];
+    }
+      
+    //check if we'll always be out of bounds
+    bounds_flag &= (min[i] >= max_[i] || max[i] <= min_[i]);    
+    
+  }
+
+  bias_ = make_gauss_grid_gpu(dim_, min, max, bias_dx_, grid_period, INTERPOLATE, bias_sigma_);
+  //create histogram with no interpolation/no derivatives for tracking CV
+  cv_hist_ = make_grid_gpu(dim_, min, max, bias_sigma_, grid_period, 0, 0);
+    
+  bias_->set_boundary(min_, max_, b_periodic_boundary_);
+  if(initial_bias_ != NULL)
+    bias_->add(initial_bias_, 1.0, 0.0);
+  
+
+  
+  if(bounds_flag) {
+    //we do this after so that we have a grid to at least write out
+    std::cout << "I am out of bounds!" << std::endl;
+    b_outofbounds_ = 1;
+    return;
+  }
+
+  //get volume
+  //note that get_volume won't get the system volume, due the skin 
+  //between regions. However, it is correct for getting average bias
+  //because some hills will be counted twice and this increase in volume
+  //compensates for that.
+  edm_data_t other_vol = 0;
+  edm_data_t vol = bias_->get_volume();
+  total_volume_ = 0;
+
+  other_vol = vol;
+  total_volume_ += other_vol;
 
 }
 
