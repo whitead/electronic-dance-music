@@ -16,6 +16,8 @@
 
 
 EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename) {
+  printf("Called EDMBiasGPU constructor...\n");
+  gpuErrchk(cudaMallocManaged((void**)&send_buffer_, sizeof(edm_data_t) * BIAS_BUFFER_DBLS));
   read_input(input_filename);
 }
 
@@ -247,3 +249,33 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
   return 1;
 }
 
+void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform) {
+  add_hills(nlocal, positions, runiform, -1);
+}
+
+void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask) {
+
+  int i;
+  pre_add_hill(nlocal);
+  for(i = 0; i < nlocal; i++) {
+    if(apply_mask < 0 || apply_mask & mask_[i])
+      add_hill(&positions[i][0], runiform[i]);
+  }
+  post_add_hill();
+
+}
+
+
+void EDM::EDMBiasGPU::queue_add_hill(const edm_data_t* position, edm_data_t this_h){
+  //use the same buffer system but there's only one cause it's just GPU
+  size_t i;
+  for(i = 0; i < dim_; i++)
+    send_buffer_[buffer_i_ * (dim_+ 1) + i] = position[i];
+  send_buffer_[buffer_i_ * (dim_ + 1) + i] = this_h;
+  buffer_i_++;
+  
+  //do we need to flush?
+  if(buffer_i_ >= BIAS_BUFFER_SIZE)
+    temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
+  
+}

@@ -1,5 +1,5 @@
 #include "grid_gpu.cuh"
-#include "edm_bias_gpu.cuh"
+#include "edm_bias_gpu.cu"
 #include "gaussian_grid_gpu.cuh"
 #include <curand.h>
 #include <curand_kernel.h>
@@ -1375,7 +1375,13 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
 
 
   add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_bias_added, d_g);
- gpuErrchk(cudaDeviceSynchronize());
+  unsigned int blockSize = 128;
+  printf("The g.minisize_total_ is %d\n", g.minisize_total_);
+  //for some reason, addreduce is getting segfaults, but the intergral kernel works...
+  //might need to add special treatment for non-power-of-2 addreduce
+  //addReduce<<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_, blockSize);//<blockSize><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
+  //printf("d_bias_added[0] is now: %f\n", d_bias_added[0]);
+  gpuErrchk(cudaDeviceSynchronize());
   gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   edm_data_t tot_bias_added = 0;
   for (int i = 0; i < g.minisize_total_; i++){
@@ -1402,7 +1408,6 @@ BOOST_AUTO_TEST_CASE( edm_bias_reader_gpu ) {
   BOOST_REQUIRE_EQUAL(bias.b_tempering_, 0);
   BOOST_REQUIRE(pow(bias.bias_sigma_[0] - 2,2) < EPSILON);
   BOOST_REQUIRE(pow(bias.bias_dx_[1] - 1.0,2) < EPSILON);
-  printf("made it this far.\n");
 }//edm_gpu_bias_reader
 
 //this struct is used in the following sanity test
@@ -1422,11 +1427,12 @@ struct EDMBiasGPUTest{
 BOOST_FIXTURE_TEST_SUITE( edmbiasgpu_test, EDMBiasGPUTest )
 
 BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
+  printf("starting edm_gpu_sanity test...\n");
   edm_data_t** positions = (edm_data_t**) malloc(sizeof(edm_data_t*));
   positions[0] = (edm_data_t*) malloc(sizeof(edm_data_t));
   edm_data_t runiform[] = {1};
 
-  positions[0][0] = 5.0;
+  positions[0][0] = 5.0;//put a hill in the middle of the grid
   bias.add_hills(1, positions, runiform);
   
   bias.write_bias("BIAS");
