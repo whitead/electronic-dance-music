@@ -641,15 +641,15 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_wrap_3) {
 
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
 
-  edm_data_t point[] = {0.01};
+  edm_data_t point[] = {0.01, 1.0};
   edm_data_t* d_point;
-  gpuErrchk(cudaMalloc((void**)&d_point, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_point, point, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_point, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_point, point, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
 
 //THE MOMENT WE'VE ALL BEEN WAITING FOR!!
   
 //  g.add_value(point,1);
-  add_value_kernel<1><<<1, g.minisize_total_>>>(d_point, 1.0, d_g);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_point, d_g);
 
   edm_data_t* d_target;
   gpuErrchk(cudaMalloc((void**)&d_target, sizeof(edm_data_t)));//for checking the value
@@ -693,12 +693,12 @@ BOOST_AUTO_TEST_CASE( gpu_boundary_remap_nowrap_1) {
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
 
 
-  edm_data_t point[] = {-0.01};
+  edm_data_t point[] = {-0.01, 1.0};
   edm_data_t* d_point;
-  gpuErrchk(cudaMalloc((void**)&d_point, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_point, point, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_point, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_point, point, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
 //  g.add_value(point,1);
-  add_value_kernel<1><<<1, g.minisize_total_>>>(d_point, 1.0, d_g);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_point,d_g);
 
 //  edm_data_t der[1];
   edm_data_t* d_der;
@@ -790,12 +790,12 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_add_check ) {
   gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
   //add 1 gaussian
-  edm_data_t x[] = {0};
+  edm_data_t x[] = {0, 1.0};
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
 //  g.add_value(x, 1);
-  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_g);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g);
 
   //now check a few points
   edm_data_t* d_target;
@@ -839,12 +839,12 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_pbc_check ) {
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
 
   //add 1 gaussian
-  edm_data_t x[] = {2};
+  edm_data_t x[] = {2, 1};
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
 //  g.add_value(x, 1);
-  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_g);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g);
   
   int i;
   edm_data_t der[1];
@@ -888,10 +888,10 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_subdivided_pbc_check ) {
   edm_data_t sigma[] = {1};
   edm_data_t bin_spacing[] = {1};
   int periodic[] = {0};
-  edm_data_t gauss_loc[] = {11};
+  edm_data_t gauss_loc[] = {11, 1};
   edm_data_t* d_gauss_loc;
-  gpuErrchk(cudaMalloc((void**)&d_gauss_loc, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_gauss_loc, gauss_loc, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**)&d_gauss_loc, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_gauss_loc, gauss_loc, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   edm_data_t x[1];
   DimmedGaussGridGPU<1> g (min, max, bin_spacing, periodic, 0, sigma);
   periodic[0] = 1;
@@ -904,7 +904,7 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_subdivided_pbc_check ) {
 
   //add 1 gaussian
 //  g.add_value(gauss_loc, 1); //added at equivalent to 1
-  add_value_kernel<1><<<1, g.minisize_total_>>>(d_gauss_loc, 1.0, d_g);
+  add_value_kernel<1><<<1, g.minisize_total_>>>(d_gauss_loc, d_g);
 
   int i;
   edm_data_t der[1];
@@ -952,9 +952,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
   //add N gaussian
   int N = 20;
   int i;
-  edm_data_t x[1];
+  edm_data_t x[2];
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
   edm_data_t offsets = 1. / N;
   edm_data_t g_integral[g.minisize_total_];
   edm_data_t* d_g_integral;
@@ -965,8 +965,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_test ) {
   int j;
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
-    add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.5, d_g_integral, d_g);
+    x[1] = 1.5;
+    gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+    add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g_integral, d_g);
     gpuErrchk(cudaMemcpy(g_integral, d_g_integral, g.minisize_total_*sizeof(edm_data_t), cudaMemcpyDeviceToHost));
     for(j = 0; j < g.minisize_total_; j++){
       g_integral_total += g_integral[j];
@@ -1016,17 +1017,18 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test ) {
   //add N gaussian
   int N = 20;
   int i;
-  edm_data_t x[1];
+  edm_data_t x[2];
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
   
   edm_data_t offsets = 1. / N;
   
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
-    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.5, d_g);
+    x[1] = 1.5;
+    gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g);
   }
 
   //now we calculate finite differences on the grid
@@ -1077,16 +1079,17 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_derivative_test_mcgdp_1 ) {
   //add N gaussian
   int N = 20;
   int i;
-  edm_data_t x[1];
+  edm_data_t x[2];
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
   edm_data_t offsets = 1. / N;
 
   //generate a random number but use sequential grid point offsets
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100 + i * offsets;
-    gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
-    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.5, d_g);
+    x[1] = 1.5;
+    gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g);
   }
 
   //now we calculate finite differences on the grid
@@ -1161,9 +1164,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
   //add N gaussian
   int N = 20;
   int i;
-  edm_data_t x[1];
+  edm_data_t x[2];
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, sizeof(edm_data_t)));
+  gpuErrchk(cudaMalloc((void**)&d_x, 2*sizeof(edm_data_t)));
   edm_data_t der[1];
   edm_data_t* d_der;
   gpuErrchk(cudaMalloc((void**)&d_der, sizeof(edm_data_t)));
@@ -1171,8 +1174,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
   //generate a random number
   for(i = 0; i < N; i++) {
     x[0] = rand() % 200 - 100;
-    gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
-    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_g);
+    x[1] = 1.0;
+    gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+    add_value_kernel<1><<<1, g.minisize_total_>>>(d_x, d_g);
   }
 
   //Check if the boundaries were duplicated
@@ -1181,24 +1185,24 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
   edm_data_t* d_value;
   gpuErrchk(cudaMalloc((void**)&d_value, sizeof(edm_data_t)));
   x[0] = 50.0;
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<1><<<1,1>>>(d_x, d_value, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(value, d_value, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
 
   x[0] = 49.0;
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<1><<<1,1>>>(d_x, d_value, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(value2, d_value, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
 
   BOOST_REQUIRE(pow(value[0] - value2[0] ,2) < 2*(EPSILON));//This one cuts it too close...?
 
   x[0] = 150.0;
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<1><<<1,1>>>(d_x, d_value, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(value, d_value, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
 
   x[0] = 151.0;
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<1><<<1,1>>>(d_x, d_value, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(value2, d_value, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
 
@@ -1210,7 +1214,7 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
 //  g.get_value_deriv(x,der);
   edm_data_t* d_dummy;
   gpuErrchk(cudaMalloc((void**)&d_dummy, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_deriv_kernel<1><<<1,1>>>(d_x, d_der, d_dummy, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(der[0] * der[0] < EPSILON);
@@ -1219,7 +1223,7 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_1D ) {
   x[0] = -50.1;
   x[0] = -50.0;
   gpuErrchk(cudaMalloc((void**)&d_dummy, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_deriv_kernel<1><<<1,1>>>(d_x, d_der, d_dummy, &(d_g->grid_));
   gpuErrchk(cudaDeviceSynchronize());
   gpuErrchk(cudaMemcpy(der, d_der, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
@@ -1271,9 +1275,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
   //add N gaussian
   int N = 20;
   int i;
-  edm_data_t x[3];
+  edm_data_t x[4];
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc((void**)&d_x, 3*sizeof(edm_data_t)));
+  gpuErrchk(cudaMalloc((void**)&d_x, 4*sizeof(edm_data_t)));
   edm_data_t der[3];
   edm_data_t* d_der;
   gpuErrchk(cudaMalloc((void**)&d_der, 3*sizeof(edm_data_t)));
@@ -1286,19 +1290,20 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
     x[0] = rand() % 20 - 10;
     x[1] = rand() % 20 - 10;
     x[2] = rand() % 20 - 10;
-    gpuErrchk(cudaMemcpy(d_x, x, 3*sizeof(edm_data_t), cudaMemcpyHostToDevice));
-    add_value_kernel<3><<<1, g.minisize_total_>>>(d_x, 5.0, d_g);
+    x[3] = 5.0;
+    gpuErrchk(cudaMemcpy(d_x, x, 4*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+    add_value_kernel<3><<<1, g.minisize_total_>>>(d_x, d_g);
   }
 
   //Check if the boundaries were duplicated
   edm_data_t v2;
   x[0] = x[2] = 50.1;
   x[1] = 5.0;
-  gpuErrchk(cudaMemcpy(d_x, x, 3*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 4*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<3><<<1,1>>>(d_x, d_v, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(&v2, d_v, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   x[0] = x[1] = 50.0;
-  gpuErrchk(cudaMemcpy(d_x, x, 3*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 4*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<3><<<1,1>>>(d_x, d_v, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(&v, d_v, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   
@@ -1315,11 +1320,11 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
   //check another location
   x[0] = -5.1;
   x[2] = 5.1;
-  gpuErrchk(cudaMemcpy(d_x, x, 3*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 4*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<3><<<1,1>>>(d_x, d_v, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(&v, d_v, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   x[0] = x[2] = -5.0;
-  gpuErrchk(cudaMemcpy(d_x, x, 3*sizeof(edm_data_t), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(d_x, x, 4*sizeof(edm_data_t), cudaMemcpyHostToDevice));
   get_value_kernel<3><<<1,1>>>(d_x, d_v, &(d_g->grid_));
   gpuErrchk(cudaMemcpy(&v2, d_v, sizeof(edm_data_t), cudaMemcpyDeviceToHost));
   BOOST_REQUIRE(pow(v - v2, 2) < 0.001);
@@ -1364,17 +1369,17 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
   set_boundary_kernel<1><<<1,1>>>(d_min, d_max, d_periodic, d_g);
   
   //add gaussian that was failing
-  edm_data_t x[1] = {-3.91944};
+  edm_data_t x[2] = {-3.91944, 1.0};
   edm_data_t h = 1.0;
   edm_data_t bias_added[g.minisize_total_]; //= g->add_value(x, h);
   edm_data_t* d_bias_added;
   gpuErrchk(cudaMalloc((void**)&d_bias_added, g.minisize_total_ * sizeof(edm_data_t)));
   edm_data_t* d_x;
-  gpuErrchk(cudaMalloc(&d_x, sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, sizeof(edm_data_t), cudaMemcpyHostToDevice));//here w/ limit=4096
+  gpuErrchk(cudaMalloc(&d_x, 2*sizeof(edm_data_t)));
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));//here w/ limit=4096
 
 
-  add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, 1.0, d_bias_added, d_g);
+  add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, d_bias_added, d_g);
   unsigned int blockSize = 128;
   printf("The g.minisize_total_ is %d\n", g.minisize_total_);
   //for some reason, addreduce is getting segfaults, but the intergral kernel works...
@@ -1506,13 +1511,14 @@ BOOST_AUTO_TEST_CASE( edm_gpu_timer_1d ){
   edm_data_t coordinates[n_hills];
   //now just call a kernel to add a bunch of gaussians, and time it
   boost::timer::auto_cpu_timer t;
-  for( unsigned int i = 0; i < n_hills; i++){
+  for( unsigned int i = 0; i < 2*n_hills; i+=2){
     int rand_num = rand() % 20 - 10;
     coordinates[i] = rand_num;
+    coordinates[i+1] = 1.0;
   }
   gpuErrchk(cudaMemcpy(d_coordinates, coordinates, n_hills * sizeof(edm_data_t), cudaMemcpyHostToDevice));
   //add lots of hills in parallel!
-  add_value_kernel<1><<<n_hills/8, 8 * g.minisize_total_>>>(d_coordinates, 1.0, d_g);
+  add_value_kernel<1><<<n_hills/8, 8 * g.minisize_total_>>>(d_coordinates, d_g);
   gpuErrchk(cudaDeviceSynchronize());
   t.stop();
   sec seconds = chrono::nanoseconds(t.elapsed().user);

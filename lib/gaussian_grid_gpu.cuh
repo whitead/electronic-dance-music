@@ -57,8 +57,10 @@ namespace EDM{
       //nothing
     }
 
+    //HOST_DEV edm_data_t do_add_value(const edm_data_t* x0, edm_data_t * height);
+
     HOST_DEV void do_remap(edm_data_t x[DIM]) const {
-    #ifdef __CUDACC__
+#ifdef __CUDACC__
       edm_data_t dp[2];
       size_t i;
 
@@ -94,15 +96,15 @@ namespace EDM{
 	}
       }
       return;
-    #else
+#else
       remap(x);
-    #endif //CUDACC
+#endif //CUDACC
       
     }//do_remap
 
 
     HOST_DEV void do_set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
-    #ifdef __CUDACC__
+#ifdef __CUDACC__
       //do the set_boundary on GPU
       size_t i,j;
       edm_data_t s;
@@ -128,28 +130,28 @@ namespace EDM{
 		erf((boundary_max_[i] - s) / sigma_[i]));
 
 	    bc_denom_table_[i][j] = tmp1;
-    #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 	    tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
 
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
-    #endif
+#endif
 	    //mcgovern-de pablo contribution derivative
 	    tmp3 = 1. * 
 	      (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
 	       exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
 
 	    bc_denom_deriv_table_[i][j] = tmp3;
-    #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 	    bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
 	      sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
-    #endif
+#endif
 	    if(j > 2) {
 	      //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	    }
@@ -160,9 +162,9 @@ namespace EDM{
 	}
       }
       return;
-    #else
+#else
       set_boundary(min, max, b_periodic);
-    #endif //CUDACC
+#endif //CUDACC
 
     }//do_set_boundary
     
@@ -195,28 +197,28 @@ namespace EDM{
 		erf((boundary_max_[i] - s) / sigma_[i]));
 
 	    bc_denom_table_[i][j] = tmp1;
-  #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 	    tmp2 = sqrt(M_PI) * sigma_[i] / 2. * erf((boundary_max_[i] - boundary_min_[i]) / sigma_[i]);
 
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));
-  #endif
+#endif
 	    //mcgovern-de pablo contribution derivative
 	    tmp3 = 1. * 
 	      (exp( -pow(s - boundary_min_[i],2) / pow(sigma_[i],2)) - 
 	       exp( -pow(boundary_max_[i] - s,2)/ pow(sigma_[i],2)));
 
 	    bc_denom_deriv_table_[i][j] = tmp3;
-  #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 	    bc_denom_deriv_table_[i][j] += (tmp2 - tmp1) * 
 	      sigmoid_dx((s - boundary_min_[i]) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((s - boundary_min_[i]) / (BC_MAR * sigma_[i]));
 	    bc_denom_deriv_table_[i][j] += -(tmp2 - tmp1) * 
 	      sigmoid_dx((boundary_max_[i] - s) / (BC_MAR * sigma_[i])) / (BC_MAR * sigma_[i]) - 
 	      tmp3 * sigmoid((boundary_max_[i] - s) / (BC_MAR * sigma_[i]));	  
-  #endif
+#endif
 	    if(j > 2) {
 	      //	    std::cout << ((bc_denom_table_[i][j] - bc_denom_table_[i][j  - 2]) / (2 * (boundary_max_[i] - boundary_min_[i]) / (BC_TABLE_SIZE - 1))) << " =?= " << bc_denom_deriv_table_[i][j-1] << std::endl;
 	    }
@@ -230,7 +232,7 @@ namespace EDM{
     }
 
     HOST_DEV void do_duplicate_boundary(){
-  #ifdef __CUDACC__
+#ifdef __CUDACC__
       size_t i,j,k,l;
       size_t index_outter[DIM], index_bound[DIM];
       size_t min_i[DIM], max_i[DIM];
@@ -296,18 +298,19 @@ namespace EDM{
     
       
       return;
-  #else
+#else
       duplicate_boundary();
-  #endif//CUDACC
+#endif//CUDACC
     }//do_duplicate_boundary
 
-    HOST_DEV edm_data_t do_add_value(const edm_data_t* x0, edm_data_t height) {
-        #ifdef __CUDACC__ //device version
+    HOST_DEV edm_data_t do_add_value(const edm_data_t* buffer) {
+#ifdef __CUDACC__ //device version
       size_t i,j;
-
+      
       int index[DIM];//some temp local index, possibly negative
       int index1; //some temp collapsed index, possibly negative
 
+      edm_data_t height;//the height of the hill retrieved from the buffer
       edm_data_t xx[DIM]; //points away from hill center but affected by addition
       size_t xx_index[DIM];//The grid index that corresponds to xx
       size_t xx_index1;//The collapsed grid index that corresponds to xx
@@ -332,8 +335,14 @@ namespace EDM{
 
       //switch to non-const so we can wrap
       edm_data_t x[DIM];
-      for(i = 0; i < DIM; i++)
-	x[i] = x0[i + threadIdx.x/minisize_total_ + blockIdx.x * blockDim.x ];
+      i = threadIdx.y;//for(i = 0; i < DIM; i++)
+      for(i = 0; i < threadIdx.y + DIM; i++){
+	x[i] = buffer[i];//MAKE SURE THIS IS PASSED AS A BIG ARR
+      }
+      height = buffer[i];//the height is after the coords
+
+
+// + threadIdx.x/minisize_total_ + blockIdx.x * blockDim.x ];
 
 
       do_remap(x); //attempt to remap to be close or in grid
@@ -441,9 +450,9 @@ namespace EDM{
 		temp3 = exp(-pow(x[j] - boundary_max_[j], 2) / (pow(sigma_[j],2)));
 		temp4 = sigmoid((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR));
 
-  #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 		bc_correction = (temp1  - expo ) * temp2 + (temp3 - expo ) * temp4;
-  #endif
+#endif
 		bc_denom *= bc_denom_table_[j][bc_index];
 	    
 		//dp has been divided by sigma once already
@@ -454,12 +463,12 @@ namespace EDM{
 		//this is just the force of the uncorrected
 		bc_force[j] = temp5 * expo;
 
-  #ifdef BC_CORRECTION
+#ifdef BC_CORRECTION
 		bc_force[j] +=  (temp1 - expo) * temp6 - 
 		  temp5 * expo * temp2 + 
 		  (temp3 - expo) * temp7  -
 		  temp5 * expo * temp4;
-  #endif
+#endif
 
 		bc_force[j] = bc_force[j] * bc_denom - bc_denom_deriv_table_[j][bc_index] * (expo + bc_correction);	    
 		bc_force[j] /= bc_denom * bc_denom;
@@ -470,8 +479,8 @@ namespace EDM{
 	      }
 	    }
 	    expo /= bc_denom;
-	
-      
+
+
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
 	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
@@ -501,10 +510,10 @@ namespace EDM{
       return bias_added;
     
       //return(0);
-      #else
-      return(add_value(x0, height));
+#else
+      return(add_value(buffer[threadIdx.y], buffer[threadIdx.y + DIM]));
 
-      #endif//CUDACC
+#endif//CUDACC
     }//do_add_value
 
 
@@ -577,8 +586,8 @@ namespace EDM_Kernels{
    * how much mass was added.
    */
   template <int DIM>
-  __global__ void add_value_kernel(const edm_data_t* point, edm_data_t height, DimmedGaussGridGPU<DIM>* g){
-    g->do_add_value(point, height);
+  __global__ void add_value_kernel(const edm_data_t* buffer, DimmedGaussGridGPU<DIM>* g){
+    g->do_add_value(buffer);
     return;
   }
 
@@ -590,8 +599,8 @@ namespace EDM_Kernels{
    */
 
   template <int DIM>
-  __global__ void add_value_integral_kernel(const edm_data_t* point, edm_data_t height, edm_data_t* target, DimmedGaussGridGPU<DIM>* g){
-    target[threadIdx.x] = g->do_add_value(point, height);
+  __global__ void add_value_integral_kernel(const edm_data_t* buffer, edm_data_t* target, DimmedGaussGridGPU<DIM>* g){
+    target[threadIdx.x] = g->do_add_value(buffer);
     return;
   }
 

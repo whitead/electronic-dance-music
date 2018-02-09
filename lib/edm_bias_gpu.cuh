@@ -70,7 +70,8 @@ namespace EDM{
     using EDMBias::pre_add_hill;
 
     int read_input(const std::string& input_filename);
-
+    edm_data_t flush_buffers(int synched);
+    edm_data_t do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type);
     edm_data_t* send_buffer_;
 
     

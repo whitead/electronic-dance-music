@@ -256,7 +256,7 @@ void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, 
 void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask) {
 
   int i;
-  pre_add_hill(nlocal);
+  pre_add_hill(nlocal);//this is unchanged b/c it's all cpu-side
   for(i = 0; i < nlocal; i++) {
     if(apply_mask < 0 || apply_mask & mask_[i])
       add_hill(&positions[i][0], runiform[i]);
@@ -278,4 +278,37 @@ void EDM::EDMBiasGPU::queue_add_hill(const edm_data_t* position, edm_data_t this
   if(buffer_i_ >= BIAS_BUFFER_SIZE)
     temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
   
+}
+
+edm_data_t EDM::EDMBiasGPU::flush_buffers(int synched) {
+
+  edm_data_t bias_added = 0;
+  
+  //flush the buffer. only one with GPU version for now...
+  //TODO: make this a kernel call!
+  edm_data_t* d_bias_added;
+  gpuErrchk(cudaMalloc((void**)&d_bias_added, sizeof(edm_data_t)));
+  bias_added += do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
+
+  //reset buffer count
+  buffer_i_ = 0;
+
+  return bias_added;
+}
+
+edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type){
+  /*TODO: REPLACE this with a properly-calculated kernel call such that we can recover
+  ** the bias_added but only call kernel *once*...
+  ** Note: see edm_gpu_test.cu:1377 for how that's called.
+  */
+  edm_data_t bias_added = 0;
+  
+  size_t i;
+  for(i = 0; i < hill_number; i++){
+    bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);    
+    hills_added_++;
+    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
+  }
+
+  return bias_added;
 }
