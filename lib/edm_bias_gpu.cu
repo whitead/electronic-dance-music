@@ -1,5 +1,6 @@
 #include "edm_bias_gpu.cuh"
 #include "grid_gpu.cuh"
+#include "gaussian_grid_gpu.cuh"
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <cmath>
@@ -12,12 +13,15 @@
 #include <map>
 
 
-
+using namespace EDM_Kernels;
 
 
 EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename) {
   printf("Called EDMBiasGPU constructor...\n");
-  gpuErrchk(cudaMallocManaged((void**)&send_buffer_, sizeof(edm_data_t) * BIAS_BUFFER_DBLS));
+  gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * BIAS_BUFFER_DBLS));
+  for(int i = 0; i < BIAS_BUFFER_DBLS; i++){
+    send_buffer_[i] = 0;//CUDA wants this..?
+  }
   read_input(input_filename);
 }
 
@@ -145,7 +149,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
    */
   //parse file into a map
   using namespace std;
-
   ifstream input(input_filename.c_str());
   if(!input.is_open()) {      
     cerr << "Cannot open input file " << input_filename << endl;
@@ -172,7 +175,7 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
       return 0;
     extract_edm_data_t("global_tempering", parsed_input, 0,&global_tempering_);    
   }
-  
+
   if(!extract_edm_data_t("hill_prefactor", parsed_input, 1, &hill_prefactor_))
     return 0;
   extract_edm_data_t("hill_density", parsed_input, 0, &hill_density_);
@@ -181,7 +184,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     return 0;
   else
     dim_ = tmp;
-  
   if(dim_ == 0 || dim_ > 3) {
     cerr << "Invalid dimesion " << dim_ << endl;
     return 0;
@@ -194,7 +196,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
   cudaMallocManaged(&min_ ,sizeof(edm_data_t) * dim_ );
   cudaMallocManaged(&max_ ,sizeof(edm_data_t) * dim_ );
   cudaMallocManaged(&b_periodic_boundary_ ,sizeof(int) * dim_ );
-  
   if(!extract_edm_data_t_array("bias_spacing", parsed_input, 1, bias_dx_, dim_))
     return 0;
   if(!extract_edm_data_t_array("bias_sigma", parsed_input, 1, bias_sigma_, dim_))
@@ -217,7 +218,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     expected_target_ = target_->expected_bias();//read_grid_gpu() returns a Grid*
     std::cout << "(edm_bias_gpu) Expected Target is " << expected_target_ << std::endl;
   }
-
   if(parsed_input.find("initial_bias_filename") == parsed_input.end()) {
     initial_bias_ = NULL;
   } else {
@@ -225,7 +225,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     string cleaned_filename = clean_string(ibfilename, 0);
     initial_bias_ = read_grid_gpu(dim_, cleaned_filename, 1); //read grid, do use interpolation
   }
-
 
   if(parsed_input.find("hills_filename") != parsed_input.end()) {
     string hfilename = parsed_input.at("hills_filename");
@@ -237,7 +236,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     hill_output_.open(cleaned_filename.c_str());
 
   }
-
   if(parsed_input.find("histogram_filename") != parsed_input.end()) {
     string hist_filename = parsed_input.at("histogram_filename");
     hist_output_ = clean_string(hist_filename, 0);
@@ -253,6 +251,7 @@ void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, 
   add_hills(nlocal, positions, runiform, -1);
 }
 
+//TODO (maybe): parallelize this call too
 void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask) {
 
   int i;
@@ -263,6 +262,23 @@ void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, 
   }
   post_add_hill();
 
+}
+
+void EDM::EDMBiasGPU::post_add_hill() {
+
+  if(temp_hill_cum_ < 0) {
+    //error must call pre_add_hill before post_add_hill
+  }
+
+  temp_hill_cum_ += flush_buffers(1); //flush and done
+
+
+  update_height(temp_hill_cum_);
+
+  temp_hill_cum_ = -1;
+  temp_hill_prefactor_ = -1;
+  steps_++;
+  printf("post_add_hill was called. steps_ = %d\n", steps_);
 }
 
 
@@ -281,13 +297,9 @@ void EDM::EDMBiasGPU::queue_add_hill(const edm_data_t* position, edm_data_t this
 }
 
 edm_data_t EDM::EDMBiasGPU::flush_buffers(int synched) {
-
   edm_data_t bias_added = 0;
-  
   //flush the buffer. only one with GPU version for now...
   //TODO: make this a kernel call!
-  edm_data_t* d_bias_added;
-  gpuErrchk(cudaMalloc((void**)&d_bias_added, sizeof(edm_data_t)));
   bias_added += do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
 
   //reset buffer count
@@ -302,13 +314,64 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   ** Note: see edm_gpu_test.cu:1377 for how that's called.
   */
   edm_data_t bias_added = 0;
-  
-  size_t i;
-  for(i = 0; i < hill_number; i++){
-    bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);    
-    hills_added_++;
-    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
+  printf("edm_bias_gpu.cu:307 Called do_add_hills.\n");
+  size_t i, j;
+  int minisize = bias_->get_minisize_total();//this works
+  printf("edm_bias_gpu.cu:309 minisize set to %d, with hill number = %zd\n", minisize, hill_number);
+  dim3 grid_dims(minisize, hill_number);
+  edm_data_t* d_bias_added;
+  gpuErrchk(cudaMallocManaged((void**)&d_bias_added, minisize * hill_number * sizeof(edm_data_t)));
+  for(i = 0; i < minisize * hill_number; i++){
+    d_bias_added[i] = 0;
   }
+  //TODO: FIX THIS SEGFAULT!
+  launch_add_value_integral_kernel(dim_, buffer, d_bias_added, bias_, grid_dims);//this launches kernel.
+
+//  for(i = 0; i < hill_number; i++){
+//    for(j = 0; j < minisize; j++){
+//      bias_added += d_bias_added[i*minisize + j];//sum over each mini-grid
+//    }
+//    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
+//  }
+  hills_added_ += hill_number;
 
   return bias_added;
+}
+
+/*have to use another switch-based function to dynamically launch 
+ *a kernel without prior knowledge of what dimension we're using.
+ */
+void EDM::EDMBiasGPU::launch_add_value_integral_kernel(int dim, const edm_data_t* buffer, edm_data_t* target, Grid* bias, dim3 grid_dims){
+  printf("Called launch_add_value_integral kernel with dimension %d!\n", dim);
+  switch(dim){
+  case 1:
+    DimmedGaussGridGPU<1>* d_bias;
+    printf("Trying to copy a 1D grid to GPU...\n");
+    gpuErrchk(cudaMalloc((void**)&d_bias, sizeof(DimmedGaussGridGPU<1>)));
+    gpuErrchk(cudaMemcpy(d_bias, bias, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+    printf("Successfully copied the 1D grid to GPU.\n");
+    gpuErrchk(cudaDeviceSynchronize());
+    printf("launching kernel with grid_dims x = %d, y = %d...\n", grid_dims.x, grid_dims.y);
+    add_value_integral_kernel<1><<<1, grid_dims>>>(buffer, target, d_bias);
+    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    return;
+  case 2:
+    DimmedGaussGridGPU<2>* d_bias2;
+    gpuErrchk(cudaMalloc((void**)&d_bias2, sizeof(DimmedGaussGridGPU<2>)));
+    gpuErrchk(cudaMemcpy(d_bias2, bias, sizeof(DimmedGaussGridGPU<2>), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaDeviceSynchronize());
+    add_value_integral_kernel<2><<<1, grid_dims>>>(buffer, target, d_bias2);
+    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    return;
+  case 3:
+    DimmedGaussGridGPU<3>* d_bias3;
+    gpuErrchk(cudaMalloc((void**)&d_bias3, sizeof(DimmedGaussGridGPU<3>)));
+    gpuErrchk(cudaMemcpy(d_bias3, bias, sizeof(DimmedGaussGridGPU<3>), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaDeviceSynchronize());
+    add_value_integral_kernel<3><<<1, grid_dims>>>(buffer, target, d_bias3);
+    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    return;
+  }
+  printf("SHOULD NOT BE HERE!!!\n");
+  return;
 }

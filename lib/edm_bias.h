@@ -65,7 +65,7 @@ namespace EDM{
      **/
     void setup(edm_data_t temperature, edm_data_t boltzmann_constant);
     
-    int read_input(const std::string& input_filename);
+    virtual int read_input(const std::string& input_filename);
     /**
      * This version of update_forces is the most general and will update
      * the forces of the arrays. apply_mask will be used to test against
@@ -88,11 +88,11 @@ namespace EDM{
      * Add hills using arrays. A precomputed array (different each time) needs to be
      * passed if stochastic sampling is done (otherwise NULL).
      **/
-    void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform);
+    virtual void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform);
     /**
      * Add hills using arrays and taking a mask.
      **/
-    void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask);
+    virtual void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask);
 
     /**
      * A way to add hills one at a time. Call pre_add_hill first,
@@ -106,7 +106,7 @@ namespace EDM{
      **/
     void pre_add_hill(int est_hill_count);
     void add_hill(const edm_data_t* position, edm_data_t runiform);
-    void post_add_hill();
+    virtual void post_add_hill();
 
     /**
      * Write the bias across all MPI processes. Will also output individual if EDM_MPI_DEBUG is deinfed
@@ -197,14 +197,14 @@ namespace EDM{
      * This code performs the actual adding of hills in the buffer OR it 
      * calls the GPU host method to invoke a GPU kernel to execute the hill add 
      */
-    edm_data_t do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type);
+    virtual edm_data_t do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type);
 
     /*
      * This function will put the hills into our buffer of hills to 
      * add. The buffer will be flushed either when it's full or at the end
      * of the overall hill-add step.
      */
-    void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
+    virtual void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
 
     
     EDMBias(const EDMBias& that);//just disable copy constructor
@@ -229,7 +229,7 @@ namespace EDM{
      * These two methods are used to send hills to my neighobrs
      */
     int check_for_flush();
-    edm_data_t flush_buffers(int snyched);
+    virtual edm_data_t flush_buffers(int snyched);
 
 
 

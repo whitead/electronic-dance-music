@@ -488,7 +488,7 @@ void EDM::EDMBias::post_add_hill() {
  
 
 void EDM::EDMBias::output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type) {
-   
+  
   size_t i;
    
   hill_output_ << std::setprecision(8) << std::fixed;

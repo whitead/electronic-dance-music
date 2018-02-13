@@ -68,6 +68,7 @@ namespace EDM{
     void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask);
     void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
     using EDMBias::pre_add_hill;
+    void post_add_hill();
 
     int read_input(const std::string& input_filename);
     edm_data_t flush_buffers(int synched);
@@ -78,7 +79,7 @@ namespace EDM{
   private:
     //histogram output
     std::string hist_output_;
-
+    void launch_add_value_integral_kernel(int dim, const edm_data_t* buffer, edm_data_t* target, Grid* grid, dim3 grid_dims);
 
   };
 

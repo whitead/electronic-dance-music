@@ -51,6 +51,25 @@ namespace EDM{
 								  b_periodic, 
 								  b_derivatives, 
 								  b_interpolate){
+      gpuErrchk(cudaMallocManaged(&dx_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&min_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&max_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&grid_number_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&b_periodic_, sizeof(edm_data_t) * DIM));
+      size_t i;
+      for(i = 0; i < DIM; i++) {
+	min_[i] = min[i];
+	max_[i] = max[i];
+	b_periodic_[i] = b_periodic[i];
+
+	grid_number_[i] = (int) ceil((max_[i] - min_[i]) / bin_spacing[i]);
+	dx_[i] = (max_[i] - min_[i]) / grid_number_[i];
+	//add one to grid points if 
+	grid_number_[i] = b_periodic_[i] ? grid_number_[i] : grid_number_[i] + 1;
+	//increment dx to compensate
+	if(!b_periodic_[i])
+	  max_[i] += dx_[i];
+      }
       initialize();
     }
 
@@ -65,6 +84,12 @@ namespace EDM{
      * Constructor from file, with interpolation specified
      **/
     DimmedGridGPU(const std::string& input_grid, int b_interpolate): DimmedGrid<DIM> (input_grid, b_interpolate) {
+      gpuErrchk(cudaMallocManaged(&dx_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&min_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&max_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&grid_number_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&b_periodic_, sizeof(edm_data_t) * DIM));
+
       read(input_grid);
     }
 
@@ -102,6 +127,12 @@ namespace EDM{
 #endif //CUDACC
 	grid_deriv_ = NULL;
       }
+      gpuErrchk(cudaMallocManaged(&dx_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&min_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&max_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&grid_number_, sizeof(edm_data_t) * DIM));
+      gpuErrchk(cudaMallocManaged(&b_periodic_, sizeof(edm_data_t) * DIM));
+
       read(input_grid);
     }
 
@@ -118,6 +149,39 @@ namespace EDM{
 	gpuErrchk(cudaFree(grid_deriv_));
 	grid_deriv_ = NULL;
       }
+      if(dx_ != NULL){
+	gpuErrchk(cudaFree(dx_));
+	dx_ = NULL;
+      }
+      if(min_ != NULL){
+	gpuErrchk(cudaFree(min_));
+	min_ = NULL;
+      }
+      if(max_ != NULL){
+	gpuErrchk(cudaFree(max_));
+	max_ = NULL;
+      }
+      if(grid_number_ != NULL){
+	gpuErrchk(cudaFree(grid_number_));
+	grid_number_ = NULL;
+      }
+      if(b_periodic_ != NULL){
+	gpuErrchk(cudaFree(b_periodic_));
+	b_periodic_ = NULL;
+      }
+      if(d_grid_number_ != NULL){
+	cudaFree(d_grid_number_);
+	d_grid_number_ = NULL;
+      }
+      if(d_b_derivatives_ != NULL){
+	cudaFree(d_b_derivatives_);
+	d_b_derivatives_ = NULL;
+      }
+      if(d_b_interpolate_ != NULL){
+	cudaFree(d_b_interpolate_);
+	d_b_interpolate_ = NULL;
+      }
+
     }
 
 
@@ -263,6 +327,7 @@ namespace EDM{
       }
 
       // read plumed-style header
+
       string word;
       input >> word >> word;
       if(word.compare("FORCE") != 0) {
@@ -271,7 +336,8 @@ namespace EDM{
       } else {
 	input >> b_derivatives_;
       }
-    
+
+
       input >> word >> word;
       if(word.compare("NVAR") != 0) {
 	cerr << "Mangled grid file: " << filename << " No NVAR found" << endl;
@@ -284,6 +350,7 @@ namespace EDM{
 
 	}
       }
+
 
       input >> word >> word;
       if(word.compare("TYPE") != 0) {
@@ -298,6 +365,7 @@ namespace EDM{
 	}
       }
 
+
       input >> word >> word;
       if(word.compare("BIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No BIN found" << endl;
@@ -308,6 +376,7 @@ namespace EDM{
 	}
       }
 
+
       input >> word >> word;
       if(word.compare("MIN") != 0) {
 	cerr << "Mangled grid file: " << filename << " No MIN found" << endl;
@@ -317,6 +386,7 @@ namespace EDM{
 	  input >> min_[i];
 	}
       }
+
 
       input >> word >> word;
       if(word.compare("MAX") != 0) {
@@ -380,7 +450,6 @@ namespace EDM{
       // if(grid_deriv_ != NULL){
       //   free(grid_deriv_);
       // }
-    
       //build arrays
       initialize();
     
@@ -397,7 +466,7 @@ namespace EDM{
 	  }
 	}
       }    
-
+      gpuErrchk(cudaDeviceSynchronize());
       //all done!
       input.close();
     }
@@ -406,7 +475,9 @@ namespace EDM{
      * Called by the __host__ version of do_get_value() for GPU grids.
      **/
     virtual edm_data_t get_value(const edm_data_t* x) const{
+      printf("get_value of grid_gpu.cuh was called.\n");
       if(!(this->in_grid(x))){
+	printf("in_grid(x) failed!\n");
 	return 0;
       }
       if(b_interpolate_ && b_derivatives_) {
@@ -431,12 +502,12 @@ namespace EDM{
     using DimmedGrid<DIM>::b_interpolate_;
     using DimmedGrid<DIM>::grid_;
     using DimmedGrid<DIM>::grid_deriv_;
-    using DimmedGrid<DIM>::dx_;
-    using DimmedGrid<DIM>::min_;
-    using DimmedGrid<DIM>::max_;
-    using DimmedGrid<DIM>::grid_number_;
-    using DimmedGrid<DIM>::b_periodic_;
-    using DimmedGrid<DIM>::read;
+    edm_data_t* dx_;
+    edm_data_t* min_;
+    edm_data_t* max_;
+    int* grid_number_;
+    int* b_periodic_;
+    //using DimmedGrid<DIM>::read;
 
   private:  
 

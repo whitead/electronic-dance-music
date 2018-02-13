@@ -66,6 +66,7 @@ namespace EDM{
      *Write out the file in lammps tabular potential format.
      **/
     virtual void lammps_multi_write(const std::string& filename) const = 0;
+    virtual size_t get_minisize_total() const = 0;
   };//class Grid
 
   template< int DIM>
@@ -116,8 +117,8 @@ namespace EDM{
       //nothing
     }
 
-    edm_data_t get_value(const edm_data_t* x) const {
-
+    virtual edm_data_t get_value(const edm_data_t* x) const {
+      printf("get_value in gaussian_grid.h was called!\n");
       size_t i;
 
       //for constness
@@ -128,8 +129,11 @@ namespace EDM{
       //Attempt to wrap around the specified boundaries (possibly separate from grid bounds)
       if(!in_bounds(xx)) {
 	remap(xx);
-	if(!in_bounds(xx))
+	if(!in_bounds(xx)){
+	  printf("x was NOT IN BOUNDS!!\n");
 	  return 0;
+	}
+	  
       }
     
       return grid_.get_value(xx);
@@ -184,6 +188,10 @@ namespace EDM{
 		     int b_lammps_format) const {
       grid_.multi_write(filename, box_low, box_high, b_periodic, 0);
     }//multi_write
+
+    size_t get_minisize_total() const{
+      return(minisize_total_);
+    }
 
   
     void set_interpolation(int b_interpolate) {

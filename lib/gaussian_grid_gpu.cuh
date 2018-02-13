@@ -60,7 +60,6 @@ namespace EDM{
     //HOST_DEV edm_data_t do_add_value(const edm_data_t* x0, edm_data_t * height);
 
     HOST_DEV void do_remap(edm_data_t x[DIM]) const {
-#ifdef __CUDACC__
       edm_data_t dp[2];
       size_t i;
 
@@ -96,11 +95,29 @@ namespace EDM{
 	}
       }
       return;
-#else
-      remap(x);
-#endif //CUDACC
-      
     }//do_remap
+
+    edm_data_t get_value(const edm_data_t* x) const {
+      printf("get_value in gaussian_grid_gpu.h was called!                   (onGPU)\n");
+      size_t i;
+
+      //for constness
+      edm_data_t xx[DIM];
+      for(i = 0; i < DIM; i++)
+	xx[i] = x[i];
+
+      //Attempt to wrap around the specified boundaries (possibly separate from grid bounds)
+      if(!in_bounds(xx)) {
+	do_remap(xx);
+	if(!in_bounds(xx)){
+	  printf("x was NOT IN BOUNDS!!\n");
+	  return 0;
+	}
+	  
+      }
+    
+      return grid_.get_value(xx);
+    }//get_value
 
 
     HOST_DEV void do_set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {
@@ -231,6 +248,11 @@ namespace EDM{
     
     }
 
+    size_t get_minisize_total(){
+      return(minisize_total_);
+    }
+      
+
     HOST_DEV void do_duplicate_boundary(){
 #ifdef __CUDACC__
       size_t i,j,k,l;
@@ -336,17 +358,15 @@ namespace EDM{
       //switch to non-const so we can wrap
       edm_data_t x[DIM];
       i = threadIdx.y;//for(i = 0; i < DIM; i++)
-      for(i = 0; i < threadIdx.y + DIM; i++){
+      for(i; i < threadIdx.y + DIM; i++){
 	x[i] = buffer[i];//MAKE SURE THIS IS PASSED AS A BIG ARR
       }
       height = buffer[i];//the height is after the coords
-
 
 // + threadIdx.x/minisize_total_ + blockIdx.x * blockDim.x ];
 
 
       do_remap(x); //attempt to remap to be close or in grid
-
       //now do check on if we are in the boundary of the overall grid
       for(i = 0; i < DIM; i++)
 	if(!b_periodic_boundary_[i] && (x[i] < boundary_min_[i] || x[i] > boundary_max_[i]))
@@ -359,7 +379,6 @@ namespace EDM{
       for(i = 0; i < DIM; i++) {
 	x_index[i] = int_floor((x[i] - grid_.min_[i]) / grid_.dx_[i]);
       }
-
       //loop over only the support of the gaussian
       i = threadIdx.x;
       if( i < minisize_total_) {
@@ -378,13 +397,11 @@ namespace EDM{
 	for(j = 0; j < DIM; j++)
 	  index[j] -= minisize_[j];
 
-
 	b_flag = 0;
 	//convert offset into grid index and point
 	for(j = 0; j < DIM; j++) {
 	  //turn offset into index
 	  index[j] += x_index[j];
-
 	  //check if out of grid or needs to be wrap
 	  if(index[j] >= grid_.grid_number_[j]) {
 	    if(grid_.b_periodic_[j]) {
@@ -404,16 +421,13 @@ namespace EDM{
 	  }
 	  //we know now it's > 0 and in grid
 	  xx_index[j] = static_cast<size_t>(index[j]);
-
 	  xx[j] = grid_.min_[j] + grid_.dx_[j] * xx_index[j];
-	
 	  //is this point within the boundary?
 	  if(!b_periodic_boundary_[j] && (xx[j] < boundary_min_[j] || xx[j] > boundary_max_[j])) {
 	    b_flag = 1;
 	    break;
 	  }
 	}
-
 	//was this point out of grid?
 	if(!b_flag){
 
@@ -449,17 +463,14 @@ namespace EDM{
 		temp2 = sigmoid((xx[j] - boundary_min_[j]) / (sigma_[j] * BC_MAR));
 		temp3 = exp(-pow(x[j] - boundary_max_[j], 2) / (pow(sigma_[j],2)));
 		temp4 = sigmoid((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR));
-
 #ifdef BC_CORRECTION
 		bc_correction = (temp1  - expo ) * temp2 + (temp3 - expo ) * temp4;
 #endif
 		bc_denom *= bc_denom_table_[j][bc_index];
-	    
 		//dp has been divided by sigma once already
 		temp5 = -2 * dp[j] / sigma_[j];
 		temp6 = sigmoid_dx((xx[j] - boundary_min_[j]) / (sigma_[j] * BC_MAR)) / (BC_MAR * sigma_[j]);
 		temp7 = -sigmoid_dx((boundary_max_[j] - xx[j]) / (sigma_[j] * BC_MAR)) / (BC_MAR * sigma_[j]);
-	    
 		//this is just the force of the uncorrected
 		bc_force[j] = temp5 * expo;
 
@@ -473,13 +484,11 @@ namespace EDM{
 		bc_force[j] = bc_force[j] * bc_denom - bc_denom_deriv_table_[j][bc_index] * (expo + bc_correction);	    
 		bc_force[j] /= bc_denom * bc_denom;
 		bc_correction /= bc_denom;
-	    
 	      } else {
 		bc_denom *=  sqrt(M_PI) * sigma_[j];
 	      }
 	    }
 	    expo /= bc_denom;
-
 
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
@@ -495,7 +504,6 @@ namespace EDM{
 
 	    if(!b_dirty_bounds && bc_correction * bc_correction >  0)
 	      b_dirty_bounds = 1; //set it to be true that our bounds are dirty.
-
 	  }
 	}
 
@@ -508,10 +516,6 @@ namespace EDM{
 
       }//if(i < minisize_total)
       return bias_added;
-    
-      //return(0);
-#else
-      return(add_value(buffer[threadIdx.y], buffer[threadIdx.y + DIM]));
 
 #endif//CUDACC
     }//do_add_value
