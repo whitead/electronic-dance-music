@@ -475,6 +475,7 @@ namespace EDM{
      * Called by the __host__ version of do_get_value() for GPU grids.
      **/
     virtual edm_data_t get_value(const edm_data_t* x) const{
+      gpuErrchk(cudaDeviceSynchronize());
       printf("get_value of grid_gpu.cuh was called.\n");
       if(!(this->in_grid(x))){
 	printf("in_grid(x) failed!\n");

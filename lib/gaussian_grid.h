@@ -139,7 +139,7 @@ namespace EDM{
       return grid_.get_value(xx);
     }//get_value
 
-    edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const{
+    virtual edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const{
 
       size_t i;
 

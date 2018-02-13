@@ -98,7 +98,7 @@ namespace EDM{
     }//do_remap
 
     edm_data_t get_value(const edm_data_t* x) const {
-      printf("get_value in gaussian_grid_gpu.h was called!                   (onGPU)\n");
+      gpuErrchk(cudaDeviceSynchronize());      
       size_t i;
 
       //for constness
@@ -118,6 +118,28 @@ namespace EDM{
     
       return grid_.get_value(xx);
     }//get_value
+
+    edm_data_t get_value_deriv(const edm_data_t* x, edm_data_t* der) const{
+      gpuErrchk(cudaDeviceSynchronize());
+      size_t i;
+
+      //for constness
+      edm_data_t xx[DIM];
+      for(i = 0; i < DIM; i++)
+	xx[i] = x[i];
+
+      //Attempt to wrap around the specified boundaries (separate from grid bounds)
+      if(!in_bounds(xx)) {
+	do_remap(xx);
+	if(!in_bounds(xx)) {
+	  for(i = 0; i < DIM; i++)
+	    der[i] = 0;
+	  return 0;
+	}
+      }
+
+      return grid_.get_value_deriv(xx, der);
+    }//get_value_deriv
 
 
     HOST_DEV void do_set_boundary(const edm_data_t* min, const edm_data_t* max, const int* b_periodic) {

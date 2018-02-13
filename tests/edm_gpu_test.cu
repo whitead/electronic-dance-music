@@ -1380,10 +1380,9 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
 
 
   add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, d_bias_added, d_g);
-  unsigned int blockSize = 128;
   printf("The g.minisize_total_ is %zd\n", g.minisize_total_);
   //for some reason, addreduce is getting segfaults, but the intergral kernel works...
-  //might need to add special treatment for non-power-of-2 addreduce
+  //TODO: might need to add special treatment for non-power-of-2 addreduce
   //addReduce<<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_, blockSize);//<blockSize><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
   //printf("d_bias_added[0] is now: %f\n", d_bias_added[0]);
   gpuErrchk(cudaDeviceSynchronize());
@@ -1440,12 +1439,12 @@ BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
   bias.add_hills(1, positions, runiform);
   bias.write_bias("BIAS");//TODO: investigate why this isn't actually writing
   //test if the value at the point is correct
-  gpuErrchk(cudaDeviceSynchronize());
+  //gpuErrchk(cudaDeviceSynchronize());
   edm_data_t bias_value = bias.bias_->get_value(positions[0]);
-  edm_data_t bias_sig_value = bias.bias_sigma_[0];
   BOOST_REQUIRE(pow( bias_value - bias.hill_prefactor_ / sqrt(2 * M_PI) / bias.bias_sigma_[0], 2) < EPSILON);
   //check if the claimed amount of bias added is correct
   printf("Checking cumulative bias.\n");
+  printf("bias.cum_bias_ = %f, and it should be about %f\n", bias.cum_bias_, bias.hill_prefactor_);
   BOOST_REQUIRE(pow(bias.cum_bias_ - bias.hill_prefactor_, 2) < 0.001);
   printf("Cumulative bias OK.\n");
   //now  check that the forces point away from the hills
@@ -1453,6 +1452,7 @@ BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
   edm_data_t der[0];
   positions[0][0] = 4.99; //to the left
   bias.bias_->get_value_deriv(positions[0], der);
+  printf("get_value_deriv(4.99) gave us %f\n", der[0]);
   //the negative of the bias (the force) should point to the left
   BOOST_REQUIRE(-der[0] < 0);
 

@@ -326,13 +326,14 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   }
   //TODO: FIX THIS SEGFAULT!
   launch_add_value_integral_kernel(dim_, buffer, d_bias_added, bias_, grid_dims);//this launches kernel.
-
-//  for(i = 0; i < hill_number; i++){
-//    for(j = 0; j < minisize; j++){
-//      bias_added += d_bias_added[i*minisize + j];//sum over each mini-grid
-//    }
-//    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
-//  }
+  gpuErrchk(cudaDeviceSynchronize());
+  for(i = 0; i < hill_number; i++){
+    for(j = 0; j < minisize; j++){
+      bias_added += d_bias_added[i*minisize + j];//sum over each mini-grid
+    }
+    gpuErrchk(cudaDeviceSynchronize());
+    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
+  }
   hills_added_ += hill_number;
 
   return bias_added;
