@@ -195,7 +195,6 @@ namespace EDM{
 	return(0);
       }
 #ifdef __CUDACC__ //device version
-
       if(d_b_interpolate_[0] && d_b_derivatives_[0]) {//these are pointers
 	edm_data_t temp[DIM];
 	return do_get_value_deriv(x, temp);
@@ -258,9 +257,6 @@ namespace EDM{
 
 
     HOST_DEV edm_data_t do_get_value_deriv(const edm_data_t* x, edm_data_t* der) const{
-      // if(d_b_derivatives_[0]){
-      // 	printf("I GUESS DERIVATIVES WAS TRUE ON GPU\n");
-      // }
       size_t i;
       if(!in_grid(x)) {
 	for(i = 0; i < DIM; i++)
@@ -291,7 +287,6 @@ namespace EDM{
 	  where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	  //treat possible stride wrap
 	  if(b_periodic_[i] && index[i] == grid_number_[i] - 1){
-//	  printf("adjusting for being at the right edge\n");
 	    stride[i] *= (1 - grid_number_[i]);
 	  }
 	  
@@ -476,9 +471,7 @@ namespace EDM{
      **/
     virtual edm_data_t get_value(const edm_data_t* x) const{
       gpuErrchk(cudaDeviceSynchronize());
-      printf("get_value of grid_gpu.cuh was called.\n");
       if(!(this->in_grid(x))){
-	printf("in_grid(x) failed!\n");
 	return 0;
       }
       if(b_interpolate_ && b_derivatives_) {

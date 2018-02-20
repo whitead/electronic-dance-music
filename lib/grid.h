@@ -95,7 +95,6 @@ template<int DIM>
   
   // looping over neighbour points:
   for(ipoint = 0; ipoint < npoints; ipoint++){
-//    printf("made it to ipoint = %i\n", ipoint);
     // find the local grid offset of neighbour point (x0) [0 or 1] and its corresponding change in collapsed index in order to use the given potential and forces
     tmp = ipoint;
     shift = 0;
@@ -349,7 +348,6 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
    * Get the value of the grid at x
    **/ 
   virtual edm_data_t get_value(const edm_data_t* x) const{
-
     if(!in_grid(x)) {
 //	std::cout << "THIS SHOULD BE PRINTING\n";
       /*
@@ -439,7 +437,6 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
 	where[i] = wrapped_x - min_[i] - index[i] * dx_[i];
 	//treat possible stride wrap
 	if(b_periodic_[i] && index[i] == grid_number_[i] - 1){
-//	  printf("adjusting for being at the right edge\n");
 	  stride[i] *= (1 - grid_number_[i]);
 	}
 	  

@@ -17,12 +17,12 @@ using namespace EDM_Kernels;
 
 
 EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename) {
-  printf("Called EDMBiasGPU constructor...\n");
-  gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * BIAS_BUFFER_DBLS));
-  for(int i = 0; i < BIAS_BUFFER_DBLS; i++){
+  gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * GPU_BIAS_BUFFER_SIZE));
+  for(int i = 0; i < GPU_BIAS_BUFFER_DBLS; i++){
     send_buffer_[i] = 0;//CUDA wants this..?
   }
   read_input(input_filename);
+  gpuErrchk(cudaDeviceSynchronize());
 }
 
 
@@ -60,8 +60,16 @@ EDM::EDMBiasGPU::~EDMBiasGPU() {
     gpuErrchk(cudaFree(b_periodic_boundary_));
     b_periodic_boundary_ = NULL;
   }
-    
+  if(send_buffer_ != NULL){
+    gpuErrchk(cudaFree(send_buffer_));
+    send_buffer_ = NULL;
+  }
 
+  if(d_bias_added_ != NULL){
+    gpuErrchk(cudaFree(d_bias_added_));
+    send_buffer_ = NULL;
+  }
+  gpuErrchk(cudaDeviceSynchronize());
 }
 
 void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3], 
@@ -119,6 +127,17 @@ void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3],
   bias_->set_boundary(min_, max_, b_periodic_boundary_);
   if(initial_bias_ != NULL)
     bias_->add(initial_bias_, 1.0, 0.0);
+
+  size_t free[1];
+  size_t total[1];
+  minisize = bias_->get_minisize_total();
+  cudaMemGetInfo(free, total);
+  printf("Free device mem: %zd // Total device mem: %zd // Attempting to malloc: %zu\n", free, total, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t));
+  gpuErrchk(cudaMallocManaged((void**)&d_bias_added_, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));//that's the biggest it will have to be
+  for(int i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){
+    d_bias_added_[i] = 0;
+  }
+
   
 
   
@@ -140,7 +159,6 @@ void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3],
 
   other_vol = vol;
   total_volume_ += other_vol;
-
 }
 
 int EDM::EDMBiasGPU::read_input(const std::string& input_filename){ 
@@ -278,7 +296,6 @@ void EDM::EDMBiasGPU::post_add_hill() {
   temp_hill_cum_ = -1;
   temp_hill_prefactor_ = -1;
   steps_++;
-  printf("post_add_hill was called. steps_ = %d\n", steps_);
 }
 
 
@@ -291,7 +308,7 @@ void EDM::EDMBiasGPU::queue_add_hill(const edm_data_t* position, edm_data_t this
   buffer_i_++;
   
   //do we need to flush?
-  if(buffer_i_ >= BIAS_BUFFER_SIZE)
+  if(buffer_i_ >= GPU_BIAS_BUFFER_SIZE)
     temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
   
 }
@@ -314,47 +331,64 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   ** Note: see edm_gpu_test.cu:1377 for how that's called.
   */
   edm_data_t bias_added = 0;
-  printf("edm_bias_gpu.cu:307 Called do_add_hills.\n");
   size_t i, j;
-  int minisize = bias_->get_minisize_total();//this works
-  printf("edm_bias_gpu.cu:309 minisize set to %d, with hill number = %zd\n", minisize, hill_number);
   dim3 grid_dims(minisize, hill_number);
-  edm_data_t* d_bias_added;
-  gpuErrchk(cudaMallocManaged((void**)&d_bias_added, minisize * hill_number * sizeof(edm_data_t)));
-  for(i = 0; i < minisize * hill_number; i++){
-    d_bias_added[i] = 0;
-  }
-  //TODO: FIX THIS SEGFAULT!
-  launch_add_value_integral_kernel(dim_, buffer, d_bias_added, bias_, grid_dims);//this launches kernel.
+  //TODO: change this so we're not using so much managed mem. Atomic adds to bias_added?
+  launch_add_value_integral_kernel(dim_, buffer, d_bias_added_, bias_, grid_dims);//this launches kernel.
   gpuErrchk(cudaDeviceSynchronize());
+  //TODO: g
   for(i = 0; i < hill_number; i++){
     for(j = 0; j < minisize; j++){
-      bias_added += d_bias_added[i*minisize + j];//sum over each mini-grid
+      bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
     }
     gpuErrchk(cudaDeviceSynchronize());
     output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
   }
   hills_added_ += hill_number;
-
   return bias_added;
+}
+
+void EDM::EDMBiasGPU::output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type) {
+  
+  size_t i;
+   
+  hill_output_ << std::setprecision(8) << std::fixed;
+  hill_output_ << steps_ << " ";
+  hill_output_ << type << " ";
+  hill_output_ << hills_added_ << " ";
+  for(i = 0; i < dim_; i++)  {
+    hill_output_ << position[i] << " ";
+  }
+  hill_output_ << height << " ";
+  hill_output_ << bias_added << " ";
+  hill_output_ << cum_bias_ / total_volume_ << std::endl;
+
+  //histogram it
+  if(type == NEIGH_HILL ||
+     type == BUFF_HILL ||
+     type == ADD_HILL) {
+    //cv_hist_->add_value(position, 1);
+  } else if(type == ADD_UNDO_HILL ||
+	    type == BUFF_UNDO_HILL) {
+    //undo histogram
+    //cv_hist_->add_value(position, -1);//commented for timing test only
+  }
+   
 }
 
 /*have to use another switch-based function to dynamically launch 
  *a kernel without prior knowledge of what dimension we're using.
  */
 void EDM::EDMBiasGPU::launch_add_value_integral_kernel(int dim, const edm_data_t* buffer, edm_data_t* target, Grid* bias, dim3 grid_dims){
-  printf("Called launch_add_value_integral kernel with dimension %d!\n", dim);
   switch(dim){
   case 1:
     DimmedGaussGridGPU<1>* d_bias;
-    printf("Trying to copy a 1D grid to GPU...\n");
     gpuErrchk(cudaMalloc((void**)&d_bias, sizeof(DimmedGaussGridGPU<1>)));
     gpuErrchk(cudaMemcpy(d_bias, bias, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
-    printf("Successfully copied the 1D grid to GPU.\n");
     gpuErrchk(cudaDeviceSynchronize());
-    printf("launching kernel with grid_dims x = %d, y = %d...\n", grid_dims.x, grid_dims.y);
     add_value_integral_kernel<1><<<1, grid_dims>>>(buffer, target, d_bias);
-    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    gpuErrchk(cudaFree(d_bias));
+    gpuErrchk(cudaDeviceSynchronize());
     return;
   case 2:
     DimmedGaussGridGPU<2>* d_bias2;
@@ -362,7 +396,8 @@ void EDM::EDMBiasGPU::launch_add_value_integral_kernel(int dim, const edm_data_t
     gpuErrchk(cudaMemcpy(d_bias2, bias, sizeof(DimmedGaussGridGPU<2>), cudaMemcpyHostToDevice));
     gpuErrchk(cudaDeviceSynchronize());
     add_value_integral_kernel<2><<<1, grid_dims>>>(buffer, target, d_bias2);
-    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    gpuErrchk(cudaFree(d_bias2));
+    gpuErrchk(cudaDeviceSynchronize());
     return;
   case 3:
     DimmedGaussGridGPU<3>* d_bias3;
@@ -370,9 +405,9 @@ void EDM::EDMBiasGPU::launch_add_value_integral_kernel(int dim, const edm_data_t
     gpuErrchk(cudaMemcpy(d_bias3, bias, sizeof(DimmedGaussGridGPU<3>), cudaMemcpyHostToDevice));
     gpuErrchk(cudaDeviceSynchronize());
     add_value_integral_kernel<3><<<1, grid_dims>>>(buffer, target, d_bias3);
-    printf("Now exiting call to launch_add_value_integral_kernel...\n");
+    gpuErrchk(cudaFree(d_bias3));
+    gpuErrchk(cudaDeviceSynchronize());
     return;
   }
-  printf("SHOULD NOT BE HERE!!!\n");
   return;
 }

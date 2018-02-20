@@ -20,7 +20,6 @@ EDM::Grid* EDM::make_grid_gpu( int dim,
 }
 
 EDM::Grid* EDM::read_grid_gpu( int dim, const std::string& filename, int b_interpolate) {
-  printf("read_grid_gpu was called with dimension %i\n", dim);
   switch(dim) {
   case 1:
     return new DimmedGridGPU<1>(filename, b_interpolate);
@@ -34,7 +33,6 @@ EDM::Grid* EDM::read_grid_gpu( int dim, const std::string& filename, int b_inter
 
 
 EDM::Grid* EDM::read_grid_gpu( int dim, const std::string& filename) {
-  printf("read_grid_gpu was called with dimension %i\n", dim);
   switch(dim) {
   case 1:
     return new DimmedGridGPU<1>(filename);

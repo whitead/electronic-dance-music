@@ -7,6 +7,10 @@
 #include "edm_bias.h"
 #include "gaussian_grid_gpu.cuh"
 
+#define GPU_BIAS_BUFFER_SIZE 2048
+#define GPU_BIAS_BUFFER_DBLS (2048 * 8)
+
+
 namespace EDM{ 
 
 //  template <unsigned int blockSize>
@@ -21,7 +25,6 @@ namespace EDM{
 
 //  template <unsigned int blockSize>
   __global__ void addReduce(edm_data_t *g_idata, edm_data_t *g_odata, unsigned int n, unsigned int blockSize){
-    printf("Hello from thread %d\n", threadIdx.x);
     extern __shared__ edm_data_t sdata[];
     unsigned int tid= threadIdx.x;
     unsigned int i = blockIdx.x * (blockSize * 2) + tid;
@@ -74,6 +77,10 @@ namespace EDM{
     edm_data_t flush_buffers(int synched);
     edm_data_t do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type);
     edm_data_t* send_buffer_;
+    int minisize;//tracks the minisize of the bias
+    edm_data_t* d_bias_added_;//track bias added on GPU.
+
+    void output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type);
 
     
   private:

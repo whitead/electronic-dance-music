@@ -110,7 +110,6 @@ namespace EDM{
       if(!in_bounds(xx)) {
 	do_remap(xx);
 	if(!in_bounds(xx)){
-	  printf("x was NOT IN BOUNDS!!\n");
 	  return 0;
 	}
 	  
@@ -347,6 +346,10 @@ namespace EDM{
 #endif//CUDACC
     }//do_duplicate_boundary
 
+    edm_data_t add_value(const edm_data_t* buffer){
+      return(do_add_value(buffer));
+    }
+    
     HOST_DEV edm_data_t do_add_value(const edm_data_t* buffer) {
 #ifdef __CUDACC__ //device version
       size_t i,j;
@@ -379,11 +382,12 @@ namespace EDM{
 
       //switch to non-const so we can wrap
       edm_data_t x[DIM];
-      i = threadIdx.y;//for(i = 0; i < DIM; i++)
-      for(i; i < threadIdx.y + DIM; i++){
-	x[i] = buffer[i];//MAKE SURE THIS IS PASSED AS A BIG ARR
+      int thread_y = threadIdx.y + blockDim.y * blockIdx.y;
+      i = thread_y * (DIM+1);//this is the index of the start of a new coord in buffer
+      for(i; i < thread_y + DIM; i++){
+	x[i] = buffer[i];//MAKE SURE THIS IS PASSED CORRECTLY
       }
-      height = buffer[i];//the height is after the coords
+      height = buffer[i];//the height is directly AFTER the coord value(s)
 
 // + threadIdx.x/minisize_total_ + blockIdx.x * blockDim.x ];
 
@@ -560,7 +564,7 @@ namespace EDM{
     using DimmedGaussGrid<DIM>::b_periodic_boundary_;
     using DimmedGaussGrid<DIM>::bc_denom_table_;
     using DimmedGaussGrid<DIM>::bc_denom_deriv_table_;
-    using DimmedGaussGrid<DIM>::add_value;
+//    using DimmedGaussGrid<DIM>::add_value;
 
     DimmedGridGPU<DIM> grid_;//the underlying grid is a GPU-able grid
   };//DimmedGaussGridGPU class

@@ -118,7 +118,6 @@ namespace EDM{
     }
 
     virtual edm_data_t get_value(const edm_data_t* x) const {
-      printf("get_value in gaussian_grid.h was called!\n");
       size_t i;
 
       //for constness
@@ -130,7 +129,6 @@ namespace EDM{
       if(!in_bounds(xx)) {
 	remap(xx);
 	if(!in_bounds(xx)){
-	  printf("x was NOT IN BOUNDS!!\n");
 	  return 0;
 	}
 	  
