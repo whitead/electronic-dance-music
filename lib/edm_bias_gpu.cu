@@ -166,6 +166,7 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
    * where appropriate, etc.
    */
   //parse file into a map
+  printf("GPU version of read_input was called...\n");
   using namespace std;
   ifstream input(input_filename.c_str());
   if(!input.is_open()) {      
@@ -247,11 +248,16 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
   if(parsed_input.find("hills_filename") != parsed_input.end()) {
     string hfilename = parsed_input.at("hills_filename");
     string cleaned_filename = clean_string(hfilename, 1);
-    hill_output_.open(cleaned_filename.c_str());    
-  } else {
+    if(!(hill_output_.is_open())){
+      hill_output_.open(cleaned_filename.c_str());    
+    }
+  }
+  else {
     string hfilename("HILLS");
     string cleaned_filename = clean_string(hfilename, 1);
-    hill_output_.open(cleaned_filename.c_str());
+    if(!(hill_output_.is_open())){
+      hill_output_.open(cleaned_filename.c_str());
+    }
 
   }
   if(parsed_input.find("histogram_filename") != parsed_input.end()) {
@@ -259,7 +265,7 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     hist_output_ = clean_string(hist_filename, 0);
   } else {
     string hist_filename("HIST");
-    hist_output_ = clean_string(hist_filename, 0);
+      hist_output_ = clean_string(hist_filename, 0);
   }
 
   return 1;
@@ -351,7 +357,7 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
 void EDM::EDMBiasGPU::output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type) {
   
   size_t i;
-   
+  
   hill_output_ << std::setprecision(8) << std::fixed;
   hill_output_ << steps_ << " ";
   hill_output_ << type << " ";
