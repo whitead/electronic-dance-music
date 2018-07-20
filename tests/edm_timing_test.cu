@@ -11,7 +11,7 @@
 #include <stdio.h>
 //These must be declared here.
 #define BOOST_TEST_DYN_LINK 
-#define BOOST_TEST_MODULE EDM_GPU
+#define BOOST_TEST_MODULE EDM_GPU_TIMING
 #define EPSILON 1e-6
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)

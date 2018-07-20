@@ -835,8 +835,6 @@ void EDM::EDMBias::set_mask(const int* mask) {
 }
 
 int EDM::EDMBias::read_input(const std::string& input_filename){
-  printf("CPU version of read_input was called!!\n");
-
   //parse file into a map
   using namespace std;
 

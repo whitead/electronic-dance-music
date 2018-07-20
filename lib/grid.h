@@ -196,7 +196,13 @@ class DimmedGrid : public Grid {
 	    int b_interpolate) : b_derivatives_(b_derivatives), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
 
     size_t i;
+    dx_ = (edm_data_t *) calloc( DIM, sizeof(edm_data_t));
+    min_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    max_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    grid_number_  = (int *) calloc(DIM, sizeof(edm_data_t));
+    b_periodic_  = (int *) calloc(DIM, sizeof(edm_data_t));
 
+    
     for(i = 0; i < DIM; i++) {
       min_[i] = min[i];
       max_[i] = max[i];
@@ -222,6 +228,12 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
    * Constructor from file, with interpolation specified
    **/
  DimmedGrid(const std::string& input_grid, int b_interpolate): b_derivatives_(0), b_interpolate_(b_interpolate), grid_(NULL), grid_deriv_(NULL) {
+    dx_ = (edm_data_t *) calloc( DIM, sizeof(edm_data_t));
+    min_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    max_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    grid_number_  = (int *) calloc(DIM, sizeof(edm_data_t));
+    b_periodic_  = (int *) calloc(DIM, sizeof(edm_data_t));
+
     read(input_grid);
   }
 
@@ -229,6 +241,11 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
    * Constructor from grid file
    **/
  DimmedGrid(const std::string& input_grid): b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL) {
+    dx_ = (edm_data_t *) calloc( DIM, sizeof(edm_data_t));
+    min_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    max_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    grid_number_  = (int *) calloc(DIM, sizeof(edm_data_t));
+    b_periodic_  = (int *) calloc(DIM, sizeof(edm_data_t));
     read(input_grid);
   }
 
@@ -237,6 +254,12 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
    * Clone constructor
    **/
  DimmedGrid(const DimmedGrid<DIM>& other) : b_derivatives_(other.b_derivatives_), b_interpolate_(other.b_interpolate_), grid_(NULL), grid_deriv_(NULL) {
+    dx_ = (edm_data_t *) calloc( DIM, sizeof(edm_data_t));
+    min_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    max_ = (edm_data_t *) calloc(DIM, sizeof(edm_data_t));
+    grid_number_  = (int *) calloc(DIM, sizeof(edm_data_t));
+    b_periodic_  = (int *) calloc(DIM, sizeof(edm_data_t));
+    
     size_t i,j;
     for(i = 0; i < DIM; i++) {
       dx_[i] = other.dx_[i];
@@ -261,7 +284,17 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
       free(grid_);
     if(grid_deriv_ != NULL)
       free(grid_deriv_);
-    
+    if(dx_ != NULL)
+      free(dx_ );
+    if(min_ != NULL)
+      free(min_);
+    if(max_ != NULL)
+      free(max_);
+    if(grid_number_  != NULL)
+      free(grid_number_);
+    if(b_periodic_  != NULL)
+      free(b_periodic_);
+
   }
   
   /**
@@ -884,11 +917,11 @@ DimmedGrid():b_derivatives_(0), b_interpolate_(1), grid_(NULL), grid_deriv_(NULL
   int b_interpolate_;//if interpolation should be used on the grid
   edm_data_t* grid_;//the grid values
   edm_data_t* grid_deriv_;//derivatives    
-  edm_data_t dx_[DIM];//grid spacing
-  edm_data_t min_[DIM];//grid minimum
-  edm_data_t max_[DIM];//maximum
-  int grid_number_[DIM];//number of points on grid
-  int b_periodic_[DIM];//if a dimension is periodic
+  edm_data_t* dx_;//[DIM];//grid spacing //THESE NEED TO BE MALLOC'D??--
+  edm_data_t* min_;//[DIM];//grid minimum
+  edm_data_t* max_;//[DIM];//maximum
+  int* grid_number_;//[DIM];//number of points on grid
+  int* b_periodic_;//[DIM];//if a dimension is periodic
 
  private:  
 

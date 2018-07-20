@@ -9,7 +9,7 @@
 #include <stdio.h>
 //These must be declared here.
 #define BOOST_TEST_DYN_LINK 
-#define BOOST_TEST_MODULE EDM_GPU_TIMING
+#define BOOST_TEST_MODULE EDM_GPU
 
 #define EPSILON 1e-6
 #define QUOTE(name) #name
@@ -171,6 +171,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity ){
 }//grid_gpu_3d_sanity
 
 BOOST_AUTO_TEST_CASE( grid_gpu_1d_read ) {
+  gpuErrchk(cudaDeviceReset());
   DimmedGridGPU<1> g(GRID_SRC + "/1.grid");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
   BOOST_REQUIRE((g.max_[0] - (2.5 + g.dx_[0]))/g.max_[0] < EPSILON);
@@ -306,7 +307,7 @@ BOOST_AUTO_TEST_CASE( grid_gpu_read_write_consistency ) {
 
     for(j = 0; j < ref_length; j++)
       BOOST_REQUIRE(pow(ref_grid[j] - g->get_grid()[j], 2) < EPSILON);
-
+    delete g;
   }
 }//grid_gpu_read_write_consistency
 
@@ -1345,6 +1346,7 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
 }//gpu_gauss_grid_interp_test_mcgdp_3D
 
 BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
+//  gpuErrchk(cudaDeviceReset());
   edm_data_t min[] = {0};
   edm_data_t max[] = {10};
   edm_data_t bin_spacing[] = {0.009765625};
@@ -1371,29 +1373,43 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
   //add gaussian that was failing
   edm_data_t x[2] = {-3.91944, 1.0};
   edm_data_t h = 1.0;
-  edm_data_t bias_added[g.minisize_total_]; //= g->add_value(x, h);
+  edm_data_t bias_added[g.minisize_total_]; 
+  for(int i = 0; i < g.minisize_total_; i++){
+    bias_added[i] = 0;
+  }
   edm_data_t* d_bias_added;
   gpuErrchk(cudaMalloc((void**)&d_bias_added, g.minisize_total_ * sizeof(edm_data_t)));
+  gpuErrchk(cudaMemset(d_bias_added, edm_data_t(1.0), g.minisize_total_ * sizeof(edm_data_t)));
   edm_data_t* d_x;
   gpuErrchk(cudaMalloc(&d_x, 2*sizeof(edm_data_t)));
-  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));//here w/ limit=4096
+  gpuErrchk(cudaMemcpy(d_x, x, 2*sizeof(edm_data_t), cudaMemcpyHostToDevice));
 
 
   add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, d_bias_added, d_g);
   printf("The g.minisize_total_ is %zd\n", g.minisize_total_);
-  //for some reason, addreduce is getting segfaults, but the intergral kernel works...
-  //TODO: might need to add special treatment for non-power-of-2 addreduce
-  //addReduce<<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_, blockSize);//<blockSize><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
+  gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
+    printf("BEFORE ADDREDUCE bias_added[0] is now %f\n", bias_added[0]);
+  edm_data_t tot_bias_added = 0;
+  for (int i = 0; i < g.minisize_total_; i++){
+    printf("BEFORE ADDREDUCE bias_added[%i] is %f\n", i, bias_added[i]);
+    tot_bias_added += bias_added[i];
+  }
+  printf("BEFORE ADDREDUCE tot_bias_added is %f\n", tot_bias_added);
+  //Must always call addReduce with next greater power of two than data size?
+  addReduce<<<1, 128, 128 * sizeof(edm_data_t)>>>(d_bias_added, d_bias_added, g.minisize_total_, 128);//<BLOCK_SIZE_MAX><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
   //printf("d_bias_added[0] is now: %f\n", d_bias_added[0]);
   gpuErrchk(cudaDeviceSynchronize());
   gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
-  edm_data_t tot_bias_added = 0;
+  printf("AFTER ADDREDUCE bias_added[0] is %f\n", bias_added[0]);
   for (int i = 0; i < g.minisize_total_; i++){
+    printf("AFTER ADDREDUCE bias_added[%i] is %f\n", i, bias_added[i]);
     tot_bias_added += bias_added[i];
   }
   
+  printf("AFTER ADDREDUCE tot_bias_added is now: %f\n", tot_bias_added);
   //unnormalized, so a little height scaling is necessary
-  //std::cout << bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
+  std::cout << tot_bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
   BOOST_REQUIRE(pow(tot_bias_added - h, 2) < 0.1);
 
 

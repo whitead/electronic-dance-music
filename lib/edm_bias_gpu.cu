@@ -166,7 +166,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
    * where appropriate, etc.
    */
   //parse file into a map
-  printf("GPU version of read_input was called...\n");
   using namespace std;
   ifstream input(input_filename.c_str());
   if(!input.is_open()) {      
@@ -342,7 +341,7 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   //TODO: change this so we're not using so much managed mem. Atomic adds to bias_added?
   launch_add_value_integral_kernel(dim_, buffer, d_bias_added_, bias_, grid_dims);//this launches kernel.
   gpuErrchk(cudaDeviceSynchronize());
-  //TODO: g
+  //TODO: make this parallel also -- both inner (j) and outer (i), preferably
   for(i = 0; i < hill_number; i++){
     for(j = 0; j < minisize; j++){
       bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
