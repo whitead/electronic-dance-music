@@ -164,7 +164,6 @@ BOOST_AUTO_TEST_CASE( grid_gpu_3d_sanity ){
       }
     }
   }
-  printf("for debugging\n");
   gpuErrchk(cudaFree(d_g));
   gpuErrchk(cudaFree(d_temp));
   gpuErrchk(cudaFree(d_array));
@@ -1386,28 +1385,15 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
 
 
   add_value_integral_kernel<1><<<1, g.minisize_total_>>>(d_x, d_bias_added, d_g);
-  printf("The g.minisize_total_ is %zd\n", g.minisize_total_);
-  gpuErrchk(cudaDeviceSynchronize());
-    gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
-    printf("BEFORE ADDREDUCE bias_added[0] is now %f\n", bias_added[0]);
-  edm_data_t tot_bias_added = 0;
-  for (int i = 0; i < g.minisize_total_; i++){
-    printf("BEFORE ADDREDUCE bias_added[%i] is %f\n", i, bias_added[i]);
-    tot_bias_added += bias_added[i];
-  }
-  printf("BEFORE ADDREDUCE tot_bias_added is %f\n", tot_bias_added);
-  //Must always call addReduce with next greater power of two than data size?
-  addReduce<<<1, 128, 128 * sizeof(edm_data_t)>>>(d_bias_added, d_bias_added, g.minisize_total_, 128);//<BLOCK_SIZE_MAX><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
-  //printf("d_bias_added[0] is now: %f\n", d_bias_added[0]);
   gpuErrchk(cudaDeviceSynchronize());
   gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
-  printf("AFTER ADDREDUCE bias_added[0] is %f\n", bias_added[0]);
-  for (int i = 0; i < g.minisize_total_; i++){
-    printf("AFTER ADDREDUCE bias_added[%i] is %f\n", i, bias_added[i]);
-    tot_bias_added += bias_added[i];
-  }
+  edm_data_t tot_bias_added = 0;
+  //Must always call addReduce with next greater power of two than data size?
+  addReduce<<<1,  nextHighestPowerOf2(g.minisize_total_),  nextHighestPowerOf2(g.minisize_total_) * sizeof(edm_data_t)>>>(d_bias_added, d_bias_added, g.minisize_total_,  nextHighestPowerOf2(g.minisize_total_));//<BLOCK_SIZE_MAX><<<1, g.minisize_total_>>>(d_bias_added, d_bias_added, g.minisize_total_);
+  gpuErrchk(cudaDeviceSynchronize());
+  gpuErrchk(cudaMemcpy(bias_added, d_bias_added, g.minisize_total_ * sizeof(edm_data_t), cudaMemcpyDeviceToHost));
+    tot_bias_added = bias_added[0];
   
-  printf("AFTER ADDREDUCE tot_bias_added is now: %f\n", tot_bias_added);
   //unnormalized, so a little height scaling is necessary
   std::cout << tot_bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
   BOOST_REQUIRE(pow(tot_bias_added - h, 2) < 0.1);
@@ -1453,7 +1439,7 @@ BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
 
   positions[0][0] = 5.0;//put a hill in the middle of the grid
   bias.add_hills(1, positions, runiform);
-  bias.write_bias("BIAS");//TODO: investigate why this isn't actually writing
+  bias.write_bias("BIAS");
   //test if the value at the point is correct
   //gpuErrchk(cudaDeviceSynchronize());
   edm_data_t bias_value = bias.bias_->get_value(positions[0]);

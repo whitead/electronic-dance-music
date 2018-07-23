@@ -281,7 +281,7 @@ void EDM::EDMBiasGPU::add_hills(int nlocal, const edm_data_t* const* positions, 
   pre_add_hill(nlocal);//this is unchanged b/c it's all cpu-side
   for(i = 0; i < nlocal; i++) {
     if(apply_mask < 0 || apply_mask & mask_[i])
-      add_hill(&positions[i][0], runiform[i]);
+      add_hill(&positions[i][0], runiform[i]);//this is unchanged b/c it's all cpu-side
   }
   post_add_hill();
 
@@ -343,10 +343,13 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   gpuErrchk(cudaDeviceSynchronize());
   //TODO: make this parallel also -- both inner (j) and outer (i), preferably
   for(i = 0; i < hill_number; i++){
-    for(j = 0; j < minisize; j++){
-      bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
-    }
+    // for(j = 0; j < minisize; j++){
+    //   bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
+    // }
+    //have to call each addreduce separately for this bookkeeping
+    addReduce<<<1,  nextHighestPowerOf2(minisize),  nextHighestPowerOf2(minisize) * sizeof(edm_data_t)>>>(&d_bias_added_[i*minisize], &d_bias_added_[i*minisize], minisize,  nextHighestPowerOf2(minisize));
     gpuErrchk(cudaDeviceSynchronize());
+    bias_added += d_bias_added_[i*minisize];
     output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
   }
   hills_added_ += hill_number;

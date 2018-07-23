@@ -11,7 +11,14 @@
 #define GPU_BIAS_BUFFER_DBLS (2048 * 8)
 
 
-namespace EDM{ 
+namespace EDM{
+  __host__ __device__ int nextHighestPowerOf2(int input){
+    int val = 1;
+    while(val < input){
+      val *= 2;
+    }
+    return(val);
+  }
 
 //  template <unsigned int blockSize>
   __device__ void warpAddReduce(volatile edm_data_t *sdata, unsigned int tid, unsigned int blockSize){
@@ -40,9 +47,12 @@ namespace EDM{
     unsigned int i = blockIdx.x * (blockSize * 2) + tid;
     unsigned int gridSize = blockSize * 2 * gridDim.x;
     sdata[i] = 0;
-    printf("sdata[%i] is %f\n", i, sdata[i]);
+    //printf("sdata[%i] is %f\n", i, sdata[i]);//all zeros: good
     __syncthreads();
-    while (i < n){sdata[tid] += g_idata[i] + g_idata[i+blockSize]; i += gridSize;}
+    while (i < n){
+      sdata[tid] += i+blockSize < n ? g_idata[i] + g_idata[i+blockSize] : g_idata[i];
+      i += gridSize;
+    }
     __syncthreads();
 
     if(blockSize >= 512){if (tid < 256){ sdata[tid] += sdata[tid + 256];} __syncthreads();}
@@ -50,7 +60,6 @@ namespace EDM{
     if(blockSize >= 128){if (tid < 64){ sdata[tid] += sdata[tid + 64];} __syncthreads();}
     if(tid < 32) warpAddReduce(sdata,tid, blockSize);//<blockSize>(sdata, tid);
     __syncthreads();
-    printf("Hello from thread %i! sdata[%i] is now %f\n", tid, tid, sdata[tid]);
     __syncthreads();
     if(tid == 0) {g_odata[0] = sdata[0];}
     __syncthreads();
