@@ -450,7 +450,7 @@ namespace EDM{
     using DimmedGrid<DIM>:: max_;
     using DimmedGrid<DIM>:: grid_number_;
     using DimmedGrid<DIM>:: b_periodic_;
-    //using DimmedGrid<DIM>::read;
+    using DimmedGrid<DIM>::write;
 
   private:  
 

@@ -134,9 +134,10 @@ void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3],
   cudaMemGetInfo(free, total);
   printf("Free device mem: %zd // Total device mem: %zd // Attempting to malloc: %zu\n", free, total, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t));
   gpuErrchk(cudaMallocManaged((void**)&d_bias_added_, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));//that's the biggest it will have to be
-  for(int i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){
-    d_bias_added_[i] = 0;
-  }
+  gpuErrchk(cudaMemset(d_bias_added_, 0, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));
+//  for(int i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){
+//    d_bias_added_[i] = 0;
+//  }
 
   
 
@@ -342,16 +343,16 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   launch_add_value_integral_kernel(dim_, buffer, d_bias_added_, bias_, grid_dims);//this launches kernel.
   gpuErrchk(cudaDeviceSynchronize());
   //TODO: make this parallel also -- both inner (j) and outer (i), preferably
-  for(i = 0; i < hill_number; i++){
+//  for(i = 0; i < hill_number; i++){
     // for(j = 0; j < minisize; j++){
     //   bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
     // }
     //have to call each addreduce separately for this bookkeeping
-    addReduce<<<1,  nextHighestPowerOf2(minisize),  nextHighestPowerOf2(minisize) * sizeof(edm_data_t)>>>(&d_bias_added_[i*minisize], &d_bias_added_[i*minisize], minisize,  nextHighestPowerOf2(minisize));
+    addReduce<<<1,  nextHighestPowerOf2(minisize * hill_number),  nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t)>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  nextHighestPowerOf2(minisize * hill_number));
     gpuErrchk(cudaDeviceSynchronize());
-    bias_added += d_bias_added_[i*minisize];
-    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
-  }
+    bias_added += d_bias_added_[0];//[i*minisize];
+//    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
+//  }
   hills_added_ += hill_number;
   return bias_added;
 }

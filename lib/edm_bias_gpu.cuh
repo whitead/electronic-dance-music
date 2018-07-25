@@ -47,7 +47,6 @@ namespace EDM{
     unsigned int i = blockIdx.x * (blockSize * 2) + tid;
     unsigned int gridSize = blockSize * 2 * gridDim.x;
     sdata[i] = 0;
-    //printf("sdata[%i] is %f\n", i, sdata[i]);//all zeros: good
     __syncthreads();
     while (i < n){
       sdata[tid] += i+blockSize < n ? g_idata[i] + g_idata[i+blockSize] : g_idata[i];
@@ -94,6 +93,8 @@ namespace EDM{
     void add_hills(int nlocal, const edm_data_t* const* positions, const edm_data_t* runiform, int apply_mask);
     void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
     using EDMBias::pre_add_hill;
+    using EDMBias::write_bias;
+    using EDMBias::bias_;//need same pointer for the write calls to work?
     void post_add_hill();
 
     int read_input(const std::string& input_filename);

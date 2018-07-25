@@ -546,7 +546,9 @@ namespace EDM{
 #endif//CUDACC
     }//do_add_value
 
-
+    void write(const std::string& filename) const {
+      grid_.write(filename);
+    }//write
 
     //need to tell compiler where to find these since we have a derived templated class
 
