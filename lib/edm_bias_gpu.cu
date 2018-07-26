@@ -131,8 +131,8 @@ void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3],
   size_t free[1];
   size_t total[1];
   minisize = bias_->get_minisize_total();
-  cudaMemGetInfo(free, total);
-  printf("Free device mem: %zd // Total device mem: %zd // Attempting to malloc: %zu\n", free, total, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t));
+//  cudaMemGetInfo(free, total);
+//  printf("Free device mem: %zd // Total device mem: %zd // Attempting to malloc: %zu\n", free, total, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t));
   gpuErrchk(cudaMallocManaged((void**)&d_bias_added_, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));//that's the biggest it will have to be
   gpuErrchk(cudaMemset(d_bias_added_, 0, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));
 //  for(int i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){

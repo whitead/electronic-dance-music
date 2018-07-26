@@ -411,6 +411,7 @@ edm_data_t EDM::EDMBias::do_add_hills(const edm_data_t* buffer, const size_t hil
   
   size_t i;
   for(i = 0; i < hill_number; i++){
+    //(dim_+1)*i here b/c of the height terms
     bias_added += bias_->add_value(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_]);    
     hills_added_++;
     output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
@@ -427,7 +428,7 @@ void EDM::EDMBias::queue_add_hill(const edm_data_t* position, edm_data_t this_h)
   buffer_i_++;
   
   //do we need to flush?
-  if(buffer_i_ >= BIAS_BUFFER_SIZE)
+  if(buffer_i_ >= BIAS_BUFFER_SIZE -1 )
     temp_hill_cum_ += flush_buffers(0); //flush and we don't know if we're synched
   
 }
