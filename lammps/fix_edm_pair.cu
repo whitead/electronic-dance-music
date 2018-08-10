@@ -6,6 +6,9 @@
  **/
 
 #include "fix_edm_pair.h"
+#ifdef __CUDACC__
+#include "edm_bias_gpu.cuh"
+#endif
 
 using namespace LAMMPS_NS;
 
@@ -47,7 +50,11 @@ FixEDMPair::FixEDMPair(LAMMPS *lmp, int narg, char **arg) :
   thermo_energy = 1;
 
   //here is where we would load up the EDM bias
+  #ifdef __CUDACC__
+  bias = new EDM::EDMBiasGPU(arg[4]);
+  #else
   bias = new EDM::EDMBias(arg[4]);
+  #endif
 
   if(bias->dim_ != 1)
     error->all(FLERR, "Pairwise distance must be 1 dimension in EDM input file");

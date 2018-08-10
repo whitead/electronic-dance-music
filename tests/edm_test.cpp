@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 
-#define EPSILON 1e-10
+#define EPSILON 1e-9
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 #define GRID_SRC std::string(STR(TEST_GRID_SRC))
@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE( grid_3d_sanity ){
 BOOST_AUTO_TEST_CASE( grid_1d_read ) {
   DimmedGrid<1> g(GRID_SRC + "/1.grid");
   BOOST_REQUIRE_EQUAL(g.min_[0], 0);
-  BOOST_REQUIRE((g.max_[0] -  (2.5 + g.dx_[0]))/g.max_[0]);
+  BOOST_REQUIRE_CLOSE(g.max_[0], (2.5 + g.dx_[0]), 0.05);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
   BOOST_REQUIRE_EQUAL(g.grid_number_[0], 101);
 }

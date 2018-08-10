@@ -1,6 +1,4 @@
 #include "edm_bias_gpu.cuh"
-#include "grid_gpu.cuh"
-#include "gaussian_grid_gpu.cuh"
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <cmath>
@@ -14,7 +12,6 @@
 
 
 using namespace EDM_Kernels;
-
 
 EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename) {
   gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * GPU_BIAS_BUFFER_SIZE));
@@ -332,17 +329,11 @@ edm_data_t EDM::EDMBiasGPU::flush_buffers(int synched) {
 }
 
 edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t hill_number, char hill_type){
-  /*TODO: REPLACE this with a properly-calculated kernel call such that we can recover
-  ** the bias_added but only call kernel *once*...
-  ** Note: see edm_gpu_test.cu:1377 for how that's called.
-  */
   edm_data_t bias_added = 0;
   size_t i, j;
   dim3 grid_dims(minisize, hill_number);
-  //TODO: change this so we're not using so much managed mem. Atomic adds to bias_added?
   launch_add_value_integral_kernel(dim_, buffer, d_bias_added_, bias_, grid_dims);//this launches kernel.
   gpuErrchk(cudaDeviceSynchronize());
-  //TODO: make this parallel also -- both inner (j) and outer (i), preferably
 //  for(i = 0; i < hill_number; i++){
     // for(j = 0; j < minisize; j++){
     //   bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
@@ -351,6 +342,7 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
     addReduce<<<1,  nextHighestPowerOf2(minisize * hill_number),  nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t)>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  nextHighestPowerOf2(minisize * hill_number));
     gpuErrchk(cudaDeviceSynchronize());
     bias_added += d_bias_added_[0];//[i*minisize];
+    //TODO: Fix this so we can output hills again
 //    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
 //  }
   hills_added_ += hill_number;

@@ -349,6 +349,21 @@ namespace EDM{
     edm_data_t add_value(const edm_data_t* buffer){
       return(do_add_value(buffer));
     }
+#ifdef USE_DOUBLES
+    __device__ double atomicAdd(double* address, double val)
+      {
+        unsigned long long int* address_as_ull =
+          (unsigned long long int*)address;
+        unsigned long long int old = *address_as_ull, assumed;
+        do {
+          assumed = old;
+          old = atomicCAS(address_as_ull, assumed,
+                          __double_as_longlong(val +
+                                               __longlong_as_double(assumed)));
+        } while (assumed != old);
+        return __longlong_as_double(old);
+      }
+#endif
     
     HOST_DEV edm_data_t do_add_value(const edm_data_t* buffer) {
 #ifdef __CUDACC__ //device version
@@ -518,8 +533,11 @@ namespace EDM{
 
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
+            #ifdef __CUDA_ARCH__
 	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
-//	    grid_.grid_[xx_index1] += height * (expo + bc_correction);
+            #else
+	    grid_.grid_[xx_index1] += height * (expo + bc_correction);
+            #endif
 	    bias_added += height * (expo + bc_correction) * vol_element;
 	    for(j = 0; j < DIM; j++) {
 	      if(b_periodic_boundary_[j])
@@ -592,6 +610,48 @@ namespace EDM{
 namespace EDM_Kernels{
   //the kernels exist for testing purposes.
   using namespace EDM;
+
+  inline __device__ void warpAddReduce(volatile edm_data_t *sdata, unsigned int tid, unsigned int blockSize){
+    //This and addReduce must ALWAYS be called with a power-of-two size, even if the data
+    //is smaller than that
+    if (blockSize >= 64) sdata[tid] += sdata[tid + 32];
+    __syncthreads();
+    if (blockSize >= 32) sdata[tid] += sdata[tid + 16];
+    __syncthreads();
+    if (blockSize >= 16) sdata[tid] += sdata[tid + 8];
+    __syncthreads();
+    if (blockSize >= 8) sdata[tid] += sdata[tid + 4];
+    __syncthreads();
+    if (blockSize >= 4) sdata[tid] += sdata[tid + 2];
+    __syncthreads();
+    if (blockSize >= 2) sdata[tid] += sdata[tid + 1];
+    __syncthreads();
+  }
+
+  inline __global__ void addReduce(edm_data_t *g_idata, edm_data_t *g_odata, unsigned int n, unsigned int blockSize){
+    //This and warpAddReduce must ALWAYS be called with a power-of-two size, even if the data
+    //is smaller than that
+    extern __shared__ edm_data_t sdata[];//don't forget the size of sdata in the kernel call!
+    unsigned int tid= threadIdx.x;
+    unsigned int i = blockIdx.x * (blockSize * 2) + tid;
+    unsigned int gridSize = blockSize * 2 * gridDim.x;
+    sdata[i] = 0;
+    __syncthreads();
+    while (i < n){
+      sdata[tid] += i+blockSize < n ? g_idata[i] + g_idata[i+blockSize] : g_idata[i];
+      i += gridSize;
+    }
+    __syncthreads();
+
+    if(blockSize >= 512){if (tid < 256){ sdata[tid] += sdata[tid + 256];} __syncthreads();}
+    if(blockSize >= 256){if (tid < 128){ sdata[tid] += sdata[tid + 128];} __syncthreads();}
+    if(blockSize >= 128){if (tid < 64){ sdata[tid] += sdata[tid + 64];} __syncthreads();}
+    if(tid < 32) warpAddReduce(sdata,tid, blockSize);//<blockSize>(sdata, tid);
+    __syncthreads();
+    __syncthreads();
+    if(tid == 0) {g_odata[0] = sdata[0];}
+    __syncthreads();
+  }
   
   /*
    * Kernel wrapper for do_set_boundary() on the GPU. Takes in an instance of DimmedGaussGridGPU
@@ -638,4 +698,4 @@ namespace EDM_Kernels{
 
 }
 
-  #endif //GPU_GAUSS_GRID_CH_
+#endif //GPU_GAUSS_GRID_CH_

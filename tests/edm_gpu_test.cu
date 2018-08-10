@@ -1490,12 +1490,13 @@ BOOST_AUTO_TEST_CASE( edm_gpu_timer_1d ){
   DimmedGaussGridGPU<1>* d_g;
   gpuErrchk(cudaMalloc((void**)&d_g, sizeof(DimmedGaussGridGPU<1>)));
   gpuErrchk(cudaMemcpy(d_g, &g, sizeof(DimmedGaussGridGPU<1>), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaDeviceSynchronize());
   edm_data_t* d_coordinates;
   gpuErrchk(cudaMalloc((void**)&d_coordinates, n_hills * sizeof(edm_data_t)));
   edm_data_t coordinates[n_hills];
   //now just call a kernel to add a bunch of gaussians, and time it
   boost::timer::auto_cpu_timer t;
-  for( unsigned int i = 0; i < 2*n_hills; i+=2){
+  for( unsigned int i = 0; i < n_hills; i+=2){
     int rand_num = rand() % 20 - 10;
     coordinates[i] = rand_num;
     coordinates[i+1] = 1.0;

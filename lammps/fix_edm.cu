@@ -19,8 +19,9 @@
 #include "memory.h"
 #include "fix_edm.h"
 #include "neighbor.h"
-
-#include "edm_bias.h"
+#ifdef __CUDACC__
+#include "edm_bias_gpu.cuh"
+#endif
 
 using namespace LAMMPS_NS;
 
@@ -52,7 +53,11 @@ FixEDM::FixEDM(LAMMPS *lmp, int narg, char **arg) :
 
 
   //here is where we would load up the EDM bias
+  #ifdef __CUDACC__
+  bias = new EDM::EDMBiasGPU(arg[4]);
+  #else
   bias = new EDM::EDMBias(arg[4]);
+  #endif
 
   //indicate we calculate energy
   thermo_energy = 1;
