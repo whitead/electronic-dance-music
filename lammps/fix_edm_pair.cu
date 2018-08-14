@@ -100,9 +100,9 @@ void FixEDMPair::init()
   bias->setup(temperature, force->boltz);
 
   //The bounds for every node should be the bounds of the pairwise force
-  double skin[3];
+  edm_data_t skin[3];
   skin[0] = neighbor->skin;
-  double lo[3], hi[3];
+  edm_data_t lo[3], hi[3];
   lo[0] = 0;
   // cannot use neighbor->cutneighmax b/c neighbor has not yet been init
   hi[0] = force->pair->cutforce + neighbor->skin;
@@ -152,8 +152,8 @@ void FixEDMPair::post_force(int vflag)
 
   //neighbor list loop, ripped off of pair_lj_cut
   int i,ii,j, jj, inum, jnum, itype, jtype, ncalls = 0;
-  double xtmp, ytmp, ztmp, delx, dely, delz, r;
-  double edm_force[1];
+  edm_data_t xtmp, ytmp, ztmp, delx, dely, delz, r;
+  edm_data_t edm_force[1];
   int* ilist, *jlist, *numneigh, **firstneigh;
 
   double **x = atom->x;
@@ -161,7 +161,7 @@ void FixEDMPair::post_force(int vflag)
   int* type = atom->type;
   int* mask = atom->mask;
   int newton_pair = force->newton_pair;
-  double rinv;
+  edm_data_t rinv;
   int type_ind = 0;
   
   int nlocal = atom->nlocal;
@@ -221,7 +221,7 @@ void FixEDMPair::post_force(int vflag)
       
       //get force on r-vector
       edm_force[0] = 0;
-      edm_energy += bias->update_force(&r, edm_force);
+      edm_energy += (double)(bias->update_force(&r, edm_force));
 
       //convert to pair-wise force
       f[i][0] += delx * edm_force[0];

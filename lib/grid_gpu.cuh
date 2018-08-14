@@ -513,47 +513,7 @@ namespace EDM{
  * The specific kernels like get_value_kernel are used for unit testing.
  * MUST cudaMemcpy a DimmedGridGPU object onto the GPU before invoking these kernels.
  */
-namespace EDM_Kernels{
-  
-  using namespace EDM;
-  
-  /*
-   * Kernel wrapper for get_value() on the GPU. Takes in an instance of DimmedGridGPU
-   * as well as the address of the coordinate (x) to get the value for, and the target
-   * address to store the value, which must be copied to host side if it is to be used there.
-   */
-  template <int DIM>
-  __global__ void get_value_kernel(const edm_data_t* x, edm_data_t* target,
-				   const DimmedGridGPU<DIM>* g){
-    target[0] = g->do_get_value(x);
-    return;
-  }
 
-  template <int DIM>
-  __global__ void get_value_deriv_kernel(const edm_data_t* x, edm_data_t* der, edm_data_t* target,
-					 const DimmedGridGPU<DIM>* g){
-    target[0] = g->do_get_value_deriv(x, der);
-    return;
-  }
 
-  /*
-   * Kernel wrapper for multi2one and one2multi testing
-   * Takes in target array and temp array to fill as arguments. Validate host-side.
-   */
-  template <int DIM>
-  __global__ void multi2one_kernel(size_t* array, size_t* temp, const DimmedGridGPU<DIM>* g){
-//    int i = threadIdx.x + blockIdx.x * blockDim.x;
-//    int j = threadIdx.y + blockIdx.y * blockDim.y;
-//    int k = threadIdx.z + blockIdx.z * blockDim.z;
-//    if((i < g->grid_number[0] && j < g->grid_number[1]) && k < g->grid_number[2]){
-//      array[0] = i;
-//      array[1] = j;
-//      array[2] = k;
-
-    g->one2multi(g->multi2one(array), temp);
-//    }
-  }
-  
-}
 
 #endif //GRID_CUH_

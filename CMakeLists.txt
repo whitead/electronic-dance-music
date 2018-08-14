@@ -6,7 +6,7 @@ cmake_minimum_required (VERSION 2.8)
 project (WordModel)
 set (WordModel_VERSION_MAJOR 0)
 set (WordModel_VERSION_MINOR 1)
-set (WordModel_DESCRIPTION "Experiment directed simulation implementation")
+set (WordModel_DESCRIPTION "Experiment directed metadynamics implementation")
 set (LAMMPS_SRC "/home/rainier/lammps/src")
 
 #compilation flags
@@ -21,7 +21,7 @@ set(CMAKE_CXX_FLAGS "-m64 -fprofile-arcs -ftest-coverage")
 
 
 #the CUDA stuff
-set(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
+set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
 set(CUDA_NVCC_FLAGS "-std=c++11 -I/usr/include/ -I/usr/local/include/ -I/usr/local/cuda/include/ -g -G -lineinfo -cudart shared -Xlinker -rpath,"."")
 find_package(CUDA QUIET REQUIRED) #this is for getting CUDA cross-compilation
 #set(CUDA_NVCC_FLAGS -m64)

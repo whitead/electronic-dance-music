@@ -23,6 +23,75 @@
 
 #define TIMING_BOUND_edm_cpu_timer_1d 10000
 
+namespace EDM_Kernels{
+  /*
+   * Kernel wrapper for get_value() on the GPU. Takes in an instance of DimmedGridGPU
+   * as well as the address of the coordinate (x) to get the value for, and the target
+   * address to store the value, which must be copied to host side if it is to be used there.
+   */
+  template <int DIM>
+  __global__ void get_value_kernel(const edm_data_t* x, edm_data_t* target,
+				   const DimmedGridGPU<DIM>* g){
+    target[0] = g->do_get_value(x);
+    return;
+  }
+
+  template <int DIM>
+  __global__ void get_value_deriv_kernel(const edm_data_t* x, edm_data_t* der, edm_data_t* target,
+					 const DimmedGridGPU<DIM>* g){
+    target[0] = g->do_get_value_deriv(x, der);
+    return;
+  }
+
+  /*
+   * Kernel wrapper for multi2one and one2multi testing
+   * Takes in target array and temp array to fill as arguments. Validate host-side.
+   */
+  template <int DIM>
+  __global__ void multi2one_kernel(size_t* array, size_t* temp, const DimmedGridGPU<DIM>* g){
+//    int i = threadIdx.x + blockIdx.x * blockDim.x;
+//    int j = threadIdx.y + blockIdx.y * blockDim.y;
+//    int k = threadIdx.z + blockIdx.z * blockDim.z;
+//    if((i < g->grid_number[0] && j < g->grid_number[1]) && k < g->grid_number[2]){
+//      array[0] = i;
+//      array[1] = j;
+//      array[2] = k;
+
+    g->one2multi(g->multi2one(array), temp);
+//    }
+  }
+
+  /*
+   * Kernel wrapper for do_remap() on the GPU. Takes in an instance of DimmedGaussGridGPU
+   */
+  template <int DIM>
+  __global__ void remap_kernel(edm_data_t* point, DimmedGaussGridGPU<DIM>* g){
+    g->do_remap(point);
+    return;
+  }
+
+  /*
+   * Kernel wrapper for do_set_boundary() on the GPU. Takes in an instance of DimmedGaussGridGPU
+   */
+  template <int DIM>
+  __global__ void set_boundary_kernel(const edm_data_t* min, const edm_data_t* max,
+				      const int* periodic, DimmedGaussGridGPU<DIM>* g){
+    g->do_set_boundary(min, max, periodic);
+    return;
+  }
+  
+  /*
+   * Kernel wrapper for do_add_value() on the GPU. Takes in a point, the hill height to add, 
+   * and an instance of DimmedGaussGridGPU to do the adding. Call this if it doesn't matter
+   * how much mass was added.
+   */
+  template <int DIM>
+  __global__ void add_value_kernel(const edm_data_t* buffer, DimmedGaussGridGPU<DIM>* g){
+    g->do_add_value(buffer);
+    return;
+  }
+  
+}
 using namespace boost;
 using namespace EDM;
 using namespace EDM_Kernels;

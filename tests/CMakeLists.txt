@@ -8,7 +8,7 @@ set (TEST_EDM_SRC edm)
 include_directories (/usr/include/ /usr/local/include/ /usr/local/cuda/include/ ../lib/ )
 add_definitions(-DTEST_GRID_SRC=${TEST_GRID_SRC})
 add_definitions(-DTEST_EDM_SRC=${TEST_EDM_SRC})
-add_definitions(-DUSE_DOUBLES)
+#add_definitions(-DUSE_DOUBLES)
 
 cuda_add_executable (edm_gpu_test edm_gpu_test.cu)
 cuda_add_executable (edm_timing edm_timing_test.cu)

@@ -10,6 +10,66 @@
 #include <iomanip>
 #include <map>
 
+namespace EDM_Kernels{
+  //the kernels exist for testing purposes.
+  using namespace EDM;
+
+  inline __device__ void warpAddReduce(volatile edm_data_t *sdata, unsigned int tid, unsigned int blockSize){
+    //This and addReduce must ALWAYS be called with a power-of-two size, even if the data
+    //is smaller than that
+    if (blockSize >= 64) sdata[tid] += sdata[tid + 32];
+    __syncthreads();
+    if (blockSize >= 32) sdata[tid] += sdata[tid + 16];
+    __syncthreads();
+    if (blockSize >= 16) sdata[tid] += sdata[tid + 8];
+    __syncthreads();
+    if (blockSize >= 8) sdata[tid] += sdata[tid + 4];
+    __syncthreads();
+    if (blockSize >= 4) sdata[tid] += sdata[tid + 2];
+    __syncthreads();
+    if (blockSize >= 2) sdata[tid] += sdata[tid + 1];
+    __syncthreads();
+  }
+
+  inline __global__ void addReduce(edm_data_t *g_idata, edm_data_t *g_odata, unsigned int n, unsigned int blockSize){
+    //This and warpAddReduce must ALWAYS be called with a power-of-two size, even if the data
+    //is smaller than that
+    extern __shared__ edm_data_t sdata[];//don't forget the size of sdata in the kernel call!
+    unsigned int tid= threadIdx.x;
+    unsigned int i = blockIdx.x * (blockSize * 2) + tid;
+    unsigned int gridSize = blockSize * 2 * gridDim.x;
+    sdata[i] = 0;
+    __syncthreads();
+    while (i < n){
+      sdata[tid] += i+blockSize < n ? g_idata[i] + g_idata[i+blockSize] : g_idata[i];
+      i += gridSize;
+    }
+    __syncthreads();
+
+    if(blockSize >= 512){if (tid < 256){ sdata[tid] += sdata[tid + 256];} __syncthreads();}
+    if(blockSize >= 256){if (tid < 128){ sdata[tid] += sdata[tid + 128];} __syncthreads();}
+    if(blockSize >= 128){if (tid < 64){ sdata[tid] += sdata[tid + 64];} __syncthreads();}
+    if(tid < 32) warpAddReduce(sdata,tid, blockSize);//<blockSize>(sdata, tid);
+    __syncthreads();
+    __syncthreads();
+    if(tid == 0) {g_odata[0] = sdata[0];}
+    __syncthreads();
+  }
+
+  /*
+   * Kernel wrapper for do_add_value() on the GPU. Takes in a point, the hill height to add, 
+   * an instance of DimmedGaussGridGPU to do the adding, as well as a pointer to a edm_data_t array
+   * of size equal to the gaussian support where the total height added (hill integral) 
+   * will be stored.
+   */
+
+  template <int DIM>
+  __global__ void add_value_integral_kernel(const edm_data_t* buffer, edm_data_t* target, DimmedGaussGridGPU<DIM>* g){
+    target[threadIdx.x] = g->do_add_value(buffer);
+    return;
+  }
+}
+
 
 using namespace EDM_Kernels;
 
@@ -320,6 +380,7 @@ edm_data_t EDM::EDMBiasGPU::flush_buffers(int synched) {
   edm_data_t bias_added = 0;
   //flush the buffer. only one with GPU version for now...
   //TODO: make this a kernel call!
+  gpuErrchk(cudaDeviceSynchronize());
   bias_added += do_add_hills(send_buffer_, buffer_i_, ADD_HILL);
 
   //reset buffer count

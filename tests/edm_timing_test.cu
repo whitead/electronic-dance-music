@@ -117,7 +117,8 @@ BOOST_AUTO_TEST_CASE( edm_timing_cpu) {
   printf("beginning coordinates allocation (CPU)...\n");
   edm_data_t** coordinates = (edm_data_t**) malloc(4096*1024*2*sizeof(edm_data_t*));
   for (int i = 0; i < n_hills*2*1024; i++){
-    coordinates[i] = (edm_data_t*) malloc(sizeof(edm_data_t));    
+    coordinates[i] = (edm_data_t*) malloc(sizeof(edm_data_t));
+    coordinates[i][0] = 0;
   }
   printf("allocating runiform (CPU)\n");
   edm_data_t* runiform = (edm_data_t*)malloc(4096*2*1024*sizeof(edm_data_t));

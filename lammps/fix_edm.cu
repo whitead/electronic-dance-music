@@ -103,9 +103,9 @@ void FixEDM::init()
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
 
   bias->setup(temperature, force->boltz);
-  double skin[3];
+  edm_data_t skin[3];
   skin[0] = skin[1] = skin[2] = neighbor->skin;
-  bias->subdivide(domain->sublo, domain->subhi, domain->boxlo, domain->boxhi, domain->periodicity, skin);
+  bias->subdivide((edm_data_t*)domain->sublo, (edm_data_t*)domain->subhi, (edm_data_t*)domain->boxlo, (edm_data_t*)domain->boxhi, domain->periodicity, skin);
   bias->set_mask(atom->mask);
 
   //set energy just in case
@@ -142,7 +142,7 @@ void FixEDM::post_force(int vflag)
   //  domain->pbc(); //make sure particles are with thier processors
 
   //update force/energy
-  edm_energy = bias->update_forces(atom->nlocal, atom->x, atom->f, groupbit);  
+  edm_energy = (double)(bias->update_forces(atom->nlocal, (edm_data_t* const*)atom->x, (edm_data_t**)atom->f, groupbit));
   //treat add hills
   if(update->ntimestep % stride == 0) {
 
@@ -155,7 +155,7 @@ void FixEDM::post_force(int vflag)
       random_numbers[i] = random->uniform();
     }
 
-    bias->add_hills(atom->nlocal, atom->x, random_numbers, groupbit);
+    bias->add_hills(atom->nlocal, (edm_data_t**)atom->x, (edm_data_t*)random_numbers, groupbit);
   }
 
   if(update->ntimestep % write_stride == 0) {

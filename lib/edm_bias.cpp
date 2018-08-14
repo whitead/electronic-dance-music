@@ -119,6 +119,10 @@ EDM::EDMBias::EDMBias(const std::string& input_filename) : b_tempering_(0),
   MPI_Comm_rank(MPI_COMM_WORLD,&mpi_rank_);
   MPI_Comm_size(MPI_COMM_WORLD,&mpi_size_);
 #endif
+  for(int i = 0; i < BIAS_BUFFER_DBLS; i++){
+    send_buffer_[i] = 0;
+    receive_buffer_[i] = 0;
+  }
   //read input file
   read_input(input_filename);
 }
@@ -516,7 +520,7 @@ void EDM::EDMBias::output_hill(const edm_data_t* position, edm_data_t height, ed
    
 }
 
-int EDM::EDMBias::check_for_flush() {//this is fine??
+int EDM::EDMBias::check_for_flush() {
   
   if(mpi_neighbor_count_ > 0) {
     

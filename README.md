@@ -31,10 +31,14 @@ Install
 ===
 
 It only works with lammps right now and installing it is a little
-sloppy. I'm working on it. To install:
+roundabout, and only tested for Ubuntu. We're working on it. To install:
 
-1. Copy all files into lammps src directory (don't forget the files in the `lib` directory)
-2. Recompile lammps
+1. `mkdir buid && cd build`
+2. `cmake .. && make`
+3. Copy the compiled library in the `out` dir that has been created to somewhere a linker will easily find it, e.g. /usr/lib
+4. Copy all files from `lammps` directory into the lammps src directory
+5. Copy the version of `Makefile.ubuntu` from `lammps/lammps_makefiles` into the lammps `src/MAKE/MACHINES/`, replacing the one there. Also copy the `Makefile` from `lammps/lammps_makefiles` into the lammps `src` directory, replacing the one there. (This will compile with GPU support, but you can change the CMake flags if you want the CPU version.)
+6. From lammps `src` directory, run `make-ubuntu`
 
 Ignore all the CMake files floating aruond in the source, they're just
 for unit tests.
