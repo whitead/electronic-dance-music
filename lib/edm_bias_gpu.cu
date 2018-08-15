@@ -73,7 +73,8 @@ namespace EDM_Kernels{
 
 using namespace EDM_Kernels;
 
-EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename) {
+EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename),
+							       d_bias_added_(NULL) {
   gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * GPU_BIAS_BUFFER_SIZE));
   for(int i = 0; i < GPU_BIAS_BUFFER_DBLS; i++){
     send_buffer_[i] = 0;//CUDA wants this..?
@@ -88,43 +89,45 @@ EDM::EDMBiasGPU::~EDMBiasGPU() {
   /* 
    * target_, bias_dx_, and cv_hist_ are all delete'd by the superclass, EDMBias
    */
-  if(mpi_neighbors_ != NULL){
-    gpuErrchk(cudaFree(mpi_neighbors_));
-    mpi_neighbors_ = NULL;
-  }
-    
   if(bias_dx_ != NULL){
     gpuErrchk(cudaFree(bias_dx_));
+    gpuErrchk(cudaDeviceSynchronize());
     bias_dx_ = NULL;
   }
     
   if(bias_sigma_ != NULL){
     gpuErrchk(cudaFree(bias_sigma_));
+    gpuErrchk(cudaDeviceSynchronize());
     bias_sigma_ = NULL;
   }
     
   if(min_ != NULL){
     gpuErrchk(cudaFree(min_));
+    gpuErrchk(cudaDeviceSynchronize());
     min_ = NULL;
   }
     
   if(max_ != NULL){
     gpuErrchk(cudaFree(max_));
+    gpuErrchk(cudaDeviceSynchronize());
     max_ = NULL;
   }
     
   if(b_periodic_boundary_ != NULL){
     gpuErrchk(cudaFree(b_periodic_boundary_));
+    gpuErrchk(cudaDeviceSynchronize());
     b_periodic_boundary_ = NULL;
   }
   if(send_buffer_ != NULL){
     gpuErrchk(cudaFree(send_buffer_));
+    gpuErrchk(cudaDeviceSynchronize());
     send_buffer_ = NULL;
   }
 
   if(d_bias_added_ != NULL){
     gpuErrchk(cudaFree(d_bias_added_));
-    send_buffer_ = NULL;
+    gpuErrchk(cudaDeviceSynchronize());
+    d_bias_added_ = NULL;
   }
   gpuErrchk(cudaDeviceSynchronize());
 }
