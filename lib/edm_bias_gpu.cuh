@@ -51,6 +51,7 @@ namespace EDM{
     using EDMBias::pre_add_hill;
     using EDMBias::write_bias;
     using EDMBias::bias_;//need same pointer for the write calls to work?
+    using EDMBias::bias_dx_;
     void post_add_hill();
 
     int read_input(const std::string& input_filename);

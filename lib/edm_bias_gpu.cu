@@ -74,7 +74,7 @@ namespace EDM_Kernels{
 using namespace EDM_Kernels;
 
 EDM::EDMBiasGPU::EDMBiasGPU(const std::string& input_filename) : EDMBias(input_filename),
-							       d_bias_added_(NULL) {
+                                                                 d_bias_added_(NULL){
   gpuErrchk(cudaMallocManaged(&send_buffer_, sizeof(edm_data_t) * GPU_BIAS_BUFFER_SIZE));
   for(int i = 0; i < GPU_BIAS_BUFFER_DBLS; i++){
     send_buffer_[i] = 0;//CUDA wants this..?
@@ -270,6 +270,8 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     
 
   //parse arrays now
+  if(bias_dx_ != NULL)
+    free(bias_dx_);
   cudaMallocManaged(&bias_dx_, sizeof(edm_data_t) * dim_);
   cudaMallocManaged(&bias_sigma_ ,sizeof(edm_data_t) * dim_ );
   cudaMallocManaged(&min_ ,sizeof(edm_data_t) * dim_ );
@@ -403,7 +405,7 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
     //   bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
     // }
     //have to call each addreduce separately for this bookkeeping
-    addReduce<<<1,  nextHighestPowerOf2(minisize * hill_number),  nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t)>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  nextHighestPowerOf2(minisize * hill_number));
+  addReduce<<<1,  nextHighestPowerOf2(minisize * hill_number),  nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t)>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  nextHighestPowerOf2(minisize * hill_number));
     gpuErrchk(cudaDeviceSynchronize());
     bias_added += d_bias_added_[0];//[i*minisize];
     //TODO: Fix this so we can output hills again

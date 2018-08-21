@@ -50,12 +50,12 @@ namespace EDM{
   public:
 
     EDMBias(const std::string& input_filename);
-    ~EDMBias();
+    virtual ~EDMBias();
     /** Create a grid that only occupies enough space for this process' local box.
      * MUSt CALL SETUP FIRST
      *
      **/
-    void subdivide(const edm_data_t sublo[3], const edm_data_t subhi[3], 
+    virtual void subdivide(const edm_data_t sublo[3], const edm_data_t subhi[3], 
 		   const edm_data_t boxlo[3], const edm_data_t boxhi[3],
 		   const int b_periodic[3], const edm_data_t skin[3]);
 

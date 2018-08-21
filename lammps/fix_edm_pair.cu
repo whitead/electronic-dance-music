@@ -70,7 +70,7 @@ FixEDMPair::~FixEDMPair()
 {
   if(bias != NULL)
     delete bias;
-  if(bias != NULL)
+  if(random != NULL)
     delete random;
   
 }
