@@ -425,6 +425,7 @@ edm_data_t EDM::EDMBias::do_add_hills(const edm_data_t* buffer, const size_t hil
 }
 
 void EDM::EDMBias::queue_add_hill(const edm_data_t* position, edm_data_t this_h){
+
   size_t i;
   for(i = 0; i < dim_; i++)
     send_buffer_[buffer_i_ * (dim_+ 1) + i] = position[i];
@@ -465,7 +466,7 @@ void EDM::EDMBias::add_hill(const edm_data_t* position, edm_data_t runiform) {
 
       //finally clamp bias
       this_h = fmin(this_h, BIAS_CLAMP);
-
+      printf("Queueing hill add at position: %f with height %f\n", position[0], this_h);
       queue_add_hill(position, this_h);
     }
   }
@@ -537,7 +538,6 @@ int EDM::EDMBias::check_for_flush() {
 }
 
 edm_data_t EDM::EDMBias::flush_buffers(int synched) {
-
   edm_data_t bias_added = 0;
   
   //flush our own buffer first
@@ -830,6 +830,7 @@ void EDM::EDMBias::update_height(edm_data_t bias_added) {
 #else
   other_bias = bias_added;
 #endif
+  printf("Adding %f to cum_bias_\n", other_bias);
   cum_bias_ += other_bias;
 		
 }

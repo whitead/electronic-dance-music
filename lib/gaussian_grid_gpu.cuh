@@ -533,7 +533,7 @@ namespace EDM{
 
 	    //actually add hill now!
 	    xx_index1 = grid_.multi2one(xx_index);
-            #ifdef __CUDA_ARCH__
+            #ifdef __CUDACC__
 	    atomicAdd(&(grid_.grid_[xx_index1]), height * (expo + bc_correction));
             #else
 	    grid_.grid_[xx_index1] += height * (expo + bc_correction);

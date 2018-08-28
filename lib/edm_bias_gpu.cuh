@@ -9,10 +9,11 @@
 
 #define GPU_BIAS_BUFFER_SIZE 2048
 #define GPU_BIAS_BUFFER_DBLS (2048 * 8)
+#define GPU_BLOCKSIZE (size_t) 1024
 
 
 namespace EDM{
-  __host__ inline int nextHighestPowerOf2(int input){
+  __host__ inline size_t nextHighestPowerOf2(int input){
     int val = 1;
     while(val < input){
       val *= 2;
@@ -52,6 +53,7 @@ namespace EDM{
     using EDMBias::write_bias;
     using EDMBias::bias_;//need same pointer for the write calls to work?
     using EDMBias::bias_dx_;
+    using EDMBias::cum_bias_;
     void post_add_hill();
 
     int read_input(const std::string& input_filename);
@@ -67,7 +69,7 @@ namespace EDM{
   private:
     //histogram output
     std::string hist_output_;
-    void launch_add_value_integral_kernel(int dim, const edm_data_t* buffer, edm_data_t* target, Grid* grid, dim3 grid_dims);
+    void launch_add_value_integral_kernel(int dim, const edm_data_t* buffer, edm_data_t* target, Grid* grid, dim3 block_dims, size_t n_blocks);
 
   };
 

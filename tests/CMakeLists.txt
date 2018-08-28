@@ -1,10 +1,10 @@
 #Detect boost
 #FOR BLUEHIVE
-#set(BOOST_INCLUDEDIR /software/boost/1.66.0/b1/include/boost)
-#set(BOOST_ROOT /software/boost/1.66.0/b1/)
-#find_package (Boost 1.66 COMPONENTS system timer filesystem unit_test_framework REQUIRED)  
+set(BOOST_INCLUDEDIR /software/boost/1.66.0/b1/include/boost)
+set(BOOST_ROOT /software/boost/1.66.0/b1/)
+find_package (Boost 1.66 COMPONENTS system timer filesystem unit_test_framework REQUIRED)  
 #FOR MY MACHINE
-find_package (Boost 1.55 COMPONENTS system timer filesystem unit_test_framework REQUIRED)  
+#find_package (Boost 1.55 COMPONENTS system timer filesystem unit_test_framework REQUIRED)  
 include_directories (${Boost_INCLUDE_DIRS})
 message("The Boost include dirs are at ${Boost_INCLUDE_DIRS}")
 set (TEST_GRID_SRC grids)
