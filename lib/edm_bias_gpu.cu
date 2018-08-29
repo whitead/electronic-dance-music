@@ -13,8 +13,46 @@
 namespace EDM_Kernels{
   //the kernels exist for testing purposes.
   using namespace EDM;
+  
+  __inline__ __device__
+  edm_data_t warpReduceSum(edm_data_t val){
+    for (int offset = warpSize/2; offset > 0; offset /= 2)
+      val += __shfl_down(val, offset);
+    return val;
+  }
 
-  inline __device__ void warpAddReduce(volatile edm_data_t *sdata, unsigned int tid, unsigned int blockSize){
+  __inline__ __device__
+  edm_data_t blockReduceSum(edm_data_t val){
+    static __shared__ edm_data_t shared[32];
+    int lane = threadIdx.x % warpSize;
+    int wid = threadIdx.x / warpSize;
+
+    val = warpReduceSum(val);//each warp does partial reduction
+
+    if (lane == 0) shared[wid] = val;//write reduced value to shared mem
+
+    __syncthreads();//wait for the warps to be done
+
+    //read from shared mem only if there was a warp there
+    val = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+
+    if (wid == 0) val = warpReduceSum(val); //One last reduce
+
+    return(val);
+  }
+
+  __global__ void deviceReduceKernel(edm_data_t* in, edm_data_t* out, int N){
+    edm_data_t sum = 0;
+    //reduce multiple elements per thread
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x){
+      sum += in[i];
+    }
+    sum = blockReduceSum(sum);
+    if (threadIdx.x == 0)
+      out[blockIdx.x] = sum;
+  }
+
+  inline __device__ void warpAddReduce(volatile edm_data_t* sdata, unsigned int tid, unsigned int blockSize){
     //This and addReduce must ALWAYS be called with a power-of-two size, even if the data
     //is smaller than that
     if (blockSize >= 64) sdata[tid] += sdata[tid + 32];
@@ -28,13 +66,14 @@ namespace EDM_Kernels{
   inline __global__ void addReduce(edm_data_t *g_idata, edm_data_t *g_odata, unsigned int n, unsigned int blockSize){
     //This and warpAddReduce must ALWAYS be called with a power-of-two size, even if the data
     //is smaller than that
+    //this is specialized to only reduce per hill for notating bias added per hill
     extern __shared__ edm_data_t sdata[];//don't forget the size of sdata in the kernel call!
     unsigned int tid= threadIdx.x;
-    unsigned int i = blockIdx.x * (blockSize * 2) + tid;//something is going on here...
+    unsigned int i = blockIdx.x * 2 * blockSize + tid;//something is going on here...
     unsigned int gridSize = blockSize * 2 * gridDim.x;//or possibly here...
+    sdata[i] = 0;
     while (i < n){
-      sdata[i] = 0;
-      printf("Hello from this thread! tid = %u, n= %u, i = %u, blockSize = %u and gridSize = %u\n", tid, n, i, blockSize, gridSize);
+//      printf("Hello from this thread! tid = %u, n= %u, i = %u, blockSize = %u and gridSize = %u\n", tid, n, i, blockSize, gridSize);
       sdata[tid] += i+blockSize < n ? g_idata[i] + g_idata[i+blockSize] : g_idata[i];
       i += gridSize;
     }
@@ -47,7 +86,6 @@ namespace EDM_Kernels{
     __syncthreads();
     if(tid == 0) {g_odata[0] = sdata[0];}
     __syncthreads();
-    printf("sdata[%zu] is now %f.\n", tid, sdata[tid]);
   }
 
   /*
@@ -59,7 +97,7 @@ namespace EDM_Kernels{
 
   template <int DIM>
   __global__ void add_value_integral_kernel(const edm_data_t* buffer, edm_data_t* target, DimmedGaussGridGPU<DIM>* g){
-    target[threadIdx.x] = g->do_add_value(buffer);
+    target[threadIdx.x + threadIdx.y * blockDim.x + blockIdx.x * blockDim.x * blockDim.y] = g->do_add_value(buffer);
     return;
   }
 }
@@ -188,7 +226,9 @@ void EDM::EDMBiasGPU::subdivide(const edm_data_t sublo[3],
 //  cudaMemGetInfo(free, total);
 //  printf("Free device mem: %zd // Total device mem: %zd // Attempting to malloc: %zu\n", free, total, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t));
   gpuErrchk(cudaMallocManaged((void**)&d_bias_added_, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));//that's the biggest it will have to be
-  gpuErrchk(cudaMemset(d_bias_added_, 0, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));
+  gpuErrchk(cudaMemset(d_bias_added_, (edm_data_t)0, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));
+  gpuErrchk(cudaMallocManaged((void**)&bias_added_, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));//that's the biggest it will have to be
+  gpuErrchk(cudaMemset(bias_added_, (edm_data_t)0, minisize * GPU_BIAS_BUFFER_SIZE * sizeof(edm_data_t)));
 //  for(int i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){
 //    d_bias_added_[i] = 0;
 //  }
@@ -291,7 +331,6 @@ int EDM::EDMBiasGPU::read_input(const std::string& input_filename){
     string cleaned_filename = clean_string(tfilename, 0);
     target_ = read_grid_gpu(dim_, cleaned_filename, 0); //read grid, do not use interpolation
     expected_target_ = target_->expected_bias();//read_grid_gpu() returns a Grid*
-    std::cout << "(edm_bias_gpu) Expected Target is " << expected_target_ << std::endl;
   }
   if(parsed_input.find("initial_bias_filename") == parsed_input.end()) {
     initial_bias_ = NULL;
@@ -354,7 +393,6 @@ void EDM::EDMBiasGPU::post_add_hill() {
 
 
   update_height(temp_hill_cum_);
-  std::cout << "Cumulative bias is now " << cum_bias_ << std::endl;
 
   temp_hill_cum_ = -1;
   temp_hill_prefactor_ = -1;
@@ -397,7 +435,6 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
   dim3 block_dims(minisize, hills_per_block);
   size_t n_blocks = std::max(hill_number / hills_per_block, (size_t)1);
 
-  printf("About to launch kernel. Hill height: %f\n", buffer[1]);
   launch_add_value_integral_kernel(dim_, buffer, d_bias_added_, bias_, block_dims, n_blocks);//this launches kernel.
   gpuErrchk(cudaDeviceSynchronize());
 //  for(i = 0; i < hill_number; i++){
@@ -405,15 +442,21 @@ edm_data_t EDM::EDMBiasGPU::do_add_hills(const edm_data_t* buffer, const size_t 
     //   bias_added += d_bias_added_[i*minisize + j];//sum over each mini-grid
     // }
     //have to call each addreduce separately for this bookkeeping
-  printf("Calling addReduce now with %zu hills and space for %zu edm_data_t's.\n", hill_number,nextHighestPowerOf2(minisize * hill_number)  );
-  addReduce<<<std::max((nextHighestPowerOf2(minisize * hill_number)/GPU_BLOCKSIZE), (size_t)1), std::min(GPU_BLOCKSIZE,(nextHighestPowerOf2(minisize * hill_number) )),  (nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t))>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  GPU_BLOCKSIZE);
+//  addReduce<<<hill_number, minisize,  (nextHighestPowerOf2(minisize * hill_number) * sizeof(edm_data_t))>>>(d_bias_added_, d_bias_added_, minisize * hill_number,  GPU_BLOCKSIZE);
+  int nthreads = 512;
+  n_blocks = std::min((nextHighestPowerOf2(hill_number*minisize) + nthreads -1)/nthreads, (size_t)1024);
+  edm_data_t sum = 0.0;
+  for(i = 0; i < minisize * GPU_BIAS_BUFFER_SIZE; i++){
+    sum += d_bias_added_[i];
+  }
+  deviceReduceKernel<<<n_blocks, nthreads>>>(d_bias_added_, bias_added_, nextHighestPowerOf2(minisize*hill_number));
+  deviceReduceKernel<<<1, 1024>>>(bias_added_, bias_added_, n_blocks);
   gpuErrchk(cudaDeviceSynchronize());
-  bias_added += d_bias_added_[0];//[i*minisize];
-  //TODO: Fix this so we can output hills again
+  bias_added += bias_added_[0];//[i*minisize];
+  //TODO: Fix this so we can output hills again?
 //    output_hill(&buffer[i * (dim_ + 1)], buffer[i * (dim_ + 1) + dim_], bias_added, hill_type);
 //  }
   hills_added_ += hill_number;
-  printf("Bias added from this kernel call: %f\n", bias_added);
   return bias_added;
 }
 

@@ -1445,7 +1445,6 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_integral_regression_1 ) {
     tot_bias_added = bias_added[0];
   
   //unnormalized, so a little height scaling is necessary
-  std::cout << tot_bias_added /  (sqrt(2 * M_PI) * sigma[0]) << " " << h << std::endl;
   BOOST_REQUIRE(pow(tot_bias_added - h, 2) < 0.1);
 
 
@@ -1503,12 +1502,13 @@ BOOST_AUTO_TEST_CASE( edm_gpu_sanity) {
   edm_data_t der[0];
   positions[0][0] = 4.99; //to the left
   bias.bias_->get_value_deriv(positions[0], der);
-  printf("get_value_deriv(4.99) gave us %f\n", der[0]);
+  printf("get_value_deriv(4.99) gave us %f, which should be positive.\n", der[0]);
   //the negative of the bias (the force) should point to the left
   BOOST_REQUIRE(-der[0] < 0);
 
   positions[0][0] = 5.01; // to the right of the bias
   bias.bias_->get_value_deriv(positions[0], der);
+  printf("get_value_deriv(5.01) gave us %f, which should be negative.\n", der[0]);
   //the negative of the bias (the force) should point to the right
   BOOST_REQUIRE(-der[0] > 0);
 

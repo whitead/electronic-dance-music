@@ -62,6 +62,7 @@ namespace EDM{
     edm_data_t* send_buffer_;
     int minisize;//tracks the minisize of the bias
     edm_data_t* d_bias_added_;//track bias added on GPU.
+    edm_data_t* bias_added_;
 
     void output_hill(const edm_data_t* position, edm_data_t height, edm_data_t bias_added, char type);
 

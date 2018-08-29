@@ -466,7 +466,6 @@ void EDM::EDMBias::add_hill(const edm_data_t* position, edm_data_t runiform) {
 
       //finally clamp bias
       this_h = fmin(this_h, BIAS_CLAMP);
-      printf("Queueing hill add at position: %f with height %f\n", position[0], this_h);
       queue_add_hill(position, this_h);
     }
   }
@@ -830,7 +829,6 @@ void EDM::EDMBias::update_height(edm_data_t bias_added) {
 #else
   other_bias = bias_added;
 #endif
-  printf("Adding %f to cum_bias_\n", other_bias);
   cum_bias_ += other_bias;
 		
 }
@@ -914,7 +912,6 @@ int EDM::EDMBias::read_input(const std::string& input_filename){
     string cleaned_filename = clean_string(tfilename, 0);
     target_ = read_grid(dim_, cleaned_filename, 0); //read grid, do not use interpolation
     expected_target_ = target_->expected_bias();
-    std::cout << "Expected Target is " << expected_target_ << std::endl;
   }
 
   if(parsed_input.find("initial_bias_filename") == parsed_input.end()) {
