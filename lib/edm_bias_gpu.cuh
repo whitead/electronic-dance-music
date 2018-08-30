@@ -51,6 +51,7 @@ namespace EDM{
     void queue_add_hill(const edm_data_t* position, edm_data_t this_h);
     using EDMBias::pre_add_hill;
     using EDMBias::write_bias;
+    using EDMBias::update_forces;
     using EDMBias::bias_;//need same pointer for the write calls to work?
     using EDMBias::bias_dx_;
     using EDMBias::cum_bias_;

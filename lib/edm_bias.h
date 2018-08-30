@@ -63,7 +63,7 @@ namespace EDM{
     /** This must be called so that EDM can learn the temperature and kt
      *
      **/
-    void setup(edm_data_t temperature, edm_data_t boltzmann_constant);
+    virtual void setup(edm_data_t temperature, edm_data_t boltzmann_constant);
     
     virtual int read_input(const std::string& input_filename);
     /**
@@ -71,15 +71,15 @@ namespace EDM{
      * the forces of the arrays. apply_mask will be used to test against
      * the mask given in the set_mask method. Returns energy
      **/
-    edm_data_t update_forces(int nlocal, const edm_data_t* const* positions, edm_data_t** forces, int apply_mask) const;
+    virtual edm_data_t update_forces(int nlocal, const edm_data_t* const* positions, edm_data_t** forces, int apply_mask) const;
     /**
      * An array-based update_forces without a mask
      **/
-    edm_data_t update_forces(int nlocal, const edm_data_t* const* positions,  edm_data_t** forces) const;
+    virtual edm_data_t update_forces(int nlocal, const edm_data_t* const* positions,  edm_data_t** forces) const;
     /**
      * Update the force of a single position
      **/
-    edm_data_t update_force(const edm_data_t* positions,  edm_data_t* forces) const;
+    virtual edm_data_t update_force(const edm_data_t* positions,  edm_data_t* forces) const;
     /**
      * Set a mask that will be used for the add_hills/update_forces methods which can take a mask
      **/
@@ -104,31 +104,31 @@ namespace EDM{
      * each time wihtin a pre/add/post cycle.
      *
      **/
-    void pre_add_hill(int est_hill_count);
-    void add_hill(const edm_data_t* position, edm_data_t runiform);
+    virtual void pre_add_hill(int est_hill_count);
+    virtual void add_hill(const edm_data_t* position, edm_data_t runiform);
     virtual void post_add_hill();
 
     /**
      * Write the bias across all MPI processes. Will also output individual if EDM_MPI_DEBUG is deinfed
      **/
-    void write_bias(const std::string& output) const;
+    virtual void write_bias(const std::string& output) const;
 
     /**
      * Write out histogram of observed points, possibly across multiple processors.
      **/
-    void write_histogram() const;
+    virtual void write_histogram() const;
 
     /**
      * Clear CV histogram
      **/
-    void clear_histogram();
+    virtual void clear_histogram();
 
 
     /**
      * Write a lammps table across all MPI processes.  Only valid if
      * we're working with a 1D pairwise-distance potential.
      **/
-    void write_lammps_table(const std::string& output) const;
+    virtual void write_lammps_table(const std::string& output) const;
 
 
     int b_tempering_;// boolean, do tempering
