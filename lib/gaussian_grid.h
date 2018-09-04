@@ -6,7 +6,7 @@
 #include <string>
 #include <iostream>
 #include <cmath>
-
+#include <iomanip>
 #ifndef GAUSS_SUPPORT
 #define GAUSS_SUPPORT 8.0 // sigma^2 considered for gaussian
 #endif
@@ -19,7 +19,9 @@
 #ifndef BC_CORRECTION
 #define BC_CORRECTION
 #endif
-
+#ifndef MAX_GRID_SUPPORT
+#define MAX_GRID_SUPPORT (size_t) 1024
+#endif
 
 HOST_DEV inline
 edm_data_t sigmoid(edm_data_t x) {
@@ -592,6 +594,10 @@ namespace EDM{
 	dist = sqrt(2 * GAUSS_SUPPORT) * sigma_[i]; //a distance that goes for gaussian center outwards
 	minisize_[i] =  int_floor(dist / grid_.dx_[i]);
 	minisize_total_ *= (2 * minisize_[i] + 1);
+      }
+      if(minisize_total_ >= MAX_GRID_SUPPORT){
+	std::cerr << "Maximum gaussian support size exceeded. Must be at most " << MAX_GRID_SUPPORT << std::endl;
+	edm_error("", "grid.h:read");
       }
     }//update_minigrid
     

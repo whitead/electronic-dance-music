@@ -1300,8 +1300,8 @@ BOOST_AUTO_TEST_CASE( gpu_gauss_grid_interp_test_mcgdp_3D ) {
   edm_data_t max[] = {10, 10, 10};
   edm_data_t* d_max;
   gpuErrchk(cudaMalloc((void**)&d_max, 3*sizeof(edm_data_t)));
-  edm_data_t sigma[] = {3.0, 3.0, 3.0};
-  edm_data_t bin_spacing[] = {0.9, 1.1, 1.4};
+  edm_data_t sigma[] = {1.0, 1.0, 1.0};
+  edm_data_t bin_spacing[] = {1.9, 2.1, 2.4};
   int periodic[] = {1, 1, 1};
   int* d_periodic;
   gpuErrchk(cudaMalloc((void**)&d_periodic, 3*sizeof(int)));
