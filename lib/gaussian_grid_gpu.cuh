@@ -98,6 +98,7 @@ namespace EDM{
     }//do_remap
 
     edm_data_t get_value(const edm_data_t* x) const {
+      //expect x to be DIM-dimensional
       gpuErrchk(cudaDeviceSynchronize());      
       size_t i;
 

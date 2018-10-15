@@ -76,6 +76,12 @@ FixEDM::~FixEDM()
     delete bias;
   if(bias != NULL)
     delete random;
+  if(edm_x != NULL)
+    delete edm_x;
+  if(edm_f != NULL)
+    delete edm_f;
+  if(edm_random != NULL)
+    delete edm_random;
   
   memory->destroy(random_numbers);
 }
@@ -103,14 +109,36 @@ void FixEDM::init()
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
 
   bias->setup(temperature, force->boltz);
+  //have to explicitly cast all these arrays to edm_data_t
+  // can't automatically cast, apparently
   edm_data_t skin[3];
+  edm_data_t sub_low[3];
+  edm_data_t sub_high[3];
+  edm_data_t box_low[3];
+  edm_data_t box_high[3];
+  for(int i = 0; i < 3; i++){
+    sub_low[i] = (edm_data_t)domain->sublo[i];
+    sub_high[i] = (edm_data_t)domain->subhi[i];
+    box_low[i] = (edm_data_t)domain->boxlo[i];
+    box_high[i] = (edm_data_t)domain->boxhi[i];
+  }
   skin[0] = skin[1] = skin[2] = neighbor->skin;
-  bias->subdivide((edm_data_t*)domain->sublo, (edm_data_t*)domain->subhi, (edm_data_t*)domain->boxlo, (edm_data_t*)domain->boxhi, domain->periodicity, skin);
+  bias->subdivide(sub_low, sub_high, box_low, box_high, domain->periodicity, skin);
   bias->set_mask(atom->mask);
 
   //set energy just in case
   edm_energy = 0;
-
+  num_atoms = atom->natoms;
+  //have to malloc these arrays separately for the case of EDM using floats on GPU
+  edm_x = (edm_data_t**) malloc(num_atoms*sizeof(edm_data_t*));
+  for(int i = 0; i < num_atoms; i++){
+    edm_x[i] = (edm_data_t*) malloc(3 * sizeof(edm_data_t));
+  }
+  edm_f = (edm_data_t**) malloc(num_atoms*sizeof(edm_data_t*));
+  for(int i = 0; i < num_atoms; i++){
+    edm_f[i] = (edm_data_t*) malloc(3 * sizeof(edm_data_t));
+  }
+  edm_random = (edm_data_t*) malloc(num_atoms * sizeof(edm_data_t));
 
 }
 
@@ -140,9 +168,16 @@ void FixEDM::post_force(int vflag)
 {
 
   //  domain->pbc(); //make sure particles are with thier processors
-
+  //update the edm_data_t arrs
+  int i, j;
+  for(i = 0; i < atom->nlocal; i++) {
+    for(j = 0; j< 3; j++){
+      edm_x[i][j] = (edm_data_t) atom->x[i][j];
+      edm_f[i][j] = (edm_data_t) atom->f[i][j];
+    }
+  }
   //update force/energy
-  edm_energy = (double)(bias->update_forces(atom->nlocal, (edm_data_t* const*)atom->x, (edm_data_t**)atom->f, groupbit));
+  edm_energy = (double)(bias->update_forces(atom->nlocal, edm_x, edm_f, groupbit));
   //treat add hills
   if(update->ntimestep % stride == 0) {
 
@@ -150,12 +185,11 @@ void FixEDM::post_force(int vflag)
     if(random_numbers == NULL) {
       memory->create(random_numbers, atom->nmax, "fix/edm:random_numbers");
     }
-    int i;
     for(i = 0; i < atom->nlocal; i++) {
       random_numbers[i] = random->uniform();
+      edm_random[i] = (edm_data_t) random_numbers[i];
     }
-
-    bias->add_hills(atom->nlocal, (edm_data_t**)atom->x, (edm_data_t*)random_numbers, groupbit);
+    bias->add_hills(atom->nlocal, edm_x, edm_random, groupbit);
   }
 
   if(update->ntimestep % write_stride == 0) {

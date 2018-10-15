@@ -37,6 +37,10 @@ class FixEDM : public Fix {
    class RanMars *random;
    unsigned int seed;
    int nlevels_respa;
+   int64_t num_atoms;
+   edm_data_t** edm_x;
+   edm_data_t** edm_f;
+   edm_data_t* edm_random;
 };
 
 };
